@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "typecheck": "tsc -b --noEmit",
+    "seed": "node scripts/seedUsers.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

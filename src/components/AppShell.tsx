@@ -1,6 +1,8 @@
-import { NavLink, Outlet } from 'react-router-dom'
-import { ClipboardList, LayoutDashboard } from 'lucide-react'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { ClipboardList, LayoutDashboard, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/auth/AuthProvider'
+import { siteName } from '@/lib/schema'
 
 const navItems = [
   { to: '/report', label: 'Daily Report', icon: ClipboardList },
@@ -8,6 +10,22 @@ const navItems = [
 ]
 
 export function AppShell() {
+  const { user, profile, signOut } = useAuth()
+  const navigate = useNavigate()
+
+  const name = profile?.displayName || user?.email || 'Signed in'
+  const roleLine =
+    profile?.role === 'director' && profile.siteId
+      ? `Director · ${siteName(profile.siteId)}`
+      : profile?.role
+        ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1)
+        : ''
+
+  async function handleSignOut() {
+    await signOut()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <div className="min-h-svh bg-[var(--color-cream)]">
       <header className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-[var(--color-cream)]/85 backdrop-blur">
@@ -28,25 +46,44 @@ export function AppShell() {
             </div>
           </div>
 
-          <nav className="flex items-center gap-1">
-            {navItems.map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
-                    isActive
-                      ? 'bg-[var(--color-coral)] text-white'
-                      : 'text-[var(--color-charcoal)] hover:bg-[var(--color-secondary)]'
-                  )
-                }
+          <div className="flex items-center gap-2 sm:gap-4">
+            <nav className="flex items-center gap-1">
+              {navItems.map(({ to, label, icon: Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
+                      isActive
+                        ? 'bg-[var(--color-coral)] text-white'
+                        : 'text-[var(--color-charcoal)] hover:bg-[var(--color-secondary)]'
+                    )
+                  }
+                >
+                  <Icon className="size-4" />
+                  <span className="hidden sm:inline">{label}</span>
+                </NavLink>
+              ))}
+            </nav>
+
+            <div className="flex items-center gap-2 border-l border-[var(--color-border)] pl-2 sm:pl-4">
+              <div className="hidden text-right leading-tight sm:block">
+                <p className="text-sm font-semibold text-[var(--color-charcoal)]">{name}</p>
+                {roleLine && (
+                  <p className="text-[11px] text-[var(--color-dk-gray)]">{roleLine}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                title="Sign out"
+                className="grid size-9 place-items-center rounded-lg text-[var(--color-dk-gray)] transition-colors hover:bg-[var(--color-secondary)] hover:text-[var(--color-charcoal)]"
               >
-                <Icon className="size-4" />
-                <span className="hidden sm:inline">{label}</span>
-              </NavLink>
-            ))}
-          </nav>
+                <LogOut className="size-4" />
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
