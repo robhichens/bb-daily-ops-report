@@ -109,18 +109,32 @@ const qualityOf = (r: DailyOpsReport): number => r.qualityScore ?? computeQualit
 // Points & timeliness
 // ---------------------------------------------------------------------------
 
-/** Submitted on the same local calendar day as the report date. */
+/** Bonus points for filing before 6 PM. */
+export const EARLY_BIRD_HOUR = 18
+export const EARLY_BIRD_BONUS = 3
+
+/** Submitted on the same local calendar day as the report date (by 11:59 PM). */
 export function isOnTime(r: DailyOpsReport): boolean {
   if (r.status !== 'submitted' || !r.submittedAt) return false
-  // On time = submitted on or before the end of the report's own day.
   return toIso(new Date(r.submittedAt)) <= r.date
 }
 
-/** Points for one report: base (on-time 10 / late 5) + round(quality/10). 0 if unsubmitted. */
+/** On time AND filed before 6 PM on the report's own day — earns the early-bird bonus. */
+export function isEarlyBird(r: DailyOpsReport): boolean {
+  if (!isOnTime(r) || !r.submittedAt) return false
+  const sub = new Date(r.submittedAt)
+  return toIso(sub) === r.date && sub.getHours() < EARLY_BIRD_HOUR
+}
+
+/**
+ * Points for one report: base (on-time 10 / late 5) + round(quality/10)
+ * + early-bird bonus (filed before 6 PM). 0 if unsubmitted.
+ */
 export function pointsForReport(r: DailyOpsReport): number {
   if (r.status !== 'submitted') return 0
   const base = isOnTime(r) ? 10 : 5
-  return base + Math.round(qualityOf(r) / 10)
+  const early = isEarlyBird(r) ? EARLY_BIRD_BONUS : 0
+  return base + Math.round(qualityOf(r) / 10) + early
 }
 
 // ---------------------------------------------------------------------------

@@ -11,7 +11,18 @@ import {
   type DailyOpsReport,
   type SiteId,
 } from './schema'
-import { badgesForSite, weekStatsForSite } from './gamification'
+import {
+  badgesForSite,
+  leaderboard,
+  teamGoalProgress,
+  weekStatsForSite,
+  type Badge,
+  type LeaderboardRow,
+  type TeamGoal,
+} from './gamification'
+import { addIsoDays } from './dates'
+
+const SITE_IDS: SiteId[] = SITES.map((s) => s.id)
 
 const sum = (ns: number[]) => ns.reduce((a, b) => a + b, 0)
 const distinctDays = (rows: DailyOpsReport[]) => new Set(rows.map((r) => r.date)).size
@@ -224,6 +235,65 @@ export function celebrations(weekRows: DailyOpsReport[], weekOf: string, asOf: s
 // ---------------------------------------------------------------------------
 // "Most improved" — biggest consistency gain vs the prior week
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// One assembled view — shared by the admin dashboard and the director view.
+// ---------------------------------------------------------------------------
+
+export interface DashboardView {
+  asOf: string
+  kpis: Kpis
+  board: LeaderboardRow[]
+  badgesBySite: Record<string, Badge[]>
+  teamGoal: TeamGoal
+  attendance: SiteBar[]
+  funnel: FunnelStage[]
+  staff: StaffWatchRow[]
+  packet: PacketCompliance
+  flags: Flag[]
+  wins: Flag[]
+  improved: { site: string; delta: number } | null
+  tableRows: DailyOpsReport[]
+}
+
+/**
+ * Build every dashboard metric for a week. `site` filters the operational
+ * panels + table; the leaderboard / flags / celebrations always span all sites.
+ */
+export function buildDashboardView(
+  rows: DailyOpsReport[],
+  lastWeekRows: DailyOpsReport[],
+  weekOf: string,
+  site: SiteId | 'all',
+  today: string
+): DashboardView {
+  const weekFri = addIsoDays(weekOf, 4)
+  const asOf = today < weekFri ? today : weekFri
+  const lastWeekOf = addIsoDays(weekOf, -7)
+  const lastAsOf = addIsoDays(lastWeekOf, 4)
+
+  const allSites = rows.filter((r) => r.status === 'submitted')
+  const filtered = site === 'all' ? allSites : allSites.filter((r) => r.siteId === site)
+
+  const badgesBySite: Record<string, Badge[]> = {}
+  for (const id of SITE_IDS) badgesBySite[id] = badgesForSite(allSites, id, weekOf, asOf)
+
+  return {
+    asOf,
+    kpis: computeKpis(filtered),
+    board: leaderboard(allSites, SITE_IDS, weekOf, asOf),
+    badgesBySite,
+    teamGoal: teamGoalProgress(allSites, SITE_IDS, weekOf, asOf),
+    attendance: attendanceBySite(allSites),
+    funnel: enrollmentFunnel(filtered),
+    staff: staffWatch(filtered),
+    packet: packetCompliance(filtered),
+    flags: redFlags(allSites, weekOf, asOf, today),
+    wins: celebrations(allSites, weekOf, asOf),
+    improved: mostImproved(allSites, lastWeekRows, weekOf, lastWeekOf, asOf, lastAsOf),
+    tableRows: filtered,
+  }
+}
 
 export function mostImproved(
   thisWeekRows: DailyOpsReport[],

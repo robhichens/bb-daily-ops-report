@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { LayoutDashboard, Download, FileJson } from 'lucide-react'
+import { LayoutDashboard, Download, FileJson, Sparkles } from 'lucide-react'
+import { useAuth } from '@/auth/AuthProvider'
+import { isAdmin as isAdminRole } from '@/lib/users'
 import { SITES, type SiteId, type DailyOpsReport } from '@/lib/schema'
 import { weekOf as weekOfFn } from '@/lib/derive'
 import { todayIso, addIsoDays, formatShort } from '@/lib/dates'
@@ -9,158 +11,130 @@ import {
   getReportsByWeek,
   distinctWeeks,
 } from '@/lib/reports'
-import { leaderboard, teamGoalProgress, badgesForSite, type Badge } from '@/lib/gamification'
+import { buildDashboardView } from '@/lib/dashboard'
 import {
-  computeKpis,
-  attendanceBySite,
-  enrollmentFunnel,
-  staffWatch,
-  packetCompliance,
-  redFlags,
-  celebrations,
-  mostImproved,
-} from '@/lib/dashboard'
+  subscribeDirectorView,
+  DEFAULT_DIRECTOR_VIEW,
+  SECTION_META,
+  type DirectorViewConfig as Config,
+  type DashboardSection,
+} from '@/lib/settings'
 import { exportCsv, exportJson } from '@/lib/exportReports'
 import { inputClass } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { KpiCards } from '@/components/dashboard/KpiCards'
-import { Leaderboard } from '@/components/dashboard/Leaderboard'
-import { TeamGoalBar } from '@/components/dashboard/TeamGoalBar'
-import { AttendanceBySite, EnrollmentFunnel, StaffWatch, PacketPanel } from '@/components/dashboard/Panels'
-import { RedFlags, Celebrations } from '@/components/dashboard/FlagsAndCelebrations'
+import { Card } from '@/components/ui/card'
+import { DashboardSections } from '@/components/dashboard/DashboardSections'
+import { DirectorViewConfig } from '@/components/dashboard/DirectorViewConfig'
 import { ReportsTable } from '@/components/dashboard/ReportsTable'
 
-const SITE_IDS = SITES.map((s) => s.id)
+const ALL_ON = Object.fromEntries(SECTION_META.map((s) => [s.key, true])) as Record<DashboardSection, boolean>
 
-export function Dashboard() {
-  const today = todayIso()
-  const currentWeek = weekOfFn(today)
-
-  const [weeks, setWeeks] = useState<string[]>([currentWeek])
-  const [weekOf, setWeekOf] = useState<string>(currentWeek)
-  const [site, setSite] = useState<SiteId | 'all'>('all')
+/** Subscribe to a week's reports (+ prior week for "most improved"). */
+function useWeekData(weekOf: string) {
   const [rows, setRows] = useState<DailyOpsReport[]>([])
   const [lastWeekRows, setLastWeekRows] = useState<DailyOpsReport[]>([])
-
-  // Available weeks for the picker.
-  useEffect(() => {
-    return subscribeRecentReports(200, (recent) => {
-      const found = distinctWeeks(recent)
-      const merged = Array.from(new Set([currentWeek, ...found])).sort().reverse()
-      setWeeks(merged)
-    })
-  }, [currentWeek])
-
-  // Live reports for the selected week (all sites; we filter client-side).
-  useEffect(() => {
-    return subscribeReportsByWeek(weekOf, null, setRows)
-  }, [weekOf])
-
-  // Prior week (one-shot) for "most improved".
+  useEffect(() => subscribeReportsByWeek(weekOf, null, setRows), [weekOf])
   useEffect(() => {
     let on = true
-    getReportsByWeek(addIsoDays(weekOf, -7))
-      .then((r) => on && setLastWeekRows(r))
-      .catch(() => on && setLastWeekRows([]))
-    return () => {
-      on = false
-    }
+    getReportsByWeek(addIsoDays(weekOf, -7)).then((r) => on && setLastWeekRows(r)).catch(() => on && setLastWeekRows([]))
+    return () => { on = false }
   }, [weekOf])
+  return { rows, lastWeekRows }
+}
 
-  const view = useMemo(() => {
-    const weekFri = addIsoDays(weekOf, 4)
-    const asOf = today < weekFri ? today : weekFri
-    const lastWeekOf = addIsoDays(weekOf, -7)
-    const lastAsOf = addIsoDays(lastWeekOf, 4)
+export function Dashboard() {
+  const { profile } = useAuth()
+  return isAdminRole(profile?.role) ? <AdminDashboard /> : <DirectorDashboard />
+}
 
-    const submitted = rows.filter((r) => r.status === 'submitted')
-    const allSites = submitted // leaderboard / flags / celebrations span all sites
-    const filtered = site === 'all' ? submitted : submitted.filter((r) => r.siteId === site)
+// --- Admin: full dashboard + filters + director-view config -----------------
+function AdminDashboard() {
+  const today = todayIso()
+  const currentWeek = weekOfFn(today)
+  const [weeks, setWeeks] = useState<string[]>([currentWeek])
+  const [weekOf, setWeekOf] = useState(currentWeek)
+  const [site, setSite] = useState<SiteId | 'all'>('all')
+  const [config, setConfig] = useState<Config>(DEFAULT_DIRECTOR_VIEW)
+  const { rows, lastWeekRows } = useWeekData(weekOf)
 
-    const board = leaderboard(allSites, SITE_IDS, weekOf, asOf)
-    const badgesBySite: Record<string, Badge[]> = {}
-    for (const id of SITE_IDS) badgesBySite[id] = badgesForSite(allSites, id, weekOf, asOf)
+  useEffect(
+    () =>
+      subscribeRecentReports(200, (recent) =>
+        setWeeks(Array.from(new Set([currentWeek, ...distinctWeeks(recent)])).sort().reverse())
+      ),
+    [currentWeek]
+  )
+  useEffect(() => subscribeDirectorView(setConfig), [])
 
-    return {
-      asOf,
-      kpis: computeKpis(filtered),
-      board,
-      badgesBySite,
-      teamGoal: teamGoalProgress(allSites, SITE_IDS, weekOf, asOf),
-      attendance: attendanceBySite(allSites),
-      funnel: enrollmentFunnel(filtered),
-      staff: staffWatch(filtered),
-      packet: packetCompliance(filtered),
-      flags: redFlags(allSites, weekOf, asOf, today),
-      wins: celebrations(allSites, weekOf, asOf),
-      improved: mostImproved(allSites, lastWeekRows, weekOf, lastWeekOf, asOf, lastAsOf),
-      tableRows: filtered,
-    }
-  }, [rows, lastWeekRows, weekOf, site, today])
-
+  const view = useMemo(
+    () => buildDashboardView(rows, lastWeekRows, weekOf, site, today),
+    [rows, lastWeekRows, weekOf, site, today]
+  )
   const exportLabel = `${weekOf}${site === 'all' ? '' : '-' + site}`
 
   return (
     <div className="space-y-6">
-      {/* Header + filters */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-xl bg-[var(--color-charcoal)] text-white">
-            <LayoutDashboard className="size-5" />
-          </span>
-          <div>
-            <h1 className="text-2xl font-extrabold text-[var(--color-charcoal)]">Dashboard</h1>
-            <p className="text-sm text-[var(--color-dk-gray)]">Live insights, red flags & celebrations</p>
-          </div>
-        </div>
-
+        <PageHeading icon={<LayoutDashboard className="size-5" />} title="Dashboard" subtitle="Live insights, red flags & celebrations" />
         <div className="flex flex-wrap items-center gap-2">
           <select value={weekOf} onChange={(e) => setWeekOf(e.target.value)} className={`${inputClass} h-9 w-auto`}>
-            {weeks.map((w) => (
-              <option key={w} value={w}>
-                Week of {formatShort(w)}
-              </option>
-            ))}
+            {weeks.map((w) => <option key={w} value={w}>Week of {formatShort(w)}</option>)}
           </select>
           <select value={site} onChange={(e) => setSite(e.target.value as SiteId | 'all')} className={`${inputClass} h-9 w-auto`}>
             <option value="all">All sites</option>
-            {SITES.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
+            {SITES.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <Button size="sm" variant="outline" onClick={() => exportCsv(view.tableRows, exportLabel)} title="Export CSV">
-            <Download className="size-3.5" /> CSV
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => exportJson(view.tableRows, exportLabel)} title="Export JSON">
-            <FileJson className="size-3.5" /> JSON
-          </Button>
+          <Button size="sm" variant="outline" onClick={() => exportCsv(view.tableRows, exportLabel)}><Download className="size-3.5" /> CSV</Button>
+          <Button size="sm" variant="ghost" onClick={() => exportJson(view.tableRows, exportLabel)}><FileJson className="size-3.5" /> JSON</Button>
         </div>
       </div>
 
-      <KpiCards kpis={view.kpis} />
-
-      {/* Gamification row */}
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <Leaderboard rows={view.board} badgesBySite={view.badgesBySite} mostImproved={view.improved} />
-        <div className="flex flex-col gap-4">
-          <TeamGoalBar goal={view.teamGoal} />
-          <Celebrations items={view.wins} />
-        </div>
-      </div>
-
-      {/* Operational row */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <AttendanceBySite bars={view.attendance} />
-        <EnrollmentFunnel stages={view.funnel} />
-        <StaffWatch rows={view.staff} />
-        <PacketPanel data={view.packet} />
-      </div>
-
-      <RedFlags flags={view.flags} />
-
+      <DashboardSections view={view} sections={ALL_ON} />
       <ReportsTable rows={view.tableRows} />
+      <DirectorViewConfig config={config} />
+    </div>
+  )
+}
+
+// --- Director: curated view of just the cards the admin published -----------
+function DirectorDashboard() {
+  const today = todayIso()
+  const weekOf = weekOfFn(today)
+  const [config, setConfig] = useState<Config>(DEFAULT_DIRECTOR_VIEW)
+  const { rows, lastWeekRows } = useWeekData(weekOf)
+
+  useEffect(() => subscribeDirectorView(setConfig), [])
+
+  const view = useMemo(
+    () => buildDashboardView(rows, lastWeekRows, weekOf, 'all', today),
+    [rows, lastWeekRows, weekOf, today]
+  )
+  const anyOn = Object.values(config.sections).some(Boolean)
+
+  return (
+    <div className="space-y-6">
+      <PageHeading icon={<Sparkles className="size-5" />} title="Team Dashboard" subtitle={`Week of ${formatShort(weekOf)}`} />
+      {anyOn ? (
+        <DashboardSections view={view} sections={config.sections} />
+      ) : (
+        <Card accent="sky" className="p-8 text-center">
+          <p className="text-sm text-[var(--color-dk-gray)]">
+            Your team dashboard isn’t set up yet. Check back soon!
+          </p>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+function PageHeading({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="grid size-10 place-items-center rounded-xl bg-[var(--color-charcoal)] text-white">{icon}</span>
+      <div>
+        <h1 className="text-2xl font-extrabold text-[var(--color-charcoal)]">{title}</h1>
+        <p className="text-sm text-[var(--color-dk-gray)]">{subtitle}</p>
+      </div>
     </div>
   )
 }

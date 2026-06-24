@@ -36,5 +36,11 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && role() == 'admin';
     }
+
+    // Admin-curated "Director view" config (which dashboard cards directors see).
+    match /config/{doc} {
+      allow read: if isSignedIn() && role() in ['admin', 'director'];
+      allow write: if isSignedIn() && role() == 'admin';
+    }
   }
 }

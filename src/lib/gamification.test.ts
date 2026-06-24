@@ -4,6 +4,7 @@ import { withDerived } from './derive'
 import {
   computeQualityScore,
   isOnTime,
+  isEarlyBird,
   pointsForReport,
   computeStreak,
   weekStatsForSite,
@@ -89,12 +90,22 @@ describe('timeliness & points', () => {
     expect(isOnTime(submitted(MON, { late: true }))).toBe(false)
     expect(isOnTime(emptyReport('crozet', MON))).toBe(false) // draft
   })
-  it('points = base(on-time 10/late 5) + round(quality/10)', () => {
-    expect(pointsForReport(fullReport(MON))).toBe(20) // 10 + 10
+  it('points = base(on-time 10/late 5) + round(quality/10) + early-bird (+3)', () => {
+    expect(pointsForReport(fullReport(MON))).toBe(23) // 10 on-time + 10 quality + 3 early (noon)
+    const onTimeLate = fullReport(MON)
+    onTimeLate.submittedAt = `${MON}T20:00:00` // same day but after 6 PM → no bonus
+    expect(pointsForReport(onTimeLate)).toBe(20) // 10 + 10 + 0
     const lateFull = fullReport(MON)
-    lateFull.submittedAt = `${nextDay(MON)}T09:00:00`
-    expect(pointsForReport(lateFull)).toBe(15) // 5 + 10
+    lateFull.submittedAt = `${nextDay(MON)}T09:00:00` // next day → late
+    expect(pointsForReport(lateFull)).toBe(15) // 5 + 10 + 0
     expect(pointsForReport(emptyReport('crozet', MON))).toBe(0) // unsubmitted
+  })
+  it('early-bird only before 6 PM on the report day', () => {
+    expect(isEarlyBird(submitted(MON))).toBe(true) // noon
+    const evening = submitted(MON)
+    evening.submittedAt = `${MON}T18:30:00`
+    expect(isEarlyBird(evening)).toBe(false)
+    expect(isEarlyBird(submitted(MON, { late: true }))).toBe(false)
   })
 })
 
