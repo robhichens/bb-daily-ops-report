@@ -1,0 +1,40 @@
+rules_version = '2';
+
+// Role-based rules for bb-daily-ops-report.
+// Requires a users/{uid} doc: { role: 'admin'|'director'|..., siteId?: 'crozet'|... }
+// Deploy this BEFORE the open dev rules expire (2026-07-23). Until auth + users
+// docs exist, the project is open read/write to anyone — do not load real data yet.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function role() {
+      return userDoc().role;
+    }
+    function userSite() {
+      return userDoc().siteId;
+    }
+
+    match /dailyOpsReports/{id} {
+      allow read: if isSignedIn() && role() in ['admin', 'director'];
+
+      allow create, update: if isSignedIn() && (
+        role() == 'admin' ||
+        (role() == 'director' && request.resource.data.siteId == userSite())
+      );
+
+      allow delete: if isSignedIn() && role() == 'admin';
+    }
+
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && role() == 'admin';
+    }
+  }
+}

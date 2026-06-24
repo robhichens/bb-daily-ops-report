@@ -1,0 +1,137 @@
+@import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+   bbonboard INTERNAL brand tokens (see bb-dor.md §8).
+   Exposed as Tailwind utilities: bg-cream, text-navy, border-line, etc.
+--------------------------------------------------------------------------- */
+@theme {
+  --color-navy: #1b2a4a;
+  --color-orange: #e07b39;
+  --color-teal: #2ba8a0;
+  --color-purple: #6b4e9e;
+  --color-cream: #fbf7ef;
+  --color-card: #ffffff;
+  --color-ink: #22272e;
+  --color-muted-ink: #6c7480;
+  --color-line: #e7e2d7;
+
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+  --radius-card: 22px;
+}
+
+/* ---------------------------------------------------------------------------
+   shadcn/ui semantic tokens, wired to the brand (primary = navy, accent = teal,
+   destructive = red). globals stay light — this app is cream-on-white.
+--------------------------------------------------------------------------- */
+:root {
+  --radius: 0.75rem;
+
+  --background: #fbf7ef;
+  --foreground: #22272e;
+  --card-bg: #ffffff;
+  --card-foreground: #22272e;
+  --popover: #ffffff;
+  --popover-foreground: #22272e;
+  --primary: #1b2a4a;
+  --primary-foreground: #fbf7ef;
+  --secondary: #f1ece1;
+  --secondary-foreground: #1b2a4a;
+  --muted: #f1ece1;
+  --muted-foreground: #6c7480;
+  --accent: #2ba8a0;
+  --accent-foreground: #ffffff;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --success: #2ba8a0;
+  --warning: #e07b39;
+  --border: #e7e2d7;
+  --input: #e7e2d7;
+  --ring: #2ba8a0;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card-bg: var(--card-bg);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100svh;
+    background-color: var(--color-cream);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    color: var(--color-navy);
+    text-wrap: balance;
+  }
+}
+
+/* Card with the brand's 5px left-border accent + 22px radius + soft shadow.
+   Use: <div class="bb-card" data-accent="teal"> ... </div> */
+@layer components {
+  .bb-card {
+    background-color: var(--color-card);
+    border-radius: var(--radius-card);
+    border: 1px solid var(--color-line);
+    border-left-width: 5px;
+    border-left-color: var(--color-line);
+    box-shadow:
+      0 1px 2px rgba(27, 42, 74, 0.04),
+      0 8px 24px -12px rgba(27, 42, 74, 0.12);
+  }
+  .bb-card[data-accent='teal'] {
+    border-left-color: var(--color-teal);
+  }
+  .bb-card[data-accent='orange'] {
+    border-left-color: var(--color-orange);
+  }
+  .bb-card[data-accent='purple'] {
+    border-left-color: var(--color-purple);
+  }
+  .bb-card[data-accent='navy'] {
+    border-left-color: var(--color-navy);
+  }
+}
