@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom'
-import { Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -8,17 +7,19 @@ export function Login() {
   const navigate = useNavigate()
   return (
     <div className="grid min-h-svh place-items-center bg-[var(--color-cream)] px-4">
-      <Card accent="orange" className="w-full max-w-sm">
-        <CardContent className="flex flex-col items-center gap-5 p-8 text-center">
-          <span className="grid size-12 place-items-center rounded-2xl bg-[var(--color-navy)] text-[var(--color-cream)]">
-            <Sparkles className="size-6" />
-          </span>
+      <Card accent="coral" className="w-full max-w-md">
+        <CardContent className="flex flex-col items-center gap-6 p-8 text-center">
+          <img
+            src="/brand/bb-logo-full.png"
+            alt="Bright Beginnings Preschool"
+            className="w-full max-w-[280px]"
+          />
           <div>
-            <h1 className="font-display text-2xl font-bold text-[var(--color-navy)]">
+            <h1 className="font-brand text-xl font-medium text-[var(--color-charcoal)]">
               Daily Ops Report
             </h1>
-            <p className="mt-1 text-sm text-[var(--color-muted-ink)]">
-              Bright Beginnings · sign-in coming in Phase 2
+            <p className="mt-1 text-sm text-[var(--color-dk-gray)]">
+              Sign-in coming in Phase 2
             </p>
           </div>
           <Button className="w-full" onClick={() => navigate('/report')}>

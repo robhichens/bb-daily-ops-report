@@ -8,13 +8,14 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-[var(--color-orange)] text-white shadow-sm hover:brightness-105 active:brightness-95',
-        navy: 'bg-[var(--color-navy)] text-[var(--color-cream)] shadow-sm hover:brightness-110',
+          'bg-[var(--color-coral)] text-white shadow-sm hover:brightness-105 active:brightness-95',
+        charcoal:
+          'bg-[var(--color-charcoal)] text-white shadow-sm hover:brightness-125',
         outline:
-          'border border-[var(--color-line)] bg-[var(--color-card)] text-[var(--color-ink)] hover:bg-[var(--color-secondary)]',
-        ghost: 'text-[var(--color-ink)] hover:bg-[var(--color-secondary)]',
-        destructive: 'bg-[var(--color-destructive)] text-white shadow-sm hover:brightness-105',
-        link: 'text-[var(--color-teal)] underline-offset-4 hover:underline',
+          'border border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-charcoal)] hover:bg-[var(--color-secondary)]',
+        ghost: 'text-[var(--color-charcoal)] hover:bg-[var(--color-secondary)]',
+        destructive: 'bg-[var(--color-critical)] text-white shadow-sm hover:brightness-105',
+        link: 'text-[var(--color-coral)] underline-offset-4 hover:underline',
       },
       size: {
         default: 'h-10 px-5 py-2',

@@ -246,36 +246,40 @@ Charts: simple Tailwind/SVG bars are fine (keeps the bundle light and matches th
 
 ---
 
-## 8. Design system (bbonboard internal brand — this app uses the INTERNAL brand, not BB marketing)
+## 8. Design system (official **Bright Beginnings** brand — modernized style guide)
 
-Fonts: **Playfair Display** (headings) + **Inter** (body). Card accents: **5px left border**, **22px radius**, soft shadow. Palette:
+> **Updated 2026-06-24.** This app now uses the **public Bright Beginnings brand**, not the
+> earlier "bbonboard internal" brand. The retired internal palette (navy/orange/teal/purple,
+> Playfair+Inter) is superseded by everything below. Source of truth: the modernized style
+> guide + the official logo assets in `public/brand/` (tree mark, full-color lockup, heart
+> birds). **Use the actual logo PNGs — never recreate the logo in CSS/type.**
 
-| Token | Hex |
-|---|---|
-| navy (primary / headings) | `#1B2A4A` |
-| orange (action / CTA) | `#E07B39` |
-| teal (accent / positive) | `#2BA8A0` |
-| purple (accent 2) | `#6B4E9E` |
-| cream (app background) | `#FBF7EF` |
-| card | `#FFFFFF` |
-| ink (text) | `#22272E` |
-| muted | `#6C7480` |
-| line/border | `#E7E2D7` |
+Fonts: **Inter** (body + section/UI titles, weights 300–900) · **Ubuntu** (brand wordmark /
+product title, charcoal) · **Playfair Display** (reserved for hero/CTA titles only — never
+body or UI). Tokens live in `src/index.css` (`@theme`). Cards: **5px left border**, **20px
+radius**, soft flat-ish shadow.
 
-Section accent colors (left border): Attendance = teal, Labor = purple, Enrollment/Marketing = orange, Staff = navy, Director Report = teal.
+| Token | Hex | Use |
+|---|---|---|
+| coral | `#F08782` | primary action / CTA, links, card titles |
+| coral-dark | `#C45E59` | coral text on light |
+| yellow | `#FFD437` | accent / warning, section rules |
+| sky | `#AEDFE5` | accent / info / hover |
+| sky-deep | `#3B9BA3` | sky-toned text on light |
+| charcoal | `#545454` | headings, dark surfaces (header/CTA bg) |
+| dk / mid / lt gray | `#6D6E71` / `#A7A9AC` / `#D1D2D4` | body text, muted, borders |
+| cream | `#FAFAF5` | app background |
+| card | `#FFFFFF` | card surface |
 
-Tailwind `extend` starter:
-```js
-theme: { extend: {
-  colors: {
-    navy:'#1B2A4A', orange:'#E07B39', teal:'#2BA8A0', purple:'#6B4E9E',
-    cream:'#FBF7EF', ink:'#22272E', muted:'#6C7480', line:'#E7E2D7',
-  },
-  fontFamily: { display:['"Playfair Display"','serif'], sans:['Inter','system-ui','sans-serif'] },
-  borderRadius: { card:'22px' },
-}}
-```
-Wire the shadcn CSS variables in `globals.css` to these (primary = navy, accent = teal, destructive stays red). Use Framer Motion for: view switches, section mount, list add/remove, and KPI count-up.
+**Functional status colors** (NOT in the marketing palette — used ONLY for KPIs, streaks, and
+red flags so the dashboard reads at a glance; coral stays the primary action color):
+good `#5BB98C`, critical `#E5564E`, warning = yellow `#FFD437`, info = sky.
+
+Section/card accent colors (left border), per the modernized guide: **coral · yellow · sky ·
+gray** (cycle in that order). The shadcn CSS variables in `src/index.css` are already wired
+(primary = coral, accent = sky, destructive = critical red). Use Framer Motion for: view
+switches, section mount, list add/remove, KPI count-up, and streak/celebration moments
+(the heart-bird elements are the celebratory motif).
 
 ---
 

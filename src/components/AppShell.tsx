@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { ClipboardList, LayoutDashboard, Sparkles } from 'lucide-react'
+import { ClipboardList, LayoutDashboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -10,17 +10,19 @@ const navItems = [
 export function AppShell() {
   return (
     <div className="min-h-svh bg-[var(--color-cream)]">
-      <header className="sticky top-0 z-20 border-b border-[var(--color-line)] bg-[var(--color-cream)]/85 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-[var(--color-cream)]/85 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <div className="flex items-center gap-2.5">
-            <span className="grid size-9 place-items-center rounded-xl bg-[var(--color-navy)] text-[var(--color-cream)]">
-              <Sparkles className="size-5" />
-            </span>
+            <img
+              src="/brand/bb-tree.png"
+              alt="Bright Beginnings"
+              className="size-9 object-contain"
+            />
             <div className="leading-tight">
-              <p className="font-display text-base font-bold text-[var(--color-navy)]">
+              <p className="font-brand text-base font-medium text-[var(--color-charcoal)]">
                 Daily Ops Report
               </p>
-              <p className="text-[11px] uppercase tracking-wide text-[var(--color-muted-ink)]">
+              <p className="text-[11px] uppercase tracking-wide text-[var(--color-dk-gray)]">
                 Bright Beginnings
               </p>
             </div>
@@ -35,8 +37,8 @@ export function AppShell() {
                   cn(
                     'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
                     isActive
-                      ? 'bg-[var(--color-navy)] text-[var(--color-cream)]'
-                      : 'text-[var(--color-ink)] hover:bg-[var(--color-secondary)]'
+                      ? 'bg-[var(--color-coral)] text-white'
+                      : 'text-[var(--color-charcoal)] hover:bg-[var(--color-secondary)]'
                   )
                 }
               >

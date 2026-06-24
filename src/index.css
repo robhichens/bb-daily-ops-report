@@ -1,54 +1,68 @@
 @import 'tailwindcss';
 
 /* ---------------------------------------------------------------------------
-   bbonboard INTERNAL brand tokens (see bb-dor.md §8).
-   Exposed as Tailwind utilities: bg-cream, text-navy, border-line, etc.
+   Bright Beginnings official brand (modernized style guide).
+   Exposed as Tailwind utilities: bg-cream, text-coral, text-charcoal, etc.
+   NOTE: this replaces the earlier bbonboard "internal" brand from bb-dor.md §8.
 --------------------------------------------------------------------------- */
 @theme {
-  --color-navy: #1b2a4a;
-  --color-orange: #e07b39;
-  --color-teal: #2ba8a0;
-  --color-purple: #6b4e9e;
-  --color-cream: #fbf7ef;
+  --color-coral: #f08782;
+  --color-coral-dark: #c45e59;
+  --color-coral-soft: #fae8e7;
+  --color-yellow: #ffd437;
+  --color-yellow-soft: #fff5c2;
+  --color-sky: #aedfe5;
+  --color-sky-deep: #3b9ba3;
+  --color-sky-soft: #e4f6f8;
+  --color-mid-gray: #a7a9ac;
+  --color-lt-gray: #d1d2d4;
+  --color-dk-gray: #6d6e71;
+  --color-charcoal: #545454;
+  --color-cream: #fafaf5;
   --color-card: #ffffff;
-  --color-ink: #22272e;
-  --color-muted-ink: #6c7480;
-  --color-line: #e7e2d7;
+
+  /* Functional status colors — used ONLY for KPIs / streaks / red flags, kept
+     harmonized with the warm brand. Coral stays the primary action color. */
+  --color-good: #5bb98c;
+  --color-good-soft: #e6f4ec;
+  --color-critical: #e5564e;
+  --color-critical-soft: #fbe6e4;
 
   --font-display: 'Playfair Display', Georgia, serif;
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-brand: 'Ubuntu', 'Inter', system-ui, sans-serif;
 
-  --radius-card: 22px;
+  --radius-card: 20px;
 }
 
 /* ---------------------------------------------------------------------------
-   shadcn/ui semantic tokens, wired to the brand (primary = navy, accent = teal,
-   destructive = red). globals stay light — this app is cream-on-white.
+   shadcn/ui semantic tokens, wired to the brand
+   (primary = coral, accent = sky, foreground = charcoal, bg = cream).
 --------------------------------------------------------------------------- */
 :root {
   --radius: 0.75rem;
 
-  --background: #fbf7ef;
-  --foreground: #22272e;
+  --background: #fafaf5;
+  --foreground: #545454;
   --card-bg: #ffffff;
-  --card-foreground: #22272e;
+  --card-foreground: #545454;
   --popover: #ffffff;
-  --popover-foreground: #22272e;
-  --primary: #1b2a4a;
-  --primary-foreground: #fbf7ef;
-  --secondary: #f1ece1;
-  --secondary-foreground: #1b2a4a;
-  --muted: #f1ece1;
-  --muted-foreground: #6c7480;
-  --accent: #2ba8a0;
-  --accent-foreground: #ffffff;
-  --destructive: #dc2626;
+  --popover-foreground: #545454;
+  --primary: #f08782;
+  --primary-foreground: #ffffff;
+  --secondary: #f3f3ee;
+  --secondary-foreground: #545454;
+  --muted: #f3f3ee;
+  --muted-foreground: #6d6e71;
+  --accent: #aedfe5;
+  --accent-foreground: #545454;
+  --destructive: #e5564e;
   --destructive-foreground: #ffffff;
-  --success: #2ba8a0;
-  --warning: #e07b39;
-  --border: #e7e2d7;
-  --input: #e7e2d7;
-  --ring: #2ba8a0;
+  --success: #5bb98c;
+  --warning: #ffd437;
+  --border: #e7e6df;
+  --input: #e7e6df;
+  --ring: #f08782;
 }
 
 @theme inline {
@@ -95,43 +109,49 @@
     margin: 0;
     min-height: 100svh;
     background-color: var(--color-cream);
-    color: var(--color-ink);
+    color: var(--color-charcoal);
     font-family: var(--font-sans);
   }
 
+  /* Per the style guide: section/UI titles are Inter (not Playfair). Playfair is
+     reserved for hero/CTA titles via the .font-display utility. */
   h1,
   h2,
   h3,
   h4 {
-    font-family: var(--font-display);
-    color: var(--color-navy);
+    font-family: var(--font-sans);
+    font-weight: 800;
+    color: var(--color-charcoal);
     text-wrap: balance;
   }
 }
 
-/* Card with the brand's 5px left-border accent + 22px radius + soft shadow.
-   Use: <div class="bb-card" data-accent="teal"> ... </div> */
+/* Brand card: white, 20px radius, 5px left-border accent, soft (flat-ish) shadow.
+   Use: <div class="bb-card" data-accent="coral"> ... </div>
+   Accents per the modernized guide: coral / yellow / sky / gray. */
 @layer components {
   .bb-card {
     background-color: var(--color-card);
     border-radius: var(--radius-card);
-    border: 1px solid var(--color-line);
+    border: 1px solid var(--color-border);
     border-left-width: 5px;
-    border-left-color: var(--color-line);
-    box-shadow:
-      0 1px 2px rgba(27, 42, 74, 0.04),
-      0 8px 24px -12px rgba(27, 42, 74, 0.12);
+    border-left-color: var(--color-coral);
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.05);
   }
-  .bb-card[data-accent='teal'] {
-    border-left-color: var(--color-teal);
+  .bb-card[data-accent='coral'] {
+    border-left-color: var(--color-coral);
   }
-  .bb-card[data-accent='orange'] {
-    border-left-color: var(--color-orange);
+  .bb-card[data-accent='yellow'] {
+    border-left-color: var(--color-yellow);
   }
-  .bb-card[data-accent='purple'] {
-    border-left-color: var(--color-purple);
+  .bb-card[data-accent='sky'] {
+    border-left-color: var(--color-sky);
   }
-  .bb-card[data-accent='navy'] {
-    border-left-color: var(--color-navy);
+  .bb-card[data-accent='gray'] {
+    border-left-color: var(--color-mid-gray);
+  }
+
+  .font-brand {
+    font-family: var(--font-brand);
   }
 }

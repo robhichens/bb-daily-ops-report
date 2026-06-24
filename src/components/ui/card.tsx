@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 
-type Accent = 'teal' | 'orange' | 'purple' | 'navy'
+type Accent = 'coral' | 'yellow' | 'sky' | 'gray'
 
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   /** Brand left-border accent color (bb-dor.md §8). */
@@ -32,7 +32,7 @@ const CardTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTML
   ({ className, ...props }, ref) => (
     <h3
       ref={ref}
-      className={cn('font-display text-lg font-bold leading-tight text-[var(--color-navy)]', className)}
+      className={cn('text-base font-bold leading-tight text-[var(--color-coral)]', className)}
       {...props}
     />
   )
@@ -41,7 +41,7 @@ CardTitle.displayName = 'CardTitle'
 
 const CardDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
   ({ className, ...props }, ref) => (
-    <p ref={ref} className={cn('text-sm text-[var(--color-muted-ink)]', className)} {...props} />
+    <p ref={ref} className={cn('text-sm text-[var(--color-dk-gray)]', className)} {...props} />
   )
 )
 CardDescription.displayName = 'CardDescription'
