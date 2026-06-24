@@ -1,31 +1,32 @@
 // src/lib/exportPdf.ts
-// One-click branded "Weekly Ops Summary" PDF for leadership — KPIs, leaderboard,
-// flags & celebrations, packet compliance, and the reports table. Reflects the
-// dashboard's current week/site selection.
+// PDF export of the actual SUBMISSION data — a faithful, printable copy of each
+// Daily Ops Report (every field + notes as entered), one report per page.
+// Reflects the dashboard's current week/site selection.
 
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { siteName } from './schema'
-import { formatLong, formatShort } from './dates'
-import type { DashboardView } from './dashboard'
+import {
+  ENROLLMENT_FIELDS,
+  STAFF_FIELDS,
+  type DailyOpsReport,
+  type EnrollmentMarketing,
+  type Staff,
+} from './schema'
+import { formatLong } from './dates'
 
-// Brand palette as RGB tuples.
 const C = {
   charcoal: [84, 84, 84] as [number, number, number],
   coral: [240, 135, 130] as [number, number, number],
   coralDark: [196, 94, 89] as [number, number, number],
-  yellow: [255, 212, 55] as [number, number, number],
   skyDeep: [59, 155, 163] as [number, number, number],
   good: [91, 185, 140] as [number, number, number],
   cream: [250, 250, 245] as [number, number, number],
   dkGray: [109, 110, 113] as [number, number, number],
-  ltGray: [209, 210, 212] as [number, number, number],
-  critical: [229, 86, 78] as [number, number, number],
   white: [255, 255, 255] as [number, number, number],
 }
 
-/** Load + downscale an image to a small PNG dataURL so it embeds compactly
- *  (the source brand assets are ~1500px; jsPDF stores raw bitmap otherwise). */
+const lastY = (doc: jsPDF) => (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY
+
 async function loadImage(url: string, maxPx = 96): Promise<string | null> {
   try {
     const img = new Image()
@@ -47,167 +48,183 @@ async function loadImage(url: string, maxPx = 96): Promise<string | null> {
   }
 }
 
-export async function exportWeeklyPdf(opts: {
-  view: DashboardView
+function fmtSubmitted(r: DailyOpsReport): string {
+  if (r.status !== 'submitted' || !r.submittedAt) return 'Draft (not submitted)'
+  const d = new Date(r.submittedAt)
+  return `Submitted ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+}
+
+export async function exportReportsPdf(opts: {
+  reports: DailyOpsReport[]
   weekOf: string
   siteLabel: string
 }): Promise<void> {
-  const { view, weekOf, siteLabel } = opts
+  const { reports, weekOf, siteLabel } = opts
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.getWidth()
+  const pageH = doc.internal.pageSize.getHeight()
   const M = 14
   const logo = await loadImage('/brand/bb-tree.png')
 
-  // --- Header band ---------------------------------------------------------
-  doc.setFillColor(...C.charcoal)
-  doc.rect(0, 0, pageW, 30, 'F')
-  if (logo) doc.addImage(logo, 'PNG', M, 6, 18, 18)
-  const tx = logo ? M + 23 : M
-  doc.setTextColor(...C.coral)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(17)
-  doc.text('Daily Ops Report', tx, 14)
-  doc.setTextColor(255, 255, 255)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  doc.text('Weekly Summary  ·  Bright Beginnings', tx, 21)
-  doc.setTextColor(...C.ltGray)
-  doc.setFontSize(8)
-  doc.text(
-    `Week of ${formatLong(weekOf)}   ·   ${siteLabel}   ·   Generated ${formatLong(new Date().toISOString().slice(0, 10))}`,
-    tx,
-    26.5
-  )
-
-  let y = 40
-
-  // --- KPI row -------------------------------------------------------------
-  const k = view.kpis
-  const kpis = [
-    { label: 'Avg Attendance', value: `${k.avgAttendance}`, color: C.skyDeep },
-    { label: 'Overtime', value: `${k.overtimeHours} hrs`, sub: `${k.overtimePct}%`, color: k.overtimeFlag ? C.critical : C.dkGray },
-    { label: 'Enrollment Comms', value: `${k.commsOut}`, sub: `goal ${k.commsGoal}`, color: k.commsMet ? C.good : C.coralDark },
-    { label: 'Net New Starts', value: `${k.netNewStarts > 0 ? '+' : ''}${k.netNewStarts}`, color: C.coral },
-  ]
-  const boxW = (pageW - M * 2 - 9) / 4
-  kpis.forEach((kp, i) => {
-    const x = M + i * (boxW + 3)
-    doc.setFillColor(...C.cream)
-    doc.roundedRect(x, y, boxW, 20, 2, 2, 'F')
-    doc.setTextColor(...C.dkGray)
+  const band = (title: string, sub: string, meta: string) => {
+    doc.setFillColor(...C.charcoal)
+    doc.rect(0, 0, pageW, 30, 'F')
+    if (logo) doc.addImage(logo, 'PNG', M, 6, 18, 18)
+    const tx = logo ? M + 23 : M
+    doc.setTextColor(...C.coral)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7)
-    doc.text(kp.label.toUpperCase(), x + 3, y + 5)
-    doc.setTextColor(...C.charcoal)
-    doc.setFontSize(15)
-    doc.text(kp.value, x + 3, y + 13)
-    if (kp.sub) {
-      doc.setTextColor(...kp.color)
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(7)
-      doc.text(kp.sub, x + 3, y + 18)
-    }
-  })
-  y += 28
-
-  // --- Leaderboard ---------------------------------------------------------
-  doc.setTextColor(...C.coralDark)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(11)
-  doc.text('Weekly Leaderboard', M, y)
-  y += 2
-  autoTable(doc, {
-    startY: y,
-    head: [['#', 'Site', 'Consistency', 'Streak', 'Filed', 'Points']],
-    body: view.board.map((r) => [
-      `${r.rank}`,
-      siteName(r.siteId),
-      `${r.consistency}`,
-      `${r.streak}`,
-      `${r.filed}/${r.expected}`,
-      `${r.points}`,
-    ]),
-    theme: 'grid',
-    styles: { fontSize: 9, cellPadding: 2, textColor: C.charcoal, lineColor: [231, 230, 223] },
-    headStyles: { fillColor: C.charcoal, textColor: C.white, fontStyle: 'bold' },
-    alternateRowStyles: { fillColor: C.cream },
-    margin: { left: M, right: M },
-  })
-  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
-
-  // --- Flags & celebrations (two columns) ----------------------------------
-  const colW = (pageW - M * 2 - 6) / 2
-  const startY = y
-  const listBlock = (title: string, items: string[], x: number, color: [number, number, number], empty: string) => {
-    let yy = startY
-    doc.setTextColor(...color)
+    doc.setFontSize(16)
+    doc.text(title, tx, 13)
+    doc.setTextColor(...C.white)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(11)
-    doc.text(title, x, yy)
-    yy += 5
+    doc.text(sub, tx, 20)
+    doc.setTextColor(209, 210, 212)
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8.5)
-    doc.setTextColor(...C.charcoal)
-    if (items.length === 0) {
-      doc.setTextColor(...C.dkGray)
-      doc.text(empty, x, yy)
-      yy += 5
-    } else {
-      for (const it of items.slice(0, 8)) {
-        const lines = doc.splitTextToSize(`•  ${it}`, colW - 2) as string[]
-        doc.text(lines, x, yy)
-        yy += lines.length * 4 + 1
-      }
-    }
-    return yy
+    doc.setFontSize(8)
+    doc.text(meta, tx, 26)
   }
-  const flagsEnd = listBlock('Red Flags', view.flags.map((f) => f.text), M, C.critical, 'All clear — nothing flagged.')
-  const winsEnd = listBlock('Celebrations', view.wins.map((w) => w.text), M + colW + 6, C.skyDeep, 'Wins will appear as reports roll in.')
-  y = Math.max(flagsEnd, winsEnd) + 6
 
-  // --- Packet compliance line ---------------------------------------------
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9)
-  doc.setTextColor(...C.charcoal)
-  doc.text(
-    `Director Packet Compliance:  ${view.packet.pct}%  (${view.packet.completed}/${view.packet.total} completed)`,
-    M,
-    y
+  const heading = (y: number, text: string, color: [number, number, number]) => {
+    doc.setTextColor(...color)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10.5)
+    doc.text(text, M, y)
+    return y + 2.5
+  }
+
+  const ensureSpace = (y: number, needed: number) => {
+    if (y + needed > pageH - 16) {
+      doc.addPage()
+      return 20
+    }
+    return y
+  }
+
+  const sorted = [...reports].sort((a, b) =>
+    a.date < b.date ? 1 : a.date > b.date ? -1 : a.siteName.localeCompare(b.siteName)
   )
-  y += 6
 
-  // --- Reports table -------------------------------------------------------
-  autoTable(doc, {
-    startY: y,
-    head: [['Date', 'Site', 'Director', 'Attend.', 'OT', 'Quality', 'Packet']],
-    body: [...view.tableRows]
-      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.siteName.localeCompare(b.siteName)))
-      .map((r) => [
-        formatShort(r.date),
-        r.siteName,
-        r.director || '—',
-        `${r.attendance.total}`,
-        `${r.labor.overtimeHours}`,
-        `${r.qualityScore ?? 0}`,
-        r.directorPacket.completed ? 'Yes' : 'No',
-      ]),
-    theme: 'striped',
-    styles: { fontSize: 8.5, cellPadding: 2, textColor: C.charcoal },
-    headStyles: { fillColor: C.coral, textColor: C.white, fontStyle: 'bold' },
-    alternateRowStyles: { fillColor: C.cream },
+  if (sorted.length === 0) {
+    band('Daily Ops Report', siteLabel, `Week of ${formatLong(weekOf)}`)
+    doc.setTextColor(...C.dkGray)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(11)
+    doc.text('No submitted reports for this selection.', M, 44)
+    doc.save(`bb-dor-reports-${weekOf}.pdf`)
+    return
+  }
+
+  const tableBase = {
     margin: { left: M, right: M },
-    didDrawPage: () => {
-      // Footer on every page
-      const h = doc.internal.pageSize.getHeight()
-      const page = doc.getCurrentPageInfo().pageNumber
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(7.5)
+    styles: { fontSize: 8.6, cellPadding: 1.8, textColor: C.charcoal, valign: 'top' as const },
+  }
+
+  sorted.forEach((r, i) => {
+    if (i > 0) doc.addPage()
+    band(
+      'Daily Ops Report',
+      `${r.siteName} · ${formatLong(r.date)}`,
+      `Director: ${r.director || '—'}    ·    ${fmtSubmitted(r)}    ·    Quality ${r.qualityScore ?? 0}/100`
+    )
+
+    let y = 38
+
+    // Attendance & Labor
+    y = heading(y, 'Attendance & Labor', C.skyDeep)
+    autoTable(doc, {
+      ...tableBase,
+      startY: y,
+      theme: 'plain',
+      body: [
+        ['Pre-School', `${r.attendance.preschool}`],
+        ['Subsidy (DSS, CCA, Foster, United Way)', `${r.attendance.subsidy}`],
+        ['Total Attendance', `${r.attendance.total}`],
+        ['Total Labor Hours', `${r.labor.totalHours}`],
+        ['Total Overtime Hours', `${r.labor.overtimeHours}`],
+        ['Director Minutes in Rooms', `${r.labor.directorMinutesInRooms}`],
+      ],
+      columnStyles: { 0: { cellWidth: 95, textColor: C.dkGray }, 1: { fontStyle: 'bold' } },
+    })
+    y = lastY(doc) + 7
+
+    // Enrollment / Marketing
+    y = ensureSpace(y, 30)
+    y = heading(y, 'Enrollment / Marketing', C.coralDark)
+    autoTable(doc, {
+      ...tableBase,
+      startY: y,
+      head: [['Field', 'Count', 'Notes']],
+      body: ENROLLMENT_FIELDS.map((f) => {
+        const c = r.enrollmentMarketing[f.key as keyof EnrollmentMarketing]
+        return [f.label, `${c.count}`, c.notes || '—']
+      }),
+      headStyles: { fillColor: C.coral, textColor: C.white, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: C.cream },
+      columnStyles: { 0: { cellWidth: 52 }, 1: { cellWidth: 14, halign: 'center', fontStyle: 'bold' }, 2: { cellWidth: 'auto' } },
+    })
+    y = lastY(doc) + 7
+
+    // Staff
+    y = ensureSpace(y, 30)
+    y = heading(y, 'Staff', C.charcoal)
+    autoTable(doc, {
+      ...tableBase,
+      startY: y,
+      head: [['Field', 'Count', 'Notes']],
+      body: STAFF_FIELDS.map((f) => {
+        const c = r.staff[f.key as keyof Staff]
+        const isHours = f.key === 'timeSpentRecruiting'
+        return [isHours ? 'Time Spent Recruiting (hrs)' : f.label, `${c.count}`, c.notes || '—']
+      }),
+      headStyles: { fillColor: C.charcoal, textColor: C.white, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: C.cream },
+      columnStyles: { 0: { cellWidth: 52 }, 1: { cellWidth: 14, halign: 'center', fontStyle: 'bold' }, 2: { cellWidth: 'auto' } },
+    })
+    y = lastY(doc) + 7
+
+    // Director Packet
+    y = ensureSpace(y, 18)
+    y = heading(y, 'Director Packet', C.skyDeep)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(...C.charcoal)
+    doc.text(`Completed today:  ${r.directorPacket.completed ? 'Yes' : 'No'}`, M, y + 3)
+    y += 3
+    if (!r.directorPacket.completed && r.directorPacket.incompleteReason) {
+      const lines = doc.splitTextToSize(`What got in the way: ${r.directorPacket.incompleteReason}`, pageW - M * 2) as string[]
       doc.setTextColor(...C.dkGray)
-      doc.text('Bright Beginnings · Daily Ops Report', M, h - 8)
-      doc.text(`Page ${page}`, pageW - M, h - 8, { align: 'right' })
-    },
+      doc.text(lines, M, y + 6)
+      y += 6 + lines.length * 4
+    }
+    y += 6
+
+    // Director Report
+    const reportLines = r.directorReport.map((l) => l.trim()).filter(Boolean)
+    if (reportLines.length) {
+      y = ensureSpace(y, 20)
+      y = heading(y, 'Director Report on the Day', C.coralDark)
+      autoTable(doc, {
+        ...tableBase,
+        startY: y,
+        body: reportLines.map((l, idx) => [`${idx + 1}`, l]),
+        theme: 'plain',
+        columnStyles: { 0: { cellWidth: 8, fontStyle: 'bold', textColor: C.coral }, 1: { cellWidth: 'auto' } },
+      })
+    }
   })
 
+  // Footers on every page
+  const pages = doc.getNumberOfPages()
+  for (let p = 1; p <= pages; p++) {
+    doc.setPage(p)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
+    doc.setTextColor(...C.dkGray)
+    doc.text('Bright Beginnings · Daily Ops Report', M, pageH - 8)
+    doc.text(`Page ${p} of ${pages}`, pageW - M, pageH - 8, { align: 'right' })
+  }
+
   const label = `${weekOf}${siteLabel === 'All sites' ? '' : '-' + siteLabel.toLowerCase().replace(/\s+/g, '-')}`
-  doc.save(`bb-dor-summary-${label}.pdf`)
+  doc.save(`bb-dor-reports-${label}.pdf`)
 }

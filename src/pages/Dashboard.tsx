@@ -20,7 +20,7 @@ import {
   type DashboardSection,
 } from '@/lib/settings'
 import { exportCsv } from '@/lib/exportReports'
-import { exportWeeklyPdf } from '@/lib/exportPdf'
+import { exportReportsPdf } from '@/lib/exportPdf'
 import { inputClass } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -87,7 +87,7 @@ function AdminDashboard() {
             {SITES.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <Button size="sm" variant="outline" onClick={() => exportCsv(view.tableRows, exportLabel)}><Download className="size-3.5" /> CSV</Button>
-          <Button size="sm" onClick={() => void exportWeeklyPdf({ view, weekOf, siteLabel })}><FileText className="size-3.5" /> PDF</Button>
+          <Button size="sm" onClick={() => void exportReportsPdf({ reports: view.tableRows, weekOf, siteLabel })}><FileText className="size-3.5" /> PDF</Button>
         </div>
       </div>
 
