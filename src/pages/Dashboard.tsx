@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { LayoutDashboard, Download, FileJson, Sparkles } from 'lucide-react'
+import { LayoutDashboard, Download, FileText, Sparkles } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { isAdmin as isAdminRole } from '@/lib/users'
-import { SITES, type SiteId, type DailyOpsReport } from '@/lib/schema'
+import { SITES, siteName, type SiteId, type DailyOpsReport } from '@/lib/schema'
 import { weekOf as weekOfFn } from '@/lib/derive'
 import { todayIso, addIsoDays, formatShort } from '@/lib/dates'
 import {
@@ -19,7 +19,8 @@ import {
   type DirectorViewConfig as Config,
   type DashboardSection,
 } from '@/lib/settings'
-import { exportCsv, exportJson } from '@/lib/exportReports'
+import { exportCsv } from '@/lib/exportReports'
+import { exportWeeklyPdf } from '@/lib/exportPdf'
 import { inputClass } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -71,6 +72,7 @@ function AdminDashboard() {
     [rows, lastWeekRows, weekOf, site, today]
   )
   const exportLabel = `${weekOf}${site === 'all' ? '' : '-' + site}`
+  const siteLabel = site === 'all' ? 'All sites' : siteName(site)
 
   return (
     <div className="space-y-6">
@@ -85,7 +87,7 @@ function AdminDashboard() {
             {SITES.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <Button size="sm" variant="outline" onClick={() => exportCsv(view.tableRows, exportLabel)}><Download className="size-3.5" /> CSV</Button>
-          <Button size="sm" variant="ghost" onClick={() => exportJson(view.tableRows, exportLabel)}><FileJson className="size-3.5" /> JSON</Button>
+          <Button size="sm" onClick={() => void exportWeeklyPdf({ view, weekOf, siteLabel })}><FileText className="size-3.5" /> PDF</Button>
         </div>
       </div>
 
