@@ -1,15 +1,18 @@
+import { useState } from 'react'
 import { ClipboardList } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { SITES } from '@/lib/schema'
+import { useAuth } from '@/auth/AuthProvider'
+import { isAdmin as isAdminRole } from '@/lib/users'
+import { SITES, type SiteId } from '@/lib/schema'
+import { todayIso, formatLong } from '@/lib/dates'
+import { ReportForm } from '@/components/report/ReportForm'
 
-/** Phase 1 placeholder shell. The full validated, autosaving form lands in Phase 3. */
 export function Report() {
-  const today = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  })
+  const { user, profile } = useAuth()
+  const admin = isAdminRole(profile?.role)
+
+  // Directors are scoped to their assigned site; admins default to the first.
+  const [siteId, setSiteId] = useState<SiteId>(profile?.siteId ?? SITES[0].id)
+  const [date, setDate] = useState<string>(todayIso())
 
   return (
     <div className="space-y-6">
@@ -19,35 +22,20 @@ export function Report() {
         </span>
         <div>
           <h1 className="text-2xl font-extrabold text-[var(--color-charcoal)]">
-            Today&rsquo;s Report
+            Daily Ops Report
           </h1>
-          <p className="text-sm text-[var(--color-dk-gray)]">{today}</p>
+          <p className="text-sm text-[var(--color-dk-gray)]">{formatLong(date)}</p>
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        {SITES.map((site, i) => (
-          <Card key={site.id} accent={(['coral', 'yellow', 'sky'] as const)[i % 3]}>
-            <CardHeader>
-              <CardTitle>{site.name}</CardTitle>
-              <CardDescription>Awaiting today&rsquo;s entry</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <span className="inline-flex rounded-full bg-[var(--color-secondary)] px-3 py-1 text-xs font-semibold text-[var(--color-dk-gray)]">
-                Not started
-              </span>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Card accent="yellow">
-        <CardContent className="p-6 text-sm text-[var(--color-dk-gray)]">
-          The full daily form — attendance, labor, enrollment, staff, packet, and the
-          director report — arrives in Phase 3, with autosave, validation, and a
-          celebration when you submit.
-        </CardContent>
-      </Card>
+      <ReportForm
+        siteId={siteId}
+        date={date}
+        isAdmin={admin}
+        uid={user?.uid ?? ''}
+        onSite={setSiteId}
+        onDate={setDate}
+      />
     </div>
   )
 }
