@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>How to Use · Daily Ops Report · Bright Beginnings</title>
+<link rel="icon" type="image/png" href="/brand/bb-tree.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --coral:#F08782; --coral-dark:#C45E59; --coral-soft:#FAE8E7;
+    --yellow:#FFD437; --yellow-soft:#FFF5C2;
+    --sky:#AEDFE5; --sky-deep:#3B9BA3; --sky-soft:#E4F6F8;
+    --mid-gray:#A7A9AC; --lt-gray:#D1D2D4; --dk-gray:#6D6E71; --charcoal:#545454;
+    --cream:#FAFAF5; --card:#fff; --good:#5BB98C; --good-soft:#E6F4EC;
+    --sans:'Inter',system-ui,-apple-system,sans-serif;
+    --brand:'Ubuntu','Inter',sans-serif;
+    --display:'Playfair Display',Georgia,serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--sans);background:var(--cream);color:var(--charcoal);line-height:1.55;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:920px;margin:0 auto;}
+  h1,h2,h3{color:var(--charcoal);text-wrap:balance;}
+  a{color:var(--coral-dark);}
+
+  /* HERO */
+  .hero{background:var(--charcoal);color:#fff;padding:54px 40px 48px;position:relative;overflow:hidden;}
+  .blob{position:absolute;border-radius:50%;opacity:.13;pointer-events:none;}
+  .b1{top:-70px;right:-50px;width:280px;height:280px;background:var(--coral);}
+  .b2{bottom:-60px;right:130px;width:150px;height:150px;background:var(--yellow);opacity:.10;}
+  .b3{bottom:-40px;left:-30px;width:130px;height:130px;background:var(--sky);opacity:.10;}
+  .hero-inner{position:relative;z-index:1;}
+  .hero img.tree{width:64px;height:64px;object-fit:contain;margin-bottom:18px;}
+  .eyebrow{font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:12px;}
+  .hero h1{font-family:var(--display);font-size:52px;font-weight:800;color:var(--coral);line-height:1.04;margin-bottom:10px;}
+  .hero .sub{font-size:17px;color:rgba(255,255,255,.72);max-width:560px;}
+  .hero .rule{width:64px;height:3px;background:var(--yellow);margin:18px 0 0;border-radius:2px;}
+
+  /* SECTIONS */
+  section{padding:40px;}
+  .label{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--coral);background:var(--coral-soft);padding:4px 12px;border-radius:20px;margin-bottom:16px;}
+  .label.sky{color:var(--sky-deep);background:var(--sky-soft);}
+  .label.gold{color:var(--coral-dark);background:var(--yellow-soft);}
+  .sec-title{font-size:27px;font-weight:800;margin-bottom:6px;}
+  .sec-intro{font-size:15px;color:var(--dk-gray);max-width:620px;margin-bottom:24px;}
+
+  /* CARD */
+  .card{background:var(--card);border-radius:20px;border-left:5px solid var(--coral);box-shadow:0 2px 20px rgba(0,0,0,.05);padding:22px 24px;}
+  .card.y{border-left-color:var(--yellow);} .card.s{border-left-color:var(--sky);} .card.g{border-left-color:var(--mid-gray);} .card.ok{border-left-color:var(--good);}
+
+  /* STEPS */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .step{background:#fff;border-radius:20px;box-shadow:0 2px 20px rgba(0,0,0,.05);padding:22px;position:relative;overflow:hidden;}
+  .step .n{font-size:13px;font-weight:800;color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:12px;}
+  .step .emoji{font-size:26px;position:absolute;top:18px;right:18px;opacity:.9;}
+  .step h3{font-size:16px;margin-bottom:5px;}
+  .step p{font-size:13.5px;color:var(--dk-gray);}
+  .s1 .n{background:var(--charcoal);} .s2 .n{background:var(--coral);} .s3 .n{background:var(--good);}
+
+  /* REPORT SECTIONS GRID */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .rs{display:flex;gap:14px;align-items:flex-start;background:#fff;border-radius:18px;box-shadow:0 2px 20px rgba(0,0,0,.05);padding:18px 20px;border-left:5px solid var(--coral);}
+  .rs .ic{font-size:24px;flex-shrink:0;width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;}
+  .rs h3{font-size:15px;margin-bottom:3px;}
+  .rs p{font-size:13px;color:var(--dk-gray);}
+  .rs .tip{font-size:12px;color:var(--coral-dark);margin-top:6px;font-weight:600;}
+  .ic-coral{background:var(--coral-soft);} .ic-yellow{background:var(--yellow-soft);} .ic-sky{background:var(--sky-soft);} .ic-gray{background:#f0f0f0;}
+  .rs.coral{border-left-color:var(--coral);} .rs.yellow{border-left-color:var(--yellow);} .rs.sky{border-left-color:var(--sky);} .rs.gray{border-left-color:var(--mid-gray);}
+
+  /* POINTS TABLE */
+  .points{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:6px;}
+  .pt{background:#fff;border-radius:16px;box-shadow:0 2px 16px rgba(0,0,0,.05);padding:16px;text-align:center;}
+  .pt .big{font-family:var(--brand);font-size:30px;font-weight:500;color:var(--charcoal);}
+  .pt .big.good{color:var(--good);} .pt .big.coral{color:var(--coral);}
+  .pt .cap{font-size:12px;font-weight:700;color:var(--dk-gray);margin-top:2px;}
+  .pt .desc{font-size:11.5px;color:var(--mid-gray);margin-top:3px;}
+
+  /* BADGES */
+  .badges{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;}
+  .badge{background:#fff;border:1px solid var(--lt-gray);border-radius:30px;padding:8px 14px;font-size:13px;font-weight:600;color:var(--charcoal);display:flex;align-items:center;gap:7px;box-shadow:0 1px 6px rgba(0,0,0,.04);}
+
+  /* CALLOUT */
+  .callout{display:flex;gap:14px;align-items:flex-start;border-radius:18px;padding:18px 20px;font-size:14px;}
+  .callout.flag{background:var(--coral-soft);color:var(--coral-dark);}
+  .callout.win{background:var(--good-soft);color:#2f7d57;}
+  .callout .e{font-size:22px;flex-shrink:0;}
+
+  /* BULLET LIST */
+  ul.checks{list-style:none;display:grid;gap:10px;}
+  ul.checks li{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--charcoal);}
+  ul.checks li .dot{flex-shrink:0;width:20px;height:20px;border-radius:50%;background:var(--coral);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;margin-top:1px;font-weight:700;}
+
+  /* CTA / FOOTER */
+  .cta{background:var(--charcoal);color:#fff;padding:42px 40px;position:relative;overflow:hidden;text-align:center;}
+  .cta h2{font-family:var(--display);font-size:30px;color:#fff;margin-bottom:8px;}
+  .cta p{color:rgba(255,255,255,.6);margin-bottom:20px;}
+  .btn{display:inline-block;background:var(--coral);color:#fff;font-weight:700;font-size:15px;padding:13px 32px;border-radius:50px;text-decoration:none;box-shadow:0 8px 26px rgba(240,135,130,.4);}
+  .foot{padding:22px 40px;text-align:center;font-size:12px;color:var(--mid-gray);}
+  .brandword{font-family:var(--brand);}
+
+  @media(max-width:680px){
+    .steps,.grid2{grid-template-columns:1fr;}
+    section,.hero,.cta{padding:32px 22px;}
+    .hero h1{font-size:38px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HERO -->
+  <div class="hero">
+    <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
+    <div class="hero-inner">
+      <img class="tree" src="/brand/bb-tree.png" alt="Bright Beginnings" />
+      <div class="eyebrow">Bright Beginnings · Daily Ops Report</div>
+      <h1>How to Use<br>the Daily Ops Report</h1>
+      <p class="sub">Your two-minute daily habit — capture the day, spot what needs attention, and keep your site’s streak alive. Here’s everything you need.</p>
+      <div class="rule"></div>
+    </div>
+  </div>
+
+  <!-- QUICK START -->
+  <section>
+    <span class="label">Quick Start</span>
+    <h2 class="sec-title">Three steps, every day</h2>
+    <p class="sec-intro">The whole thing takes about two minutes. Do it once a day, ideally before you head out.</p>
+    <div class="steps">
+      <div class="step s1">
+        <span class="emoji">🔑</span>
+        <div class="n">1</div>
+        <h3>Log in</h3>
+        <p>Open <b>bbdor.netlify.app</b> and sign in with your email. You’ll land on today’s report, already set to your site.</p>
+      </div>
+      <div class="step s2">
+        <span class="emoji">✍️</span>
+        <div class="n">2</div>
+        <h3>Fill it out</h3>
+        <p>Work down the sections. Enter the numbers and add a quick note wherever the count is more than zero. It saves as you type.</p>
+      </div>
+      <div class="step s3">
+        <span class="emoji">🐤</span>
+        <div class="n">3</div>
+        <h3>Submit</h3>
+        <p>Hit <b>Submit report</b> before 11:59 PM. You’ll get a little celebration — and your streak grows.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- THE SECTIONS -->
+  <section>
+    <span class="label">Filling It Out</span>
+    <h2 class="sec-title">What goes in each section</h2>
+    <p class="sec-intro">A number on its own tells half the story — the <b>notes</b> are where the value is. Whenever a count is above zero, add the names, rooms, or reasons.</p>
+    <div class="grid2">
+      <div class="rs sky"><div class="ic ic-sky">👶</div><div><h3>Attendance</h3><p>Pre-school + subsidy counts. The total adds up automatically.</p></div></div>
+      <div class="rs gray"><div class="ic ic-gray">⏱️</div><div><h3>Labor</h3><p>Total hours, overtime (add names), and director minutes in rooms.</p></div></div>
+      <div class="rs coral"><div class="ic ic-coral">📣</div><div><h3>Enrollment / Marketing</h3><p>Tours, inquiries, reg fees, new starts, enrollments, terminations.</p><p class="tip">🎯 Aim for 15 enrollment comms out each day.</p></div></div>
+      <div class="rs gray"><div class="ic ic-gray">👥</div><div><h3>Staff</h3><p>Call-outs, RTO, sent home, terminations, recruiting time, future hires.</p></div></div>
+      <div class="rs sky"><div class="ic ic-sky">✅</div><div><h3>Director Packet</h3><p>Yes or No. If <b>No</b>, a quick note on what got in the way is required.</p></div></div>
+      <div class="rs coral"><div class="ic ic-coral">📝</div><div><h3>Director Report</h3><p>Free-text notes for the day — follow-ups, write-ups, anything leadership should see. Add as many lines as you need.</p></div></div>
+    </div>
+    <div class="card s" style="margin-top:18px;display:flex;gap:14px;align-items:center;">
+      <span style="font-size:24px">💾</span>
+      <p style="font-size:14px;color:var(--dk-gray)"><b style="color:var(--charcoal)">It autosaves.</b> Every change is saved as a draft as you type — even if your wifi blips. Come back later and pick up where you left off. There’s only ever <b>one report per site, per day</b>.</p>
+    </div>
+  </section>
+
+  <!-- GAMIFICATION -->
+  <section>
+    <span class="label gold">Earn Your Streak</span>
+    <h2 class="sec-title">Showing up counts 🔥</h2>
+    <p class="sec-intro">Points reward what you control — filing daily and filing well. <b>Not</b> your enrollment numbers. So a slow enrollment week never hurts your score.</p>
+
+    <div class="points">
+      <div class="pt"><div class="big good">10</div><div class="cap">On time</div><div class="desc">Filed the same day</div></div>
+      <div class="pt"><div class="big coral">+3</div><div class="cap">Early bird</div><div class="desc">Filed before 6 PM</div></div>
+      <div class="pt"><div class="big">+10</div><div class="cap">Quality</div><div class="desc">Thorough = full notes</div></div>
+      <div class="pt"><div class="big" style="color:var(--mid-gray)">5</div><div class="cap">Late</div><div class="desc">Filed next day</div></div>
+    </div>
+
+    <div style="margin-top:20px" class="card g">
+      <h3 style="font-size:16px;margin-bottom:10px">🔥 How streaks work</h3>
+      <ul class="checks">
+        <li><span class="dot">✓</span> File on a workday (Mon–Fri) and your streak grows. Weekends and holidays don’t count against you.</li>
+        <li><span class="dot">✓</span> Missed a day? You get <b>one free “streak freeze” each month</b> — a single sick day won’t reset you.</li>
+        <li><span class="dot">✓</span> File the day after a miss and earn the <b>“Back on Track”</b> badge. 💪</li>
+      </ul>
+    </div>
+
+    <h3 style="font-size:16px;margin:22px 0 10px">Badges to collect</h3>
+    <div class="badges">
+      <span class="badge">🔥 7-day streak</span>
+      <span class="badge">🌟 30-day streak</span>
+      <span class="badge">💯 100-day streak</span>
+      <span class="badge">🏅 Perfect week</span>
+      <span class="badge">📝 Thorough</span>
+      <span class="badge">💪 Back on Track</span>
+    </div>
+  </section>
+
+  <!-- LEADERBOARD -->
+  <section>
+    <span class="label gold">Friendly Competition</span>
+    <h2 class="sec-title">The Team Dashboard</h2>
+    <p class="sec-intro">All three sites on one leaderboard — ranked by <b>consistency</b>, not who has the biggest numbers. Plus a shared team goal everyone wins together.</p>
+    <div class="grid2">
+      <div class="card y"><h3 style="font-size:16px;margin-bottom:6px">🏆 Weekly leaderboard</h3><p style="font-size:13.5px;color:var(--dk-gray)">See where your site ranks, your current streak, and the badges you’ve earned. Top of the week and “most improved” get a shout-out.</p></div>
+      <div class="card s"><h3 style="font-size:16px;margin-bottom:6px">🤝 Team goal</h3><p style="font-size:13.5px;color:var(--dk-gray)">When all three sites file every workday, the whole team hits the goal together. Rising tide, all boats.</p></div>
+    </div>
+  </section>
+
+  <!-- LEADERSHIP -->
+  <section>
+    <span class="label sky">For Leadership</span>
+    <h2 class="sec-title">The full dashboard (admin)</h2>
+    <p class="sec-intro">Admins get the complete real-time picture across all three sites — the thing a copied spreadsheet could never do.</p>
+    <ul class="checks">
+      <li><span class="dot" style="background:var(--sky-deep)">★</span><b>KPIs at a glance</b> — average attendance, overtime %, enrollment comms vs. goal, net new starts.</li>
+      <li><span class="dot" style="background:var(--sky-deep)">★</span><b>Pipeline & panels</b> — enrollment funnel, attendance by site, staff watch, packet compliance.</li>
+      <li><span class="dot" style="background:var(--sky-deep)">★</span><b>Red flags & celebrations</b> — missed reports, overtime, packet gaps surfaced instantly; wins surfaced too.</li>
+      <li><span class="dot" style="background:var(--sky-deep)">★</span><b>Export</b> — download any week as CSV or JSON.</li>
+      <li><span class="dot" style="background:var(--sky-deep)">★</span><b>Director View</b> — choose exactly which cards the directors see on their Team Dashboard.</li>
+    </ul>
+    <div class="callout flag" style="margin-top:18px"><span class="e">⚠️</span><div><b>Red flags aren’t about blame.</b> They flag operational things to look at — never a director’s score. Points and flags are completely separate.</div></div>
+  </section>
+
+  <!-- TIPS -->
+  <section>
+    <span class="label">Pro Tips</span>
+    <h2 class="sec-title">Make every report a great one</h2>
+    <div class="grid2">
+      <div class="callout win"><span class="e">⏰</span><div><b>File before 6 PM</b> for the early-bird bonus and to keep the day fresh in your memory.</div></div>
+      <div class="callout win"><span class="e">🗒️</span><div><b>Always add notes</b> where a count is above zero — names, rooms, reasons. That’s what makes the data useful.</div></div>
+      <div class="callout win"><span class="e">📣</span><div><b>Log all comms out</b> toward the daily goal of 15 — every two-way touch counts.</div></div>
+      <div class="callout win"><span class="e">🔁</span><div><b>Don’t break the chain.</b> Even a quick, honest report keeps your streak alive.</div></div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <div class="cta">
+    <span class="blob b1"></span><span class="blob b2"></span>
+    <div class="hero-inner">
+      <h2>Ready when you are.</h2>
+      <p>Two minutes a day keeps your site shining. <span class="brandword">Daily Ops Report</span></p>
+      <a class="btn" href="/">Open the Daily Ops Report →</a>
+    </div>
+  </div>
+
+  <div class="foot">
+    Bright Beginnings Preschool · Daily Ops Report · Crozet · Forest Lakes · Mill Creek
+  </div>
+
+</div>
+</body>
+</html>
