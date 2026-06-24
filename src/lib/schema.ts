@@ -91,6 +91,8 @@ export interface DailyOpsReport {
   directorPacket: DirectorPacket;
   directorReport: string[];
 
+  qualityScore?: number;   // derived 0–100 (gamification.ts); written on every save
+
   status: 'draft' | 'submitted';
   submittedAt: string | null;
   createdAt: string;
@@ -168,6 +170,7 @@ export function emptyReport(siteId: SiteId, date: string, uid = ''): DailyOpsRep
     staff: emptyMap(STAFF_FIELDS),
     directorPacket: { completed: false, incompleteReason: '' },
     directorReport: [''],
+    qualityScore: 0,
     status: 'draft',
     submittedAt: null,
     createdAt: now,

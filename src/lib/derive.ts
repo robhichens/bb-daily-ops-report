@@ -3,6 +3,7 @@
 // dashboard can query/group without recomputation.
 
 import type { DailyOpsReport } from './schema';
+import { computeQualityScore } from './gamification';
 
 export const totalAttendance = (preschool: number, subsidy: number): number =>
   (preschool || 0) + (subsidy || 0);
@@ -29,7 +30,7 @@ export function weekOf(dateIso: string): string {
 
 /** Returns a copy of the report with derived fields recomputed. */
 export function withDerived(r: DailyOpsReport): DailyOpsReport {
-  return {
+  const derived: DailyOpsReport = {
     ...r,
     day: weekdayName(r.date),
     weekOf: weekOf(r.date),
@@ -38,4 +39,6 @@ export function withDerived(r: DailyOpsReport): DailyOpsReport {
       total: totalAttendance(r.attendance.preschool, r.attendance.subsidy),
     },
   };
+  derived.qualityScore = computeQualityScore(derived);
+  return derived;
 }
