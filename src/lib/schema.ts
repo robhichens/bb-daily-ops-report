@@ -56,10 +56,17 @@ export interface Attendance {
   total: number;   // derived = preschool + subsidy
 }
 
+/** One staff member's overtime for the day. */
+export interface OvertimeEntry {
+  name: string;
+  hours: number;
+}
+
 export interface Labor {
   totalHours: number;
-  overtimeHours: number;
+  overtimeHours: number;   // derived = sum of overtimeEntries (not edited directly)
   directorMinutesInRooms: number;
+  overtimeEntries?: OvertimeEntry[];
 }
 
 export interface EnrollmentMarketing {
@@ -196,7 +203,7 @@ export function emptyReport(siteId: SiteId, date: string, uid = ''): DailyOpsRep
     weekOf: '',
     director: '',
     attendance: { preschool: 0, subsidy: 0, total: 0 },
-    labor: { totalHours: 0, overtimeHours: 0, directorMinutesInRooms: 0 },
+    labor: { totalHours: 0, overtimeHours: 0, directorMinutesInRooms: 0, overtimeEntries: [] },
     enrollmentMarketing: emptyMap(ENROLLMENT_FIELDS),
     staff: emptyMap(STAFF_FIELDS),
     directorPacket: { completed: false, incompleteReason: '' },

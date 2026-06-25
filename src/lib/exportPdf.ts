@@ -143,6 +143,9 @@ export async function exportReportsPdf(opts: {
         ['Total Attendance', `${r.attendance.total}`],
         ['Total Labor Hours', `${r.labor.totalHours}`],
         ['Total Overtime Hours', `${r.labor.overtimeHours}`],
+        ...(r.labor.overtimeEntries ?? [])
+          .filter((e) => e.name.trim() || e.hours)
+          .map((e) => [`    ↳ ${e.name || '—'}`, `${e.hours} hrs`]),
         ['Director Minutes in Rooms', `${r.labor.directorMinutesInRooms}`],
       ],
       columnStyles: { 0: { cellWidth: 95, textColor: C.dkGray }, 1: { fontStyle: 'bold' } },

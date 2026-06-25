@@ -19,7 +19,7 @@ export function reportsToCsv(rows: DailyOpsReport[]): string {
   const headers = [
     'Date', 'Day', 'Site', 'Director', 'Status', 'Quality',
     'Pre-School', 'Subsidy', 'Total Attendance',
-    'Labor Hours', 'Overtime Hours', 'Director Minutes in Rooms',
+    'Labor Hours', 'Overtime Hours', 'Overtime (by staff)', 'Director Minutes in Rooms',
     ...ENROLLMENT_FIELDS.flatMap((f) => [f.label, `${f.label} — notes`]),
     ...STAFF_FIELDS.flatMap((f) => [f.label, `${f.label} — notes`]),
     'Packet Completed', 'Packet Incomplete Reason',
@@ -30,7 +30,9 @@ export function reportsToCsv(rows: DailyOpsReport[]): string {
     const cells: (string | number | boolean)[] = [
       r.date, r.day, r.siteName, r.director, r.status, r.qualityScore ?? '',
       r.attendance.preschool, r.attendance.subsidy, r.attendance.total,
-      r.labor.totalHours, r.labor.overtimeHours, r.labor.directorMinutesInRooms,
+      r.labor.totalHours, r.labor.overtimeHours,
+      (r.labor.overtimeEntries ?? []).filter((e) => e.name.trim() || e.hours).map((e) => `${e.name}: ${e.hours}`).join('; '),
+      r.labor.directorMinutesInRooms,
       ...ENROLLMENT_FIELDS.flatMap((f) => {
         const c = r.enrollmentMarketing[f.key as keyof typeof r.enrollmentMarketing]
         return [c.count, countNoteSummary(c, f.itemFields)]

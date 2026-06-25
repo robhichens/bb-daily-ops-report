@@ -8,6 +8,10 @@ import { computeQualityScore } from './gamification';
 export const totalAttendance = (preschool: number, subsidy: number): number =>
   (preschool || 0) + (subsidy || 0);
 
+/** Sum of per-staff overtime hours (2 dp). */
+export const totalOvertime = (entries?: { hours: number }[]): number =>
+  Math.round((entries ?? []).reduce((s, e) => s + (e.hours || 0), 0) * 100) / 100;
+
 /** Weekday name for an ISO date (parsed as local to avoid TZ drift). */
 export function weekdayName(dateIso: string): string {
   if (!dateIso) return '';
@@ -37,6 +41,14 @@ export function withDerived(r: DailyOpsReport): DailyOpsReport {
     attendance: {
       ...r.attendance,
       total: totalAttendance(r.attendance.preschool, r.attendance.subsidy),
+    },
+    labor: {
+      ...r.labor,
+      // Derive from the per-staff breakout; keep the stored value if there are
+      // no entries (so legacy/seeded data isn't zeroed out).
+      overtimeHours: r.labor.overtimeEntries?.length
+        ? totalOvertime(r.labor.overtimeEntries)
+        : r.labor.overtimeHours,
     },
   };
   derived.qualityScore = computeQualityScore(derived);
