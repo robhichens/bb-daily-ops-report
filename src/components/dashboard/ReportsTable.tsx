@@ -5,8 +5,10 @@ import { Card } from '@/components/ui/card'
 import {
   ENROLLMENT_FIELDS,
   STAFF_FIELDS,
+  countNoteSummary,
   type CountNote,
   type DailyOpsReport,
+  type ItemFieldDef,
 } from '@/lib/schema'
 import { formatShort } from '@/lib/dates'
 
@@ -62,8 +64,8 @@ export function ReportsTable({ rows }: { rows: DailyOpsReport[] }) {
                       className="overflow-hidden bg-[var(--color-cream)]"
                     >
                       <div className="grid gap-4 px-5 py-4 md:grid-cols-2">
-                        <NotesBlock title="Enrollment / Marketing" entries={ENROLLMENT_FIELDS.map((f) => ({ label: f.label, c: r.enrollmentMarketing[f.key as keyof typeof r.enrollmentMarketing] }))} />
-                        <NotesBlock title="Staff" entries={STAFF_FIELDS.map((f) => ({ label: f.label, c: r.staff[f.key as keyof typeof r.staff] }))} />
+                        <NotesBlock title="Enrollment / Marketing" entries={ENROLLMENT_FIELDS.map((f) => ({ label: f.label, c: r.enrollmentMarketing[f.key as keyof typeof r.enrollmentMarketing], itemFields: f.itemFields }))} />
+                        <NotesBlock title="Staff" entries={STAFF_FIELDS.map((f) => ({ label: f.label, c: r.staff[f.key as keyof typeof r.staff], itemFields: f.itemFields }))} />
                         {r.directorReport.filter(Boolean).length > 0 && (
                           <div className="md:col-span-2">
                             <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[var(--color-coral-dark)]">Director Report</p>
@@ -85,8 +87,16 @@ export function ReportsTable({ rows }: { rows: DailyOpsReport[] }) {
   )
 }
 
-function NotesBlock({ title, entries }: { title: string; entries: { label: string; c: CountNote }[] }) {
-  const filled = entries.filter((e) => e.c.count > 0 || e.c.notes.trim())
+function NotesBlock({
+  title,
+  entries,
+}: {
+  title: string
+  entries: { label: string; c: CountNote; itemFields?: ItemFieldDef[] }[]
+}) {
+  const filled = entries
+    .map((e) => ({ ...e, summary: countNoteSummary(e.c, e.itemFields) }))
+    .filter((e) => e.c.count > 0 || e.summary.trim())
   return (
     <div>
       <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[var(--color-dk-gray)]">{title}</p>
@@ -97,7 +107,7 @@ function NotesBlock({ title, entries }: { title: string; entries: { label: strin
           {filled.map((e) => (
             <li key={e.label} className="text-[var(--color-charcoal)]">
               <span className="font-semibold">{e.label}: {e.c.count}</span>
-              {e.c.notes.trim() && <span className="text-[var(--color-dk-gray)]"> — {e.c.notes}</span>}
+              {e.summary.trim() && <span className="text-[var(--color-dk-gray)]"> — {e.summary}</span>}
             </li>
           ))}
         </ul>

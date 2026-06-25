@@ -23,6 +23,7 @@ export function StaffSection({ value, onChange, disabled }: Props) {
               key={f.key}
               label={isHours ? 'Time Spent Recruiting' : f.label}
               notesPrompt={f.notesPrompt}
+              itemFields={f.itemFields}
               value={value[f.key]}
               onChange={(next) => setField(f.key, next)}
               decimals={isHours}

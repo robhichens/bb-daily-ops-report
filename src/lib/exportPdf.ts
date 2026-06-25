@@ -8,6 +8,7 @@ import autoTable from 'jspdf-autotable'
 import {
   ENROLLMENT_FIELDS,
   STAFF_FIELDS,
+  countNoteSummary,
   type DailyOpsReport,
   type EnrollmentMarketing,
   type Staff,
@@ -157,7 +158,7 @@ export async function exportReportsPdf(opts: {
       head: [['Field', 'Count', 'Notes']],
       body: ENROLLMENT_FIELDS.map((f) => {
         const c = r.enrollmentMarketing[f.key as keyof EnrollmentMarketing]
-        return [f.label, `${c.count}`, c.notes || '—']
+        return [f.label, `${c.count}`, countNoteSummary(c, f.itemFields) || '—']
       }),
       headStyles: { fillColor: C.coral, textColor: C.white, fontStyle: 'bold' },
       alternateRowStyles: { fillColor: C.cream },
@@ -175,7 +176,7 @@ export async function exportReportsPdf(opts: {
       body: STAFF_FIELDS.map((f) => {
         const c = r.staff[f.key as keyof Staff]
         const isHours = f.key === 'timeSpentRecruiting'
-        return [isHours ? 'Time Spent Recruiting (hrs)' : f.label, `${c.count}`, c.notes || '—']
+        return [isHours ? 'Time Spent Recruiting (hrs)' : f.label, `${c.count}`, countNoteSummary(c, f.itemFields) || '—']
       }),
       headStyles: { fillColor: C.charcoal, textColor: C.white, fontStyle: 'bold' },
       alternateRowStyles: { fillColor: C.cream },

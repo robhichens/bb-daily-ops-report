@@ -69,7 +69,9 @@ export function workdaysInWeekUpTo(weekOf: string, asOf: string): string[] {
 // Quality score (0–100) — rewards thoroughness, not big numbers.
 // ---------------------------------------------------------------------------
 
-const hasNote = (n: { notes: string }): boolean => n.notes.trim().length > 0
+const hasNote = (n: { notes: string; items?: Record<string, string>[] }): boolean =>
+  n.notes.trim().length > 0 ||
+  (n.items?.some((it) => Object.values(it).some((v) => (v ?? '').trim().length > 0)) ?? false)
 
 export function computeQualityScore(r: DailyOpsReport): number {
   let score = 0

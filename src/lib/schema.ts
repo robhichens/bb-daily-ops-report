@@ -24,12 +24,24 @@ export const siteName = (id: SiteId): string =>
 /** Directors for the autocomplete (as of June 2026). */
 export const DIRECTORS = ['Jacqueline Lang', 'Jess Rybak', 'Laura Baker'];
 
-/** A counted item with an attached notes/names string. */
+/** One structured sub-field shown per item when a line is broken out. */
+export interface ItemFieldDef {
+  key: string;
+  label: string;
+  type: 'text' | 'date' | 'select';
+  options?: string[]; // for type === 'select'
+}
+/** A single item's structured details, keyed by ItemFieldDef.key. */
+export type ItemDetail = Record<string, string>;
+
+/** A counted line. `notes` is the legacy free-text; `items` holds the
+ *  structured per-item breakout (its length follows `count`). */
 export interface CountNote {
   count: number;
   notes: string;
+  items?: ItemDetail[];
 }
-export const emptyCountNote = (): CountNote => ({ count: 0, notes: '' });
+export const emptyCountNote = (): CountNote => ({ count: 0, notes: '', items: [] });
 
 /** Daily target for Enrollment Communication Out / IKS. Drives the goal pill. */
 export const ENROLLMENT_COMMS_DAILY_GOAL = 15;
@@ -109,27 +121,46 @@ export interface CountNoteField<K extends string = string> {
   label: string;
   notesPrompt: string;
   goal?: number; // when set, render a goal pill (green at >= goal, amber below)
+  /** When set, the count expands into this many structured item rows. */
+  itemFields?: ItemFieldDef[];
 }
 
+// Reusable per-item sub-fields for the structured breakouts.
+const F_NAME: ItemFieldDef = { key: 'name', label: 'First & last name', type: 'text' };
+const F_ROOM: ItemFieldDef = { key: 'room', label: 'Room', type: 'text' };
+const F_REASON: ItemFieldDef = { key: 'reason', label: 'Reason', type: 'text' };
+
 export const ENROLLMENT_FIELDS: CountNoteField<keyof EnrollmentMarketing>[] = [
-  { key: 'toursGiven', label: 'Number of Tours Given', notesPrompt: 'Add names' },
-  { key: 'toursScheduled', label: 'Number of Tours Scheduled', notesPrompt: 'Check IKS' },
-  { key: 'callsInEmailsWeb', label: 'Number of Calls In/Emails & Web Inq', notesPrompt: 'Provide all details' },
-  { key: 'enrollmentCommsOut', label: 'Enrollment Communication Out/IKS', notesPrompt: 'Provide all details (daily goal is 15 — two-way comms)', goal: ENROLLMENT_COMMS_DAILY_GOAL },
-  { key: 'regFeesPaid', label: 'Number of Reg Fees Paid', notesPrompt: 'With Names, Room and Start Date' },
-  { key: 'newStarts', label: 'Number of New Starts', notesPrompt: 'With Names, Room' },
-  { key: 'enrollmentsToday', label: 'Number of Enrollments (Today)', notesPrompt: 'With Names, Rooms, Start Date (Reg PD, Enhancement PD, Start Date confirmed)' },
-  { key: 'terminationsToday', label: 'Number of Terminations (Today)', notesPrompt: 'With Names, Room, Termination Date and Reason' },
+  { key: 'toursGiven', label: 'Number of Tours Given', notesPrompt: 'Add names', itemFields: [F_NAME] },
+  { key: 'toursScheduled', label: 'Number of Tours Scheduled', notesPrompt: 'Check IKS', itemFields: [F_NAME, { key: 'tourDate', label: 'Tour date', type: 'date' }] },
+  { key: 'callsInEmailsWeb', label: 'Number of Calls In/Emails & Web Inq', notesPrompt: 'Provide all details', itemFields: [{ key: 'type', label: 'Type', type: 'select', options: ['Call', 'Email', 'Web', 'Walk-in'] }, F_NAME] },
+  { key: 'enrollmentCommsOut', label: 'Enrollment Communication Out/IKS', notesPrompt: 'Provide all details (daily goal is 15 — two-way comms)', goal: ENROLLMENT_COMMS_DAILY_GOAL, itemFields: [{ key: 'type', label: 'Type', type: 'select', options: ['Call', 'Email', 'Text', 'IKS'] }, F_NAME, { key: 'detail', label: 'Detail', type: 'text' }] },
+  { key: 'regFeesPaid', label: 'Number of Reg Fees Paid', notesPrompt: 'With Names, Room and Start Date', itemFields: [F_NAME, F_ROOM, { key: 'startDate', label: 'Start date', type: 'date' }] },
+  { key: 'newStarts', label: 'Number of New Starts', notesPrompt: 'With Names, Room', itemFields: [F_NAME, F_ROOM] },
+  { key: 'enrollmentsToday', label: 'Number of Enrollments (Today)', notesPrompt: 'With Names, Rooms, Start Date (Reg PD, Enhancement PD, Start Date confirmed)', itemFields: [F_NAME, F_ROOM, { key: 'startDate', label: 'Start date', type: 'date' }] },
+  { key: 'terminationsToday', label: 'Number of Terminations (Today)', notesPrompt: 'With Names, Room, Termination Date and Reason', itemFields: [F_NAME, F_ROOM, { key: 'terminationDate', label: 'Termination date', type: 'date' }, F_REASON] },
 ];
 
 export const STAFF_FIELDS: CountNoteField<keyof Staff>[] = [
-  { key: 'callOutsLate', label: 'Call Outs/Late for Shift', notesPrompt: 'Name and Reason' },
-  { key: 'rtoVacation', label: 'RTO/Vacation', notesPrompt: 'Name and Reason' },
-  { key: 'sentHome', label: 'Number of Staff Sent Home', notesPrompt: 'Name and Reason (Over staffed, sick, etc.)' },
-  { key: 'staffTerminating', label: 'Staff Terminating', notesPrompt: 'Name, Reason and Last Day' },
+  { key: 'callOutsLate', label: 'Call Outs/Late for Shift', notesPrompt: 'Name and Reason', itemFields: [F_NAME, F_REASON] },
+  { key: 'rtoVacation', label: 'RTO/Vacation', notesPrompt: 'Name and Reason', itemFields: [F_NAME, F_REASON] },
+  { key: 'sentHome', label: 'Number of Staff Sent Home', notesPrompt: 'Name and Reason (Over staffed, sick, etc.)', itemFields: [F_NAME, F_REASON] },
+  { key: 'staffTerminating', label: 'Staff Terminating', notesPrompt: 'Name, Reason and Last Day', itemFields: [F_NAME, F_REASON, { key: 'lastDay', label: 'Last day', type: 'date' }] },
   { key: 'timeSpentRecruiting', label: 'Time Spent Recruiting', notesPrompt: 'Phone screening, Hiring Correspondence, Interviews' },
-  { key: 'futureHires', label: 'Future Hires', notesPrompt: 'Name, Position, Start Date' },
+  { key: 'futureHires', label: 'Future Hires', notesPrompt: 'Name, Position, Start Date', itemFields: [F_NAME, { key: 'position', label: 'Position', type: 'text' }, { key: 'startDate', label: 'Start date', type: 'date' }] },
 ];
+
+/** Human-readable summary of a counted line — prefers the structured items,
+ *  falling back to the legacy notes string. Used by exports + dashboard. */
+export function countNoteSummary(cn: CountNote, itemFields?: ItemFieldDef[]): string {
+  if (itemFields && cn.items?.length) {
+    const parts = cn.items
+      .map((it) => itemFields.map((f) => (it[f.key] ?? '').trim()).filter(Boolean).join(' · '))
+      .filter(Boolean);
+    if (parts.length) return parts.join('  |  ');
+  }
+  return cn.notes ?? '';
+}
 
 /** Section accent colors (left border) — matches the bbonboard internal brand. */
 export const SECTION_ACCENT = {

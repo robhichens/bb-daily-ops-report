@@ -6,6 +6,7 @@
 import {
   ENROLLMENT_FIELDS,
   STAFF_FIELDS,
+  countNoteSummary,
   type DailyOpsReport,
 } from './schema'
 
@@ -32,11 +33,11 @@ export function reportsToCsv(rows: DailyOpsReport[]): string {
       r.labor.totalHours, r.labor.overtimeHours, r.labor.directorMinutesInRooms,
       ...ENROLLMENT_FIELDS.flatMap((f) => {
         const c = r.enrollmentMarketing[f.key as keyof typeof r.enrollmentMarketing]
-        return [c.count, c.notes]
+        return [c.count, countNoteSummary(c, f.itemFields)]
       }),
       ...STAFF_FIELDS.flatMap((f) => {
         const c = r.staff[f.key as keyof typeof r.staff]
-        return [c.count, c.notes]
+        return [c.count, countNoteSummary(c, f.itemFields)]
       }),
       r.directorPacket.completed ? 'Yes' : 'No', r.directorPacket.incompleteReason,
       r.directorReport.filter(Boolean).join(' | '),
