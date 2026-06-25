@@ -15,7 +15,7 @@ filed in about **two minutes**. It saves as you type, and the moment you hit
 submit, the information is instantly available to leadership.
 
 **Live at:** [bbdor.netlify.app](https://bbdor.netlify.app) ·
-**How-to guide:** [bbdor.netlify.app/how-to.html](https://bbdor.netlify.app/how-to.html)
+**How-to guide:** [bbdor.netlify.app/how-to-use-the-dor.html](https://bbdor.netlify.app/how-to-use-the-dor.html)
 
 ---
 
