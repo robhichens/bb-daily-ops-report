@@ -1,1 +1,5 @@
+# Clean URL for the how-to guide (so /how-to-use-the-dor serves the page)
+/how-to-use-the-dor   /how-to-use-the-dor.html   200
+
+# SPA fallback (must stay last)
 /*  /index.html  200

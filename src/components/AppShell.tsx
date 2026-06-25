@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { ClipboardList, LayoutDashboard, LogOut } from 'lucide-react'
+import { ClipboardList, LayoutDashboard, LogOut, HelpCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/auth/AuthProvider'
 import { siteName } from '@/lib/schema'
@@ -68,6 +68,16 @@ export function AppShell() {
             </nav>
 
             <div className="flex items-center gap-2 border-l border-[var(--color-border)] pl-2 sm:pl-4">
+              <a
+                href="/how-to-use-the-dor.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="How to use the DOR"
+                aria-label="How to use the DOR"
+                className="grid size-9 place-items-center rounded-lg text-[var(--color-dk-gray)] transition-colors hover:bg-[var(--color-secondary)] hover:text-[var(--color-charcoal)]"
+              >
+                <HelpCircle className="size-5" />
+              </a>
               <div className="hidden text-right leading-tight sm:block">
                 <p className="text-sm font-semibold text-[var(--color-charcoal)]">{name}</p>
                 {roleLine && (
