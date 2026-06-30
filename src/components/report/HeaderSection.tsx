@@ -14,6 +14,7 @@ interface HeaderSectionProps {
   onDirector: (name: string) => void
   /** Admins can change site; directors are locked to theirs. */
   canEditSite: boolean
+  /** Locks the report DATA fields (Director). Site + Date stay usable as nav. */
   disabled: boolean
 }
 
@@ -35,7 +36,6 @@ export function HeaderSection({
             <select
               value={siteId}
               onChange={(e) => onSite(e.target.value as SiteId)}
-              disabled={disabled}
               className={inputClass}
             >
               {SITES.map((s) => (
@@ -50,7 +50,10 @@ export function HeaderSection({
         </Field>
 
         <Field label="Date">
-          <Input type="date" value={date} onChange={(e) => onDate(e.target.value)} disabled={disabled} />
+          {/* Date is navigation, not report data — stays usable even when the
+              loaded day is submitted, so a director can jump back to fill a
+              missed day. */}
+          <Input type="date" value={date} onChange={(e) => onDate(e.target.value)} />
         </Field>
 
         <Field label="Day">
