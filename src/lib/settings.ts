@@ -11,7 +11,6 @@ export type DashboardSection =
   | 'leaderboard'
   | 'teamGoal'
   | 'celebrations'
-  | 'attendance'
   | 'funnel'
   | 'staffWatch'
   | 'packet'
@@ -26,9 +25,8 @@ export const SECTION_META: { key: DashboardSection; label: string; hint: string 
   { key: 'leaderboard', label: 'Leaderboard', hint: 'Friendly weekly ranking + streaks' },
   { key: 'teamGoal', label: 'Team goal', hint: 'Shared “everyone filed” progress bar' },
   { key: 'celebrations', label: 'Celebrations', hint: 'Wins: streaks, goals hit, growth' },
-  { key: 'kpis', label: 'KPI cards', hint: 'Attendance, overtime, comms, net starts' },
-  { key: 'attendance', label: 'Attendance by site', hint: 'Cross-site attendance bars' },
-  { key: 'funnel', label: 'Enrollment pipeline', hint: 'Tours → enrollments funnel' },
+  { key: 'kpis', label: 'KPI cards', hint: 'Attendance, overtime, tours, reg fees' },
+  { key: 'funnel', label: 'Enrollment pipeline', hint: 'Tours → enrollments, per site' },
   { key: 'staffWatch', label: 'Staff watch', hint: 'Call-outs, hires, recruiting' },
   { key: 'packet', label: 'Packet compliance', hint: 'Director-packet completion' },
   { key: 'redFlags', label: 'Red flags', hint: 'Operational issues (sensitive)' },
@@ -41,7 +39,6 @@ export const DEFAULT_DIRECTOR_VIEW: DirectorViewConfig = {
     teamGoal: true,
     celebrations: true,
     kpis: false,
-    attendance: false,
     funnel: false,
     staffWatch: false,
     packet: false,

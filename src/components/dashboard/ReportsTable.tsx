@@ -63,11 +63,55 @@ export function ReportsTable({ rows }: { rows: DailyOpsReport[] }) {
                       exit={{ height: 0, opacity: 0 }}
                       className="overflow-hidden bg-[var(--color-cream)]"
                     >
-                      <div className="grid gap-4 px-5 py-4 md:grid-cols-2">
-                        <NotesBlock title="Enrollment / Marketing" entries={ENROLLMENT_FIELDS.map((f) => ({ label: f.label, c: r.enrollmentMarketing[f.key as keyof typeof r.enrollmentMarketing], itemFields: f.itemFields }))} />
-                        <NotesBlock title="Staff" entries={STAFF_FIELDS.map((f) => ({ label: f.label, c: r.staff[f.key as keyof typeof r.staff], itemFields: f.itemFields }))} />
+                      <div className="space-y-4 px-5 py-4">
+                        {/* Attendance & Labor */}
+                        <div>
+                          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[var(--color-sky-deep)]">Attendance &amp; Labor</p>
+                          <div className="flex flex-wrap gap-2">
+                            <Stat label="Pre-School" value={r.attendance.preschool} />
+                            <Stat label="Subsidy" value={r.attendance.subsidy} />
+                            <Stat label="Total" value={r.attendance.total} />
+                            <Stat label="Labor hrs" value={r.labor.totalHours} />
+                            <Stat label="Overtime hrs" value={r.labor.overtimeHours} />
+                            <Stat label="Dir. min in rooms" value={r.labor.directorMinutesInRooms} />
+                          </div>
+                          {(r.labor.overtimeEntries ?? []).filter((e) => e.name.trim() || e.hours).length > 0 && (
+                            <p className="mt-1.5 text-xs text-[var(--color-dk-gray)]">
+                              <span className="font-semibold">OT by staff:</span>{' '}
+                              {(r.labor.overtimeEntries ?? [])
+                                .filter((e) => e.name.trim() || e.hours)
+                                .map((e) => `${e.name || '—'} · ${e.hours} hrs`)
+                                .join('  |  ')}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Enrollment + Staff */}
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <NotesBlock title="Enrollment / Marketing" entries={ENROLLMENT_FIELDS.map((f) => ({ label: f.label, c: r.enrollmentMarketing[f.key as keyof typeof r.enrollmentMarketing], itemFields: f.itemFields }))} />
+                          <NotesBlock title="Staff" entries={STAFF_FIELDS.map((f) => ({ label: f.label, c: r.staff[f.key as keyof typeof r.staff], itemFields: f.itemFields }))} />
+                        </div>
+
+                        {/* Director Packet */}
+                        <div>
+                          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[var(--color-dk-gray)]">Director Packet</p>
+                          <p className="text-sm text-[var(--color-charcoal)]">
+                            {r.directorPacket.completed ? (
+                              <span style={{ color: 'var(--color-good)' }} className="font-semibold">✓ Completed today</span>
+                            ) : (
+                              <>
+                                <span style={{ color: 'var(--color-coral-dark)' }} className="font-semibold">Not completed</span>
+                                {r.directorPacket.incompleteReason && (
+                                  <span className="text-[var(--color-dk-gray)]"> — {r.directorPacket.incompleteReason}</span>
+                                )}
+                              </>
+                            )}
+                          </p>
+                        </div>
+
+                        {/* Director Report */}
                         {r.directorReport.filter(Boolean).length > 0 && (
-                          <div className="md:col-span-2">
+                          <div>
                             <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[var(--color-coral-dark)]">Director Report</p>
                             <ol className="list-inside list-decimal space-y-0.5 text-sm text-[var(--color-charcoal)]">
                               {r.directorReport.filter(Boolean).map((l, i) => <li key={i}>{l}</li>)}
@@ -84,6 +128,15 @@ export function ReportsTable({ rows }: { rows: DailyOpsReport[] }) {
         </div>
       )}
     </Card>
+  )
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg bg-[var(--color-secondary)] px-3 py-1.5">
+      <span className="font-brand text-lg font-medium text-[var(--color-charcoal)]">{value}</span>
+      <span className="ml-1.5 text-[11px] font-semibold text-[var(--color-dk-gray)]">{label}</span>
+    </div>
   )
 }
 

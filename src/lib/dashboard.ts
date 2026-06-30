@@ -6,6 +6,7 @@
 
 import {
   ENROLLMENT_COMMS_DAILY_GOAL,
+  REGISTRATION_FEE,
   SITES,
   siteName,
   type DailyOpsReport,
@@ -36,20 +37,18 @@ export interface Kpis {
   overtimeHours: number
   overtimePct: number // 0–100
   overtimeFlag: boolean // > 5%
-  commsOut: number
-  commsGoal: number
-  commsMet: boolean
-  netNewStarts: number
+  toursScheduledToday: number
+  toursScheduledWeek: number
+  regFeesPaid: number
+  regFeesRevenue: number // regFeesPaid × flat fee
 }
 
-export function computeKpis(rows: DailyOpsReport[]): Kpis {
+export function computeKpis(rows: DailyOpsReport[], today: string): Kpis {
   const days = Math.max(1, distinctDays(rows))
   const totalLabor = sum(rows.map((r) => r.labor.totalHours))
   const totalOt = sum(rows.map((r) => r.labor.overtimeHours))
-  const commsOut = sum(rows.map((r) => r.enrollmentMarketing.enrollmentCommsOut.count))
-  const commsGoal = rows.length * ENROLLMENT_COMMS_DAILY_GOAL
-  const newStarts = sum(rows.map((r) => r.enrollmentMarketing.newStarts.count))
-  const terms = sum(rows.map((r) => r.enrollmentMarketing.terminationsToday.count))
+  const tours = (rs: DailyOpsReport[]) => sum(rs.map((r) => r.enrollmentMarketing.toursScheduled.count))
+  const regFeesPaid = sum(rows.map((r) => r.enrollmentMarketing.regFeesPaid.count))
   const otPct = totalLabor > 0 ? (totalOt / totalLabor) * 100 : 0
 
   return {
@@ -57,29 +56,34 @@ export function computeKpis(rows: DailyOpsReport[]): Kpis {
     overtimeHours: Math.round(totalOt * 10) / 10,
     overtimePct: Math.round(otPct * 10) / 10,
     overtimeFlag: otPct > 5,
-    commsOut,
-    commsGoal,
-    commsMet: commsOut >= commsGoal && commsGoal > 0,
-    netNewStarts: newStarts - terms,
+    toursScheduledToday: tours(rows.filter((r) => r.date === today)),
+    toursScheduledWeek: tours(rows),
+    regFeesPaid,
+    regFeesRevenue: regFeesPaid * REGISTRATION_FEE,
   }
 }
 
 // ---------------------------------------------------------------------------
-// Attendance by site (always all sites, for comparison)
+// Overtime by staff (single-location card flip) — summed by name, desc.
 // ---------------------------------------------------------------------------
 
-export interface SiteBar {
-  siteId: SiteId
+export interface OvertimeStaffRow {
   name: string
-  value: number
+  hours: number
 }
 
-export function attendanceBySite(weekRows: DailyOpsReport[]): SiteBar[] {
-  return SITES.map((s) => ({
-    siteId: s.id,
-    name: s.name,
-    value: sum(weekRows.filter((r) => r.siteId === s.id).map((r) => r.attendance.total)),
-  }))
+export function overtimeByStaff(rows: DailyOpsReport[]): OvertimeStaffRow[] {
+  const byName = new Map<string, number>()
+  for (const r of rows) {
+    for (const e of r.labor.overtimeEntries ?? []) {
+      const name = e.name.trim()
+      if (!name && !e.hours) continue
+      byName.set(name || '—', (byName.get(name || '—') ?? 0) + (e.hours || 0))
+    }
+  }
+  return [...byName.entries()]
+    .map(([name, hours]) => ({ name, hours: Math.round(hours * 10) / 10 }))
+    .sort((a, b) => b.hours - a.hours)
 }
 
 // ---------------------------------------------------------------------------
@@ -101,6 +105,21 @@ export function enrollmentFunnel(rows: DailyOpsReport[]): FunnelStage[] {
     { label: 'New Starts', value: em('newStarts') },
     { label: 'Enrollments', value: em('enrollmentsToday') },
   ]
+}
+
+export interface SiteFunnel {
+  siteId: SiteId
+  name: string
+  stages: FunnelStage[]
+}
+
+/** One funnel per site — always all sites, regardless of the dashboard filter. */
+export function enrollmentFunnelBySite(allRows: DailyOpsReport[]): SiteFunnel[] {
+  return SITES.map((s) => ({
+    siteId: s.id,
+    name: s.name,
+    stages: enrollmentFunnel(allRows.filter((r) => r.siteId === s.id)),
+  }))
 }
 
 // ---------------------------------------------------------------------------
@@ -242,12 +261,13 @@ export function celebrations(weekRows: DailyOpsReport[], weekOf: string, asOf: s
 
 export interface DashboardView {
   asOf: string
+  singleSite: boolean
   kpis: Kpis
+  overtimeStaff: OvertimeStaffRow[]
   board: LeaderboardRow[]
   badgesBySite: Record<string, Badge[]>
   teamGoal: TeamGoal
-  attendance: SiteBar[]
-  funnel: FunnelStage[]
+  funnelBySite: SiteFunnel[]
   staff: StaffWatchRow[]
   packet: PacketCompliance
   flags: Flag[]
@@ -280,12 +300,13 @@ export function buildDashboardView(
 
   return {
     asOf,
-    kpis: computeKpis(filtered),
+    singleSite: site !== 'all',
+    kpis: computeKpis(filtered, today),
+    overtimeStaff: overtimeByStaff(filtered),
     board: leaderboard(allSites, SITE_IDS, weekOf, asOf),
     badgesBySite,
     teamGoal: teamGoalProgress(allSites, SITE_IDS, weekOf, asOf),
-    attendance: attendanceBySite(allSites),
-    funnel: enrollmentFunnel(filtered),
+    funnelBySite: enrollmentFunnelBySite(allSites),
     staff: staffWatch(filtered),
     packet: packetCompliance(filtered),
     flags: redFlags(allSites, weekOf, asOf, today),

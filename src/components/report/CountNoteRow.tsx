@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import type { CountNote, ItemDetail, ItemFieldDef } from '@/lib/schema'
 import { Input, inputClass } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+
+const OTHER = '__other__'
 
 interface CountNoteRowProps {
   label: string
@@ -41,6 +44,14 @@ export function CountNoteRow({
   itemFields,
 }: CountNoteRowProps) {
   const hasItems = !!itemFields && itemFields.length > 0
+  // Tracks which (row, field) selects are in free-type "Other" mode, keyed `${i}:${key}`.
+  const [otherKeys, setOtherKeys] = useState<Set<string>>(new Set())
+  const toggleOther = (id: string, on: boolean) =>
+    setOtherKeys((prev) => {
+      const next = new Set(prev)
+      on ? next.add(id) : next.delete(id)
+      return next
+    })
 
   const setCount = (raw: string) => {
     if (raw === '') {
@@ -114,41 +125,72 @@ export function CountNoteRow({
                   <span className="mt-1 grid size-5 shrink-0 place-items-center rounded-full bg-[var(--color-coral-soft)] text-[10px] font-bold text-[var(--color-coral-dark)]">
                     {i + 1}
                   </span>
-                  <div className={cn('grid flex-1 gap-2', colsClass(itemFields!.length))}>
-                    {itemFields!.map((f) => {
-                      const val = value.items?.[i]?.[f.key] ?? ''
-                      return (
-                        <div key={f.key} className="flex flex-col">
-                          {f.type === 'select' ? (
-                            <select
-                              value={val}
-                              disabled={disabled}
-                              onChange={(e) => setItem(i, f.key, e.target.value)}
-                              className={cn(inputClass, 'h-9')}
-                            >
-                              <option value="">Select…</option>
-                              {f.options?.map((o) => (
-                                <option key={o} value={o}>
-                                  {o}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <Input
-                              type={f.type === 'date' ? 'date' : 'text'}
-                              value={val}
-                              disabled={disabled}
-                              onChange={(e) => setItem(i, f.key, e.target.value)}
-                              className="h-9"
-                            />
-                          )}
-                          <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--color-mid-gray)]">
-                            {f.label}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  {(() => {
+                    const item = value.items?.[i] ?? {}
+                    const visible = itemFields!.filter(
+                      (f) => !f.showWhen || (item[f.showWhen.key] ?? '') === f.showWhen.equals
+                    )
+                    return (
+                      <div className={cn('grid flex-1 gap-2', colsClass(visible.length))}>
+                        {visible.map((f) => {
+                          const val = item[f.key] ?? ''
+                          const id = `${i}:${f.key}`
+                          const isOther =
+                            !!f.allowOther && (otherKeys.has(id) || (!!val && !f.options?.includes(val)))
+                          return (
+                            <div key={f.key} className="flex flex-col">
+                              {f.type === 'select' ? (
+                                <>
+                                  <select
+                                    value={isOther ? OTHER : val}
+                                    disabled={disabled}
+                                    onChange={(e) => {
+                                      if (e.target.value === OTHER) {
+                                        toggleOther(id, true)
+                                        setItem(i, f.key, '')
+                                      } else {
+                                        toggleOther(id, false)
+                                        setItem(i, f.key, e.target.value)
+                                      }
+                                    }}
+                                    className={cn(inputClass, 'h-9')}
+                                  >
+                                    <option value="">Select…</option>
+                                    {f.options?.map((o) => (
+                                      <option key={o} value={o}>
+                                        {o}
+                                      </option>
+                                    ))}
+                                    {f.allowOther && <option value={OTHER}>Other…</option>}
+                                  </select>
+                                  {isOther && (
+                                    <Input
+                                      value={val}
+                                      disabled={disabled}
+                                      onChange={(e) => setItem(i, f.key, e.target.value)}
+                                      placeholder="Type it in…"
+                                      className="mt-1 h-9"
+                                    />
+                                  )}
+                                </>
+                              ) : (
+                                <Input
+                                  type={f.type === 'date' ? 'date' : f.type === 'time' ? 'time' : 'text'}
+                                  value={val}
+                                  disabled={disabled}
+                                  onChange={(e) => setItem(i, f.key, e.target.value)}
+                                  className="h-9"
+                                />
+                              )}
+                              <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--color-mid-gray)]">
+                                {f.label}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })()}
                 </div>
               </div>
             ))}

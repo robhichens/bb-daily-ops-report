@@ -16,6 +16,9 @@ yarn-debug.log*
 yarn-error.log*
 firebase-debug.log*
 
+# firestore data backups (never commit report data)
+backup-*.json
+
 # editor / os
 .vscode/*
 !.vscode/extensions.json

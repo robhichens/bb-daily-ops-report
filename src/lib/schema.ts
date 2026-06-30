@@ -28,8 +28,11 @@ export const DIRECTORS = ['Jacqueline Lang', 'Jess Rybak', 'Laura Baker'];
 export interface ItemFieldDef {
   key: string;
   label: string;
-  type: 'text' | 'date' | 'select';
-  options?: string[]; // for type === 'select'
+  type: 'text' | 'date' | 'select' | 'time';
+  options?: string[];        // for type === 'select'
+  allowOther?: boolean;      // select: add an "Other…" choice that reveals a free-text box
+  /** Only render this field when another field on the same item equals a value. */
+  showWhen?: { key: string; equals: string };
 }
 /** A single item's structured details, keyed by ItemFieldDef.key. */
 export type ItemDetail = Record<string, string>;
@@ -45,6 +48,9 @@ export const emptyCountNote = (): CountNote => ({ count: 0, notes: '', items: []
 
 /** Daily target for Enrollment Communication Out / IKS. Drives the goal pill. */
 export const ENROLLMENT_COMMS_DAILY_GOAL = 15;
+
+/** Flat registration fee ($). Reg Fees Paid count × this = the dashboard $ figure. */
+export const REGISTRATION_FEE = 200;
 
 // ---------------------------------------------------------------------------
 // Section shapes
@@ -140,8 +146,8 @@ const F_REASON: ItemFieldDef = { key: 'reason', label: 'Reason', type: 'text' };
 export const ENROLLMENT_FIELDS: CountNoteField<keyof EnrollmentMarketing>[] = [
   { key: 'toursGiven', label: 'Number of Tours Given', notesPrompt: 'Add names', itemFields: [F_NAME] },
   { key: 'toursScheduled', label: 'Number of Tours Scheduled', notesPrompt: 'Check IKS', itemFields: [F_NAME, { key: 'tourDate', label: 'Tour date', type: 'date' }] },
-  { key: 'callsInEmailsWeb', label: 'Number of Calls In/Emails & Web Inq', notesPrompt: 'Provide all details', itemFields: [{ key: 'type', label: 'Type', type: 'select', options: ['Call', 'Email', 'Web', 'Walk-in'] }, F_NAME] },
-  { key: 'enrollmentCommsOut', label: 'Enrollment Communication Out/IKS', notesPrompt: 'Provide all details (daily goal is 15 — two-way comms)', goal: ENROLLMENT_COMMS_DAILY_GOAL, itemFields: [{ key: 'type', label: 'Type', type: 'select', options: ['Call', 'Email', 'Text', 'IKS'] }, F_NAME, { key: 'detail', label: 'Detail', type: 'text' }] },
+  { key: 'callsInEmailsWeb', label: 'Number of Calls In/Emails & Web Inq', notesPrompt: 'Provide all details', itemFields: [{ key: 'type', label: 'Type', type: 'select', options: ['Call', 'Email', 'Web', 'Walk-in'], allowOther: true }, F_NAME] },
+  { key: 'enrollmentCommsOut', label: 'Enrollment Communication Out/IKS', notesPrompt: 'Provide all details (daily goal is 15 — two-way comms)', goal: ENROLLMENT_COMMS_DAILY_GOAL, itemFields: [{ key: 'type', label: 'Type', type: 'select', options: ['Call', 'Email', 'Text', 'IKS'], allowOther: true }, F_NAME, { key: 'detail', label: 'Detail', type: 'text' }] },
   { key: 'regFeesPaid', label: 'Number of Reg Fees Paid', notesPrompt: 'With Names, Room and Start Date', itemFields: [F_NAME, F_ROOM, { key: 'startDate', label: 'Start date', type: 'date' }] },
   { key: 'newStarts', label: 'Number of New Starts', notesPrompt: 'With Names, Room', itemFields: [F_NAME, F_ROOM] },
   { key: 'enrollmentsToday', label: 'Number of Enrollments (Today)', notesPrompt: 'With Names, Rooms, Start Date (Reg PD, Enhancement PD, Start Date confirmed)', itemFields: [F_NAME, F_ROOM, { key: 'startDate', label: 'Start date', type: 'date' }] },
@@ -149,7 +155,7 @@ export const ENROLLMENT_FIELDS: CountNoteField<keyof EnrollmentMarketing>[] = [
 ];
 
 export const STAFF_FIELDS: CountNoteField<keyof Staff>[] = [
-  { key: 'callOutsLate', label: 'Call Outs/Late for Shift', notesPrompt: 'Name and Reason', itemFields: [F_NAME, F_REASON] },
+  { key: 'callOutsLate', label: 'Call Outs/Late for Shift', notesPrompt: 'Name and Reason', itemFields: [F_NAME, { key: 'status', label: 'Call out or late?', type: 'select', options: ['Call Out', 'Late'] }, { key: 'arrivalTime', label: 'Arrival time', type: 'time', showWhen: { key: 'status', equals: 'Late' } }, F_REASON] },
   { key: 'rtoVacation', label: 'RTO/Vacation', notesPrompt: 'Name and Reason', itemFields: [F_NAME, F_REASON] },
   { key: 'sentHome', label: 'Number of Staff Sent Home', notesPrompt: 'Name and Reason (Over staffed, sick, etc.)', itemFields: [F_NAME, F_REASON] },
   { key: 'staffTerminating', label: 'Staff Terminating', notesPrompt: 'Name, Reason and Last Day', itemFields: [F_NAME, F_REASON, { key: 'lastDay', label: 'Last day', type: 'date' }] },

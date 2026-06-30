@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
-import { BarChart3, Filter, UserCog, ClipboardCheck } from 'lucide-react'
+import { Filter, UserCog, ClipboardCheck } from 'lucide-react'
 import { Card } from '@/components/ui/card'
-import type { SiteBar, FunnelStage, StaffWatchRow, PacketCompliance } from '@/lib/dashboard'
+import type { SiteFunnel, StaffWatchRow, PacketCompliance } from '@/lib/dashboard'
 import { formatShort } from '@/lib/dates'
 
 function PanelShell({
@@ -31,51 +31,40 @@ function PanelShell({
 
 const BAR_COLORS = ['var(--color-coral)', 'var(--color-yellow)', 'var(--color-sky)']
 
-export function AttendanceBySite({ bars }: { bars: SiteBar[] }) {
-  const max = Math.max(1, ...bars.map((b) => b.value))
-  return (
-    <PanelShell title="Attendance by Site" icon={<BarChart3 className="size-4" />} accent="sky">
-      <div className="space-y-3">
-        {bars.map((b, i) => (
-          <div key={b.siteId}>
-            <div className="mb-1 flex justify-between text-xs">
-              <span className="font-semibold text-[var(--color-charcoal)]">{b.name}</span>
-              <span className="font-bold text-[var(--color-dk-gray)]">{b.value}</span>
-            </div>
-            <div className="h-3 overflow-hidden rounded-full bg-[var(--color-secondary)]">
-              <motion.div
-                className="h-full rounded-full"
-                style={{ background: BAR_COLORS[i % 3] }}
-                initial={{ width: 0 }}
-                animate={{ width: `${(b.value / max) * 100}%` }}
-                transition={{ duration: 0.7, ease: 'easeOut' }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-    </PanelShell>
-  )
-}
-
-export function EnrollmentFunnel({ stages }: { stages: FunnelStage[] }) {
-  const max = Math.max(1, ...stages.map((s) => s.value))
+/** Full-width Enrollment Pipeline broken out per location (always all sites). */
+export function EnrollmentFunnelBySite({ groups }: { groups: SiteFunnel[] }) {
+  // Shared max across all sites so the bars are comparable.
+  const max = Math.max(1, ...groups.flatMap((g) => g.stages.map((s) => s.value)))
   return (
     <PanelShell title="Enrollment Pipeline" icon={<Filter className="size-4" />} accent="coral">
-      <div className="space-y-2.5">
-        {stages.map((s, i) => (
-          <div key={s.label} className="flex items-center gap-3">
-            <span className="w-28 shrink-0 text-xs font-semibold text-[var(--color-charcoal)]">{s.label}</span>
-            <div className="h-7 flex-1 overflow-hidden rounded-lg bg-[var(--color-secondary)]">
-              <motion.div
-                className="flex h-full items-center justify-end rounded-lg pr-2 text-xs font-bold text-white"
-                style={{ background: 'var(--color-coral)', opacity: 1 - i * 0.13 }}
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.max(8, (s.value / max) * 100)}%` }}
-                transition={{ duration: 0.6, ease: 'easeOut', delay: i * 0.05 }}
-              >
-                {s.value}
-              </motion.div>
+      <div className="grid gap-x-8 gap-y-6 md:grid-cols-3">
+        {groups.map((g, gi) => (
+          <div key={g.siteId}>
+            <p
+              className="mb-2.5 text-xs font-extrabold uppercase tracking-wide"
+              style={{ color: BAR_COLORS[gi % 3] }}
+            >
+              {g.name}
+            </p>
+            <div className="space-y-2">
+              {g.stages.map((s, i) => (
+                <div key={s.label} className="flex items-center gap-2">
+                  <span className="w-24 shrink-0 text-[11px] font-semibold text-[var(--color-charcoal)]">
+                    {s.label}
+                  </span>
+                  <div className="h-6 flex-1 overflow-hidden rounded-lg bg-[var(--color-secondary)]">
+                    <motion.div
+                      className="flex h-full items-center justify-end rounded-lg pr-2 text-[11px] font-bold text-white"
+                      style={{ background: 'var(--color-coral)', opacity: 1 - i * 0.13 }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.max(10, (s.value / max) * 100)}%` }}
+                      transition={{ duration: 0.6, ease: 'easeOut', delay: i * 0.04 }}
+                    >
+                      {s.value}
+                    </motion.div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ))}
