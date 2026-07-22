@@ -113,9 +113,9 @@ export interface SiteFunnel {
   stages: FunnelStage[]
 }
 
-/** One funnel per site — always all sites, regardless of the dashboard filter. */
-export function enrollmentFunnelBySite(allRows: DailyOpsReport[]): SiteFunnel[] {
-  return SITES.map((s) => ({
+/** One funnel per site — every site in scope, regardless of the dashboard filter. */
+export function enrollmentFunnelBySite(allRows: DailyOpsReport[], scope: SiteId[] = SITE_IDS): SiteFunnel[] {
+  return SITES.filter((s) => scope.includes(s.id)).map((s) => ({
     siteId: s.id,
     name: s.name,
     stages: enrollmentFunnel(allRows.filter((r) => r.siteId === s.id)),
@@ -179,26 +179,28 @@ export interface Flag {
   date?: string
 }
 
-/** Operational red flags across all sites. Never tied to a director's score. */
+/** Operational red flags across the sites in scope. Never tied to a director's score. */
 export function redFlags(
   weekRows: DailyOpsReport[],
   weekOf: string,
   asOf: string,
-  today: string
+  today: string,
+  scope: SiteId[] = SITE_IDS
 ): Flag[] {
   const flags: Flag[] = []
+  const scoped = SITES.filter((s) => scope.includes(s.id))
 
   // Missed report today (only meaningful when viewing the current week).
   const todayInWeek = today >= weekOf && today <= asOf
   if (todayInWeek) {
-    for (const s of SITES) {
+    for (const s of scoped) {
       const filedToday = weekRows.some((r) => r.siteId === s.id && r.date === today)
       if (!filedToday) flags.push({ id: `missed-${s.id}`, text: `${s.name} hasn’t filed today`, site: s.name, date: today })
     }
   }
 
   // Per-site overtime over 5% for the week.
-  for (const s of SITES) {
+  for (const s of scoped) {
     const mine = weekRows.filter((r) => r.siteId === s.id)
     const lab = sum(mine.map((r) => r.labor.totalHours))
     const ot = sum(mine.map((r) => r.labor.overtimeHours))
@@ -278,40 +280,43 @@ export interface DashboardView {
 
 /**
  * Build every dashboard metric for a week. `site` filters the operational
- * panels + table; the leaderboard / flags / celebrations always span all sites.
+ * panels + table; the leaderboard / flags / celebrations span every site in
+ * `scope` (all sites for admins; a multi-site director's schools otherwise).
  */
 export function buildDashboardView(
   rows: DailyOpsReport[],
   lastWeekRows: DailyOpsReport[],
   weekOf: string,
   site: SiteId | 'all',
-  today: string
+  today: string,
+  scope: SiteId[] = SITE_IDS
 ): DashboardView {
   const weekFri = addIsoDays(weekOf, 4)
   const asOf = today < weekFri ? today : weekFri
   const lastWeekOf = addIsoDays(weekOf, -7)
   const lastAsOf = addIsoDays(lastWeekOf, 4)
 
-  const allSites = rows.filter((r) => r.status === 'submitted')
+  const allSites = rows.filter((r) => r.status === 'submitted' && scope.includes(r.siteId))
+  const lastWeekScoped = lastWeekRows.filter((r) => scope.includes(r.siteId))
   const filtered = site === 'all' ? allSites : allSites.filter((r) => r.siteId === site)
 
   const badgesBySite: Record<string, Badge[]> = {}
-  for (const id of SITE_IDS) badgesBySite[id] = badgesForSite(allSites, id, weekOf, asOf)
+  for (const id of scope) badgesBySite[id] = badgesForSite(allSites, id, weekOf, asOf)
 
   return {
     asOf,
     singleSite: site !== 'all',
     kpis: computeKpis(filtered, today),
     overtimeStaff: overtimeByStaff(filtered),
-    board: leaderboard(allSites, SITE_IDS, weekOf, asOf),
+    board: leaderboard(allSites, scope, weekOf, asOf),
     badgesBySite,
-    teamGoal: teamGoalProgress(allSites, SITE_IDS, weekOf, asOf),
-    funnelBySite: enrollmentFunnelBySite(allSites),
+    teamGoal: teamGoalProgress(allSites, scope, weekOf, asOf),
+    funnelBySite: enrollmentFunnelBySite(allSites, scope),
     staff: staffWatch(filtered),
     packet: packetCompliance(filtered),
-    flags: redFlags(allSites, weekOf, asOf, today),
+    flags: redFlags(allSites, weekOf, asOf, today, scope),
     wins: celebrations(allSites, weekOf, asOf),
-    improved: mostImproved(allSites, lastWeekRows, weekOf, lastWeekOf, asOf, lastAsOf),
+    improved: mostImproved(allSites, lastWeekScoped, weekOf, lastWeekOf, asOf, lastAsOf),
     tableRows: filtered,
   }
 }

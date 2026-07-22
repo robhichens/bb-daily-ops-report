@@ -5,6 +5,7 @@ import {
   emptyReport,
   reportDocId,
   type DailyOpsReport,
+  type SiteConfig,
   type SiteId,
 } from '@/lib/schema'
 import { withDerived } from '@/lib/derive'
@@ -27,12 +28,14 @@ interface ReportFormProps {
   siteId: SiteId
   date: string
   isAdmin: boolean
+  /** Schools this user may file for (drives the Site dropdown). */
+  sites: SiteConfig[]
   uid: string
   onSite: (s: SiteId) => void
   onDate: (d: string) => void
 }
 
-export function ReportForm({ siteId, date, isAdmin, uid, onSite, onDate }: ReportFormProps) {
+export function ReportForm({ siteId, date, isAdmin, sites, uid, onSite, onDate }: ReportFormProps) {
   const [draft, setDraft] = useState<DailyOpsReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [saveState, setSaveState] = useState<SaveState>('idle')
@@ -193,10 +196,10 @@ export function ReportForm({ siteId, date, isAdmin, uid, onSite, onDate }: Repor
         siteId={draft.siteId}
         date={draft.date}
         director={draft.director}
+        sites={sites}
         onSite={onSite}
         onDate={onDate}
         onDirector={(name) => update({ director: name })}
-        canEditSite={isAdmin}
         disabled={locked}
       />
       <AttendanceSection

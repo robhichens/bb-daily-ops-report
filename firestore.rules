@@ -17,8 +17,10 @@ service cloud.firestore {
     function role() {
       return userDoc().role;
     }
-    function userSite() {
-      return userDoc().siteId;
+    // Site access as a list. Newer docs carry `siteIds`; legacy docs fall back
+    // to their single `siteId`.
+    function userSites() {
+      return userDoc().get('siteIds', [userDoc().siteId]);
     }
 
     match /dailyOpsReports/{id} {
@@ -26,7 +28,7 @@ service cloud.firestore {
 
       allow create, update: if isSignedIn() && (
         role() == 'admin' ||
-        (role() == 'director' && request.resource.data.siteId == userSite())
+        (role() == 'director' && request.resource.data.siteId in userSites())
       );
 
       allow delete: if isSignedIn() && role() == 'admin';

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { LayoutDashboard, Download, FileText, Sparkles } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
-import { isAdmin as isAdminRole } from '@/lib/users'
-import { SITES, siteName, type SiteId, type DailyOpsReport } from '@/lib/schema'
+import { isAdmin as isAdminRole, userSites } from '@/lib/users'
+import { SITES, siteName, type SiteId, type DailyOpsReport, type SiteConfig } from '@/lib/schema'
 import { weekOf as weekOfFn } from '@/lib/derive'
 import { todayIso, addIsoDays, formatShort } from '@/lib/dates'
 import {
@@ -27,6 +27,7 @@ import { Card } from '@/components/ui/card'
 import { DashboardSections } from '@/components/dashboard/DashboardSections'
 import { DirectorViewConfig } from '@/components/dashboard/DirectorViewConfig'
 import { ReportsTable } from '@/components/dashboard/ReportsTable'
+import { UsersPanel } from '@/components/dashboard/UsersPanel'
 
 const ALL_ON = Object.fromEntries(SECTION_META.map((s) => [s.key, true])) as Record<DashboardSection, boolean>
 
@@ -45,13 +46,20 @@ function useWeekData(weekOf: string) {
 
 export function Dashboard() {
   const { profile } = useAuth()
-  return isAdminRole(profile?.role) ? <AdminDashboard /> : <DirectorDashboard />
+  if (isAdminRole(profile?.role)) return <FullDashboard sites={SITES} admin />
+  const mySites = SITES.filter((s) => userSites(profile).includes(s.id))
+  // Directors covering 2+ schools get the full dashboard scoped to their sites.
+  if (mySites.length > 1) return <FullDashboard sites={mySites} admin={false} />
+  return <DirectorDashboard />
 }
 
-// --- Admin: full dashboard + filters + director-view config -----------------
-function AdminDashboard() {
+// --- Full dashboard: filters + table + exports. Admins see every site plus the
+// --- director-view config and user management; multi-site directors see only
+// --- their schools' data.
+function FullDashboard({ sites, admin }: { sites: SiteConfig[]; admin: boolean }) {
   const today = todayIso()
   const currentWeek = weekOfFn(today)
+  const scope = sites.map((s) => s.id)
   const [weeks, setWeeks] = useState<string[]>([currentWeek])
   const [weekOf, setWeekOf] = useState(currentWeek)
   const [site, setSite] = useState<SiteId | 'all'>('all')
@@ -65,26 +73,31 @@ function AdminDashboard() {
       ),
     [currentWeek]
   )
-  useEffect(() => subscribeDirectorView(setConfig), [])
+  useEffect(() => (admin ? subscribeDirectorView(setConfig) : undefined), [admin])
 
   const view = useMemo(
-    () => buildDashboardView(rows, lastWeekRows, weekOf, site, today),
-    [rows, lastWeekRows, weekOf, site, today]
+    () => buildDashboardView(rows, lastWeekRows, weekOf, site, today, scope),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, lastWeekRows, weekOf, site, today, scope.join()]
   )
   const exportLabel = `${weekOf}${site === 'all' ? '' : '-' + site}`
-  const siteLabel = site === 'all' ? 'All sites' : siteName(site)
+  const siteLabel = site === 'all' ? (admin ? 'All sites' : 'My schools') : siteName(site)
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <PageHeading icon={<LayoutDashboard className="size-5" />} title="Dashboard" subtitle="Live insights, red flags & celebrations" />
+        <PageHeading
+          icon={<LayoutDashboard className="size-5" />}
+          title="Dashboard"
+          subtitle={admin ? 'Live insights, red flags & celebrations' : `Your schools: ${sites.map((s) => s.name).join(' · ')}`}
+        />
         <div className="flex flex-wrap items-center gap-2">
           <select value={weekOf} onChange={(e) => setWeekOf(e.target.value)} className={`${inputClass} h-9 w-auto`}>
             {weeks.map((w) => <option key={w} value={w}>Week of {formatShort(w)}</option>)}
           </select>
           <select value={site} onChange={(e) => setSite(e.target.value as SiteId | 'all')} className={`${inputClass} h-9 w-auto`}>
-            <option value="all">All sites</option>
-            {SITES.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            <option value="all">{admin ? 'All sites' : 'All my schools'}</option>
+            {sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <Button size="sm" variant="outline" onClick={() => exportCsv(view.tableRows, exportLabel)}><Download className="size-3.5" /> CSV</Button>
           <Button size="sm" onClick={() => void exportReportsPdf({ reports: view.tableRows, weekOf, siteLabel })}><FileText className="size-3.5" /> PDF</Button>
@@ -93,7 +106,8 @@ function AdminDashboard() {
 
       <DashboardSections view={view} sections={ALL_ON} />
       <ReportsTable rows={view.tableRows} />
-      <DirectorViewConfig config={config} />
+      {admin && <DirectorViewConfig config={config} />}
+      {admin && <UsersPanel />}
     </div>
   )
 }

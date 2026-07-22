@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 import { CalendarDays } from 'lucide-react'
-import { SITES, DIRECTORS, siteName, type SiteId } from '@/lib/schema'
+import { DIRECTORS, siteName, type SiteConfig, type SiteId } from '@/lib/schema'
 import { weekdayName } from '@/lib/derive'
 import { Input, inputClass } from '@/components/ui/input'
 import { SectionCard } from './SectionCard'
@@ -9,11 +9,11 @@ interface HeaderSectionProps {
   siteId: SiteId
   date: string
   director: string
+  /** Schools this user may file for; 2+ renders a dropdown, 1 renders locked text. */
+  sites: SiteConfig[]
   onSite: (s: SiteId) => void
   onDate: (d: string) => void
   onDirector: (name: string) => void
-  /** Admins can change site; directors are locked to theirs. */
-  canEditSite: boolean
   /** Locks the report DATA fields (Director). Site + Date stay usable as nav. */
   disabled: boolean
 }
@@ -22,23 +22,23 @@ export function HeaderSection({
   siteId,
   date,
   director,
+  sites,
   onSite,
   onDate,
   onDirector,
-  canEditSite,
   disabled,
 }: HeaderSectionProps) {
   return (
     <SectionCard title="Report Details" accent="gray" icon={<CalendarDays className="size-4" />}>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Site">
-          {canEditSite ? (
+          {sites.length > 1 ? (
             <select
               value={siteId}
               onChange={(e) => onSite(e.target.value as SiteId)}
               className={inputClass}
             >
-              {SITES.map((s) => (
+              {sites.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>
