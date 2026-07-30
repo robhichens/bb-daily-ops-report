@@ -100,6 +100,14 @@ export interface DirectorPacket {
   incompleteReason: string; // required when completed === false
 }
 
+/** A leadership comment/question attached to one Director-Report line (Day Notes). */
+export interface NoteComment {
+  note: string;    // the exact Director-Report line this is about
+  text: string;    // leadership's comment/question
+  author: string;  // display name of who wrote it
+  at: string;      // ISO timestamp
+}
+
 export interface DailyOpsReport {
   id: string;        // `${siteId}_${date}`
   siteId: SiteId;
@@ -117,9 +125,16 @@ export interface DailyOpsReport {
   directorReport: string[];
 
   /** Day Notes: exact Director-Report lines an admin has checked off (struck
-   *  through). Written only from the Day Notes view via setNoteAck, never by
-   *  the report form, so it survives director autosaves. */
+   *  through / "Seen by" on the director's side). Written only from the Day
+   *  Notes view via setNoteAck, never by the report form, so it survives
+   *  director autosaves. */
   acknowledgedNotes?: string[];
+
+  /** Day Notes: leadership comments/questions attached to a Director-Report
+   *  line. Stored as an array (not a keyed map) because note text can contain
+   *  characters illegal in Firestore field keys. One comment per line (v1).
+   *  Written only from the Day Notes view, so it survives director autosaves. */
+  noteComments?: NoteComment[];
 
   qualityScore?: number;   // derived 0–100 (gamification.ts); written on every save
 

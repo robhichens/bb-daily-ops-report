@@ -26,6 +26,7 @@ import { withDerived } from './derive';
 import {
   reportDocId,
   type DailyOpsReport,
+  type NoteComment,
   type SiteId,
 } from './schema';
 
@@ -203,4 +204,26 @@ export async function setNoteAck(
   await updateDoc(reportRef(reportId), {
     acknowledgedNotes: acked ? arrayUnion(note) : arrayRemove(note),
   });
+}
+
+/**
+ * Add/edit/clear the leadership comment on a single Director-Report line.
+ * Pass the report's current `noteComments` (from the live subscription) so we
+ * can rewrite the array without an extra read; an empty `text` removes the
+ * comment. Single-field write, merge-safe against director autosaves, admin-only
+ * per firestore.rules — no rules change needed.
+ */
+export async function setNoteComment(
+  reportId: string,
+  existing: NoteComment[] | undefined,
+  note: string,
+  text: string,
+  author: string
+): Promise<void> {
+  const trimmed = text.trim();
+  const rest = (existing ?? []).filter((c) => c.note !== note);
+  const next = trimmed
+    ? [...rest, { note, text: trimmed, author, at: new Date().toISOString() }]
+    : rest;
+  await updateDoc(reportRef(reportId), { noteComments: next });
 }
