@@ -5,6 +5,8 @@
 // Dashboard uses subscribeReportsByWeek + subscribeRecentReports (for the week picker).
 
 import {
+  arrayRemove,
+  arrayUnion,
   collection,
   doc,
   getDoc,
@@ -14,6 +16,7 @@ import {
   orderBy,
   query,
   setDoc,
+  updateDoc,
   where,
   type Unsubscribe,
 } from 'firebase/firestore';
@@ -178,4 +181,26 @@ export function subscribeRecentReports(
 /** Distinct weekOf values (most recent first) from a set of reports. */
 export function distinctWeeks(rows: DailyOpsReport[]): string[] {
   return Array.from(new Set(rows.map((r) => r.weekOf))).sort().reverse();
+}
+
+// ---------------------------------------------------------------------------
+// Day Notes — admin acknowledgement of Director-Report lines
+// ---------------------------------------------------------------------------
+
+/**
+ * Check/uncheck a single Director-Report line on a report (the "Day Notes"
+ * strike-through). Stores the exact note text in the doc's `acknowledgedNotes`
+ * array via arrayUnion/arrayRemove — an atomic single-field write that never
+ * touches the director's own data, so it can't clobber a same-day autosave.
+ * Admin-only per firestore.rules (admins may update any dailyOpsReports doc),
+ * so no rules change is needed and the state syncs across devices.
+ */
+export async function setNoteAck(
+  reportId: string,
+  note: string,
+  acked: boolean
+): Promise<void> {
+  await updateDoc(reportRef(reportId), {
+    acknowledgedNotes: acked ? arrayUnion(note) : arrayRemove(note),
+  });
 }

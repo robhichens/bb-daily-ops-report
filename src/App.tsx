@@ -9,6 +9,7 @@ import { Login } from '@/pages/Login'
 // Code-split the heavy authed pages (form + dashboard + Firestore/Framer usage).
 const Report = lazy(() => import('@/pages/Report').then((m) => ({ default: m.Report })))
 const Dashboard = lazy(() => import('@/pages/Dashboard').then((m) => ({ default: m.Dashboard })))
+const DayNotes = lazy(() => import('@/pages/DayNotes').then((m) => ({ default: m.DayNotes })))
 
 function PageLoader() {
   return (
@@ -45,6 +46,14 @@ export default function App() {
                 element={
                   <Suspense fallback={<PageLoader />}>
                     <Dashboard />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/day-notes"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <DayNotes />
                   </Suspense>
                 }
               />

@@ -1,17 +1,22 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { ClipboardList, LayoutDashboard, LogOut, HelpCircle } from 'lucide-react'
+import { ClipboardList, LayoutDashboard, LogOut, HelpCircle, NotebookPen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/auth/AuthProvider'
+import { isAdmin } from '@/lib/users'
 import { siteName } from '@/lib/schema'
 
-const navItems = [
+const baseNavItems = [
   { to: '/report', label: 'Daily Report', icon: ClipboardList },
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
 ]
 
+// Admin-only feed of the Director-Report lines across every school.
+const adminNavItems = [{ to: '/day-notes', label: 'Day Notes', icon: NotebookPen }]
+
 export function AppShell() {
   const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
+  const navItems = isAdmin(profile?.role) ? [...baseNavItems, ...adminNavItems] : baseNavItems
 
   const name = profile?.displayName || user?.email || 'Signed in'
   const roleLine =

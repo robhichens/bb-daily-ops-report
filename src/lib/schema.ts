@@ -116,6 +116,11 @@ export interface DailyOpsReport {
   directorPacket: DirectorPacket;
   directorReport: string[];
 
+  /** Day Notes: exact Director-Report lines an admin has checked off (struck
+   *  through). Written only from the Day Notes view via setNoteAck, never by
+   *  the report form, so it survives director autosaves. */
+  acknowledgedNotes?: string[];
+
   qualityScore?: number;   // derived 0–100 (gamification.ts); written on every save
 
   status: 'draft' | 'submitted';
