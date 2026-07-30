@@ -1,8 +1,12 @@
+import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { ClipboardList, LayoutDashboard, LogOut, HelpCircle, NotebookPen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/auth/AuthProvider'
-import { siteName } from '@/lib/schema'
+import { isAdmin, userSites } from '@/lib/users'
+import { siteName, type DailyOpsReport } from '@/lib/schema'
+import { subscribeRecentReports } from '@/lib/reports'
+import { countUnreadReplies, getDayNotesSeen } from '@/lib/dayNotesRead'
 
 // Day Notes is a two-sided view: admins triage every school's notes; directors
 // see their own notes, whether they've been seen, and leadership's replies.
@@ -12,9 +16,40 @@ const navItems = [
   { to: '/day-notes', label: 'Day Notes', icon: NotebookPen },
 ]
 
+/** Unread Day-Notes replies from the other side — powers the nav nudge. */
+function useDayNotesUnread(): number {
+  const { user, profile } = useAuth()
+  const [reports, setReports] = useState<DailyOpsReport[]>([])
+  const [tick, setTick] = useState(0)
+
+  useEffect(() => subscribeRecentReports(300, setReports), [])
+
+  // Recompute when the user opens Day Notes (marks seen) or storage changes.
+  useEffect(() => {
+    const bump = () => setTick((t) => t + 1)
+    window.addEventListener('daynotes-seen', bump)
+    window.addEventListener('storage', bump)
+    return () => {
+      window.removeEventListener('daynotes-seen', bump)
+      window.removeEventListener('storage', bump)
+    }
+  }, [])
+
+  return useMemo(() => {
+    if (!user?.uid) return 0
+    return countUnreadReplies(reports, {
+      isAdmin: isAdmin(profile?.role),
+      sites: userSites(profile),
+      since: getDayNotesSeen(user.uid),
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reports, user?.uid, profile?.role, userSites(profile).join(), tick])
+}
+
 export function AppShell() {
   const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
+  const unread = useDayNotesUnread()
 
   const name = profile?.displayName || user?.email || 'Signed in'
   const roleLine =
@@ -51,23 +86,34 @@ export function AppShell() {
 
           <div className="flex items-center gap-2 sm:gap-4">
             <nav className="flex items-center gap-1">
-              {navItems.map(({ to, label, icon: Icon }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
-                      isActive
-                        ? 'bg-[var(--color-coral)] text-white'
-                        : 'text-[var(--color-charcoal)] hover:bg-[var(--color-secondary)]'
-                    )
-                  }
-                >
-                  <Icon className="size-4" />
-                  <span className="hidden sm:inline">{label}</span>
-                </NavLink>
-              ))}
+              {navItems.map(({ to, label, icon: Icon }) => {
+                const badge = to === '/day-notes' && unread > 0
+                return (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    className={({ isActive }) =>
+                      cn(
+                        'relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
+                        isActive
+                          ? 'bg-[var(--color-coral)] text-white'
+                          : 'text-[var(--color-charcoal)] hover:bg-[var(--color-secondary)]'
+                      )
+                    }
+                  >
+                    <Icon className="size-4" />
+                    <span className="hidden sm:inline">{label}</span>
+                    {badge && (
+                      <span
+                        title={`${unread} new ${unread === 1 ? 'reply' : 'replies'}`}
+                        className="ml-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[var(--color-charcoal)] px-1 text-[10px] font-bold leading-none text-white ring-2 ring-[var(--color-cream)] max-sm:absolute max-sm:right-0.5 max-sm:top-0.5 max-sm:ml-0"
+                      >
+                        {unread > 9 ? '9+' : unread}
+                      </span>
+                    )}
+                  </NavLink>
+                )
+              })}
             </nav>
 
             <div className="flex items-center gap-2 border-l border-[var(--color-border)] pl-2 sm:pl-4">

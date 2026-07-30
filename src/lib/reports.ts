@@ -207,23 +207,34 @@ export async function setNoteAck(
 }
 
 /**
- * Add/edit/clear the leadership comment on a single Director-Report line.
- * Pass the report's current `noteComments` (from the live subscription) so we
- * can rewrite the array without an extra read; an empty `text` removes the
- * comment. Single-field write, merge-safe against director autosaves, admin-only
- * per firestore.rules — no rules change needed.
+ * Append one message to a Director-Report line's thread. Pass the report's
+ * current `noteComments` (from the live subscription) so we rewrite the array
+ * without an extra read. Single-field write, merge-safe against director
+ * autosaves. Admins may write any report; a director may write their own site's
+ * report (firestore.rules already allow that — request.resource.data.siteId is
+ * unchanged), so no rules change is needed for two-way threads.
  */
-export async function setNoteComment(
+export async function addNoteComment(
   reportId: string,
   existing: NoteComment[] | undefined,
-  note: string,
-  text: string,
-  author: string
+  comment: NoteComment
 ): Promise<void> {
-  const trimmed = text.trim();
-  const rest = (existing ?? []).filter((c) => c.note !== note);
-  const next = trimmed
-    ? [...rest, { note, text: trimmed, author, at: new Date().toISOString() }]
-    : rest;
+  const text = comment.text.trim();
+  if (!text) return;
+  const next = [...(existing ?? []), { ...comment, text }];
+  await updateDoc(reportRef(reportId), { noteComments: next });
+}
+
+/** Remove one message from a thread (delete-your-own). Matches on the full
+ *  tuple so identical-but-distinct messages aren't both dropped. */
+export async function removeNoteComment(
+  reportId: string,
+  existing: NoteComment[] | undefined,
+  comment: NoteComment
+): Promise<void> {
+  const next = (existing ?? []).filter(
+    (c) =>
+      !(c.note === comment.note && c.at === comment.at && c.author === comment.author && c.text === comment.text)
+  );
   await updateDoc(reportRef(reportId), { noteComments: next });
 }

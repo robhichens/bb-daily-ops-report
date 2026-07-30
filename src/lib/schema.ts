@@ -100,12 +100,16 @@ export interface DirectorPacket {
   incompleteReason: string; // required when completed === false
 }
 
-/** A leadership comment/question attached to one Director-Report line (Day Notes). */
+/** One message in a Day-Notes thread hanging off a Director-Report line.
+ *  Threads are two-way: leadership (role 'admin') and the site's director
+ *  (role 'director') both post. Legacy rows written before threading have no
+ *  role — treat a missing role as 'admin' (only admins could write then). */
 export interface NoteComment {
   note: string;    // the exact Director-Report line this is about
-  text: string;    // leadership's comment/question
+  text: string;    // the message body
   author: string;  // display name of who wrote it
   at: string;      // ISO timestamp
+  role?: 'admin' | 'director';
 }
 
 export interface DailyOpsReport {
