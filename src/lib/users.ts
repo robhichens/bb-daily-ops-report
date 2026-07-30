@@ -30,6 +30,7 @@ export interface UserProfile {
   siteIds?: SiteId[] // site access list (directors)
   displayName?: string
   email?: string
+  dayNotesSeenAt?: string // ISO — last time this user opened Day Notes (nudge sync)
 }
 
 /** Roles permitted to open the Daily Ops Report app at all. */
@@ -72,4 +73,19 @@ export function subscribeUsers(cb: (users: UserProfile[]) => void): Unsubscribe 
 /** Set a director's site access. Keeps legacy `siteId` synced to the first site. */
 export async function updateUserSites(uid: string, siteIds: SiteId[]): Promise<void> {
   await setDoc(usersRef(uid), { siteIds, siteId: siteIds[0] ?? null }, { merge: true })
+}
+
+/** Live subscription to just this user's Day-Notes "last seen" timestamp, so the
+ *  reply nudge clears across a user's devices. Only writable by admins per
+ *  firestore.rules (users/{uid} write = admin only), so directors fall back to
+ *  the per-device localStorage marker. */
+export function subscribeDayNotesSeenAt(uid: string, cb: (iso: string) => void): Unsubscribe {
+  return onSnapshot(usersRef(uid), (snap) => {
+    cb((snap.data() as Partial<UserProfile> | undefined)?.dayNotesSeenAt ?? '')
+  })
+}
+
+/** Persist the Day-Notes "last seen" timestamp on the user doc (admins only). */
+export async function setDayNotesSeenAt(uid: string, iso: string): Promise<void> {
+  await setDoc(usersRef(uid), { dayNotesSeenAt: iso }, { merge: true })
 }

@@ -101,10 +101,11 @@ export function DayNotes() {
   useEffect(() => subscribeRecentReports(300, setReports), [])
 
   // Opening the tab clears the "you have replies" nudge; re-mark as new
-  // messages arrive while it's open, so it stays caught-up.
+  // messages arrive while it's open, so it stays caught-up. Admins sync the
+  // "seen" timestamp to Firestore so the badge clears on their other devices.
   useEffect(() => {
-    if (user?.uid) markDayNotesSeen(user.uid)
-  }, [user?.uid, reports])
+    if (user?.uid) markDayNotesSeen(user.uid, isAdmin(profile?.role))
+  }, [user?.uid, profile?.role, reports])
 
   return isAdmin(profile?.role) ? (
     <AdminDayNotes reports={reports} />

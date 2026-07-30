@@ -6,10 +6,16 @@
 // bleed one account's "seen" into another's.
 
 import type { DailyOpsReport, NoteComment, SiteId } from './schema'
+import { setDayNotesSeenAt } from './users'
 
 const keyFor = (uid: string) => `bbdor:dayNotesSeen:${uid}`
 
-/** ISO timestamp the user last opened Day Notes ('' if never). */
+/** The later of two ISO timestamps ('' counts as earliest). */
+export function laterIso(a: string, b: string): string {
+  return a > b ? a : b
+}
+
+/** Per-device ISO timestamp the user last opened Day Notes ('' if never). */
 export function getDayNotesSeen(uid: string): string {
   if (!uid) return ''
   try {
@@ -19,14 +25,25 @@ export function getDayNotesSeen(uid: string): string {
   }
 }
 
-/** Mark Day Notes as read now, and notify any listening nav badge. */
-export function markDayNotesSeen(uid: string): void {
+/**
+ * Mark Day Notes as read now. Always writes the per-device localStorage marker
+ * and pokes the nav badge; when `syncRemote` (admins, who may write their own
+ * user doc) it also persists to Firestore so the nudge clears on their other
+ * devices. Directors pass syncRemote=false — the write would be denied.
+ */
+export function markDayNotesSeen(uid: string, syncRemote: boolean): void {
   if (!uid) return
+  const now = new Date().toISOString()
   try {
-    localStorage.setItem(keyFor(uid), new Date().toISOString())
+    localStorage.setItem(keyFor(uid), now)
     window.dispatchEvent(new Event('daynotes-seen'))
   } catch {
     /* ignore private-mode / storage failures — the nudge is best-effort */
+  }
+  if (syncRemote) {
+    setDayNotesSeenAt(uid, now).catch(() => {
+      /* best-effort; localStorage still covers this device */
+    })
   }
 }
 

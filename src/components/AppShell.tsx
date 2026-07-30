@@ -3,10 +3,10 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { ClipboardList, LayoutDashboard, LogOut, HelpCircle, NotebookPen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/auth/AuthProvider'
-import { isAdmin, userSites } from '@/lib/users'
+import { isAdmin, userSites, subscribeDayNotesSeenAt } from '@/lib/users'
 import { siteName, type DailyOpsReport } from '@/lib/schema'
 import { subscribeRecentReports } from '@/lib/reports'
-import { countUnreadReplies, getDayNotesSeen } from '@/lib/dayNotesRead'
+import { countUnreadReplies, getDayNotesSeen, laterIso } from '@/lib/dayNotesRead'
 
 // Day Notes is a two-sided view: admins triage every school's notes; directors
 // see their own notes, whether they've been seen, and leadership's replies.
@@ -19,10 +19,21 @@ const navItems = [
 /** Unread Day-Notes replies from the other side — powers the nav nudge. */
 function useDayNotesUnread(): number {
   const { user, profile } = useAuth()
+  const admin = isAdmin(profile?.role)
   const [reports, setReports] = useState<DailyOpsReport[]>([])
+  const [remoteSeen, setRemoteSeen] = useState('')
   const [tick, setTick] = useState(0)
 
   useEffect(() => subscribeRecentReports(300, setReports), [])
+
+  // Admins sync "last seen" via their user doc → nudge clears across devices.
+  useEffect(() => {
+    if (!user?.uid || !admin) {
+      setRemoteSeen('')
+      return
+    }
+    return subscribeDayNotesSeenAt(user.uid, setRemoteSeen)
+  }, [user?.uid, admin])
 
   // Recompute when the user opens Day Notes (marks seen) or storage changes.
   useEffect(() => {
@@ -38,12 +49,12 @@ function useDayNotesUnread(): number {
   return useMemo(() => {
     if (!user?.uid) return 0
     return countUnreadReplies(reports, {
-      isAdmin: isAdmin(profile?.role),
+      isAdmin: admin,
       sites: userSites(profile),
-      since: getDayNotesSeen(user.uid),
+      since: laterIso(remoteSeen, getDayNotesSeen(user.uid)),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reports, user?.uid, profile?.role, userSites(profile).join(), tick])
+  }, [reports, user?.uid, admin, userSites(profile).join(), remoteSeen, tick])
 }
 
 export function AppShell() {
