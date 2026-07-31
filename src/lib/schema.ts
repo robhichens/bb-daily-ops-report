@@ -100,6 +100,20 @@ export interface DirectorPacket {
   incompleteReason: string; // required when completed === false
 }
 
+/** The two admin request lists a Day Note can be filed to. */
+export type RequestList = 'purchase' | 'maintenance';
+
+export const REQUEST_LISTS: { id: RequestList; label: string; short: string }[] = [
+  { id: 'purchase', label: 'Purchase Requests', short: 'Buy' },
+  { id: 'maintenance', label: 'Maintenance Requests', short: 'Fix' },
+];
+
+/** Files one Director-Report line onto an admin request list (Day Notes → Dashboard). */
+export interface NoteTag {
+  note: string;      // the exact Director-Report line
+  list: RequestList;
+}
+
 /** One message in a Day-Notes thread hanging off a Director-Report line.
  *  Threads are two-way: leadership (role 'admin') and the site's director
  *  (role 'director') both post. Legacy rows written before threading have no
@@ -139,6 +153,10 @@ export interface DailyOpsReport {
    *  characters illegal in Firestore field keys. One comment per line (v1).
    *  Written only from the Day Notes view, so it survives director autosaves. */
   noteComments?: NoteComment[];
+
+  /** Day Notes: which admin request lists (Buy/Fix) each line is filed to.
+   *  Admin-only; derived into the dashboard's Purchase/Maintenance lists. */
+  noteTags?: NoteTag[];
 
   qualityScore?: number;   // derived 0–100 (gamification.ts); written on every save
 

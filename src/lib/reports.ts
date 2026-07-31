@@ -25,8 +25,11 @@ import { db } from './firebase';
 import { withDerived } from './derive';
 import {
   reportDocId,
+  siteName,
   type DailyOpsReport,
   type NoteComment,
+  type NoteTag,
+  type RequestList,
   type SiteId,
 } from './schema';
 
@@ -237,4 +240,55 @@ export async function removeNoteComment(
       !(c.note === comment.note && c.at === comment.at && c.author === comment.author && c.text === comment.text)
   );
   await updateDoc(reportRef(reportId), { noteComments: next });
+}
+
+// ---------------------------------------------------------------------------
+// Day Notes — file a note onto an admin request list (Buy / Fix)
+// ---------------------------------------------------------------------------
+
+/** Add/remove a note from a request list. Pass the report's current `noteTags`
+ *  so we rewrite the array without a re-read. Admin-only single-field write,
+ *  merge-safe against director autosaves — no rules change needed. */
+export async function setNoteTag(
+  reportId: string,
+  existing: NoteTag[] | undefined,
+  note: string,
+  list: RequestList,
+  on: boolean
+): Promise<void> {
+  const rest = (existing ?? []).filter((t) => !(t.note === note && t.list === list));
+  const next = on ? [...rest, { note, list }] : rest;
+  await updateDoc(reportRef(reportId), { noteTags: next });
+}
+
+/** One filed request, flattened from the reports for a dashboard list. */
+export interface RequestItem {
+  reportId: string;
+  siteId: SiteId;
+  siteName: string;
+  date: string;
+  director: string;
+  note: string;
+  tags: NoteTag[]; // the report's full tag array (for removal writes)
+}
+
+/** Collect every note filed to `list`, newest first. */
+export function collectRequests(reports: DailyOpsReport[], list: RequestList): RequestItem[] {
+  const out: RequestItem[] = [];
+  for (const r of reports) {
+    const tags = r.noteTags ?? [];
+    for (const t of tags) {
+      if (t.list !== list) continue;
+      out.push({
+        reportId: r.id,
+        siteId: r.siteId,
+        siteName: r.siteName || siteName(r.siteId),
+        date: r.date,
+        director: r.director,
+        note: t.note,
+        tags,
+      });
+    }
+  }
+  return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.siteName.localeCompare(b.siteName)));
 }

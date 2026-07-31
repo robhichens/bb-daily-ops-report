@@ -27,6 +27,7 @@ import { Card } from '@/components/ui/card'
 import { DashboardSections } from '@/components/dashboard/DashboardSections'
 import { DirectorViewConfig } from '@/components/dashboard/DirectorViewConfig'
 import { ReportsTable } from '@/components/dashboard/ReportsTable'
+import { RequestLists } from '@/components/dashboard/RequestLists'
 import { UsersPanel } from '@/components/dashboard/UsersPanel'
 
 const ALL_ON = Object.fromEntries(SECTION_META.map((s) => [s.key, true])) as Record<DashboardSection, boolean>
@@ -64,13 +65,15 @@ function FullDashboard({ sites, admin }: { sites: SiteConfig[]; admin: boolean }
   const [weekOf, setWeekOf] = useState(currentWeek)
   const [site, setSite] = useState<SiteId | 'all'>('all')
   const [config, setConfig] = useState<Config>(DEFAULT_DIRECTOR_VIEW)
+  const [recentRows, setRecentRows] = useState<DailyOpsReport[]>([])
   const { rows, lastWeekRows } = useWeekData(weekOf)
 
   useEffect(
     () =>
-      subscribeRecentReports(200, (recent) =>
+      subscribeRecentReports(200, (recent) => {
+        setRecentRows(recent)
         setWeeks(Array.from(new Set([currentWeek, ...distinctWeeks(recent)])).sort().reverse())
-      ),
+      }),
     [currentWeek]
   )
   useEffect(() => (admin ? subscribeDirectorView(setConfig) : undefined), [admin])
@@ -106,6 +109,7 @@ function FullDashboard({ sites, admin }: { sites: SiteConfig[]; admin: boolean }
 
       <DashboardSections view={view} sections={ALL_ON} />
       <ReportsTable rows={view.tableRows} />
+      {admin && <RequestLists reports={recentRows} />}
       {admin && <DirectorViewConfig config={config} />}
       {admin && <UsersPanel />}
     </div>

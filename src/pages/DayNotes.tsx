@@ -1,15 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { NotebookPen, Check, Send, Eye, Flag, ArrowUpRight, Trash2, CornerDownRight } from 'lucide-react'
+import { NotebookPen, Check, Send, Eye, Flag, ArrowUpRight, Trash2, CornerDownRight, ShoppingCart, Wrench } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { isAdmin, userSites } from '@/lib/users'
-import { SITES, siteName, type SiteId, type DailyOpsReport, type NoteComment } from '@/lib/schema'
+import {
+  SITES,
+  siteName,
+  REQUEST_LISTS,
+  type SiteId,
+  type DailyOpsReport,
+  type NoteComment,
+  type NoteTag,
+  type RequestList,
+} from '@/lib/schema'
 import { formatLong } from '@/lib/dates'
 import {
   subscribeRecentReports,
   setNoteAck,
   addNoteComment,
   removeNoteComment,
+  setNoteTag,
 } from '@/lib/reports'
 import { markDayNotesSeen } from '@/lib/dayNotesRead'
 import { Card } from '@/components/ui/card'
@@ -37,6 +47,8 @@ interface NoteEntry {
   acked: boolean
   thread: NoteComment[]
   allComments: NoteComment[] // the whole report's comments (for array rewrites)
+  tags: RequestList[] // which request lists this note is filed to
+  allTags: NoteTag[] // the whole report's tags (for array rewrites)
 }
 
 const noteKey = (e: { reportId: string; note: string }) => `${e.reportId}::${e.note}`
@@ -51,6 +63,7 @@ function toEntries(reports: DailyOpsReport[]): NoteEntry[] {
   for (const r of reports) {
     const acks = r.acknowledgedNotes ?? []
     const comments = r.noteComments ?? []
+    const allTags = r.noteTags ?? []
     for (const raw of r.directorReport ?? []) {
       const note = raw.trim()
       if (!note) continue
@@ -66,6 +79,8 @@ function toEntries(reports: DailyOpsReport[]): NoteEntry[] {
           .filter((c) => c.note === note)
           .sort((a, b) => (a.at < b.at ? -1 : 1)),
         allComments: comments,
+        tags: allTags.filter((t) => t.note === note).map((t) => t.list),
+        allTags,
       })
     }
   }
@@ -189,6 +204,15 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
                           {e.note}
                         </p>
                         <NoteMeta entry={e} />
+                        <ListToggles
+                          entry={e}
+                          busy={busy}
+                          onToggle={(list, on) =>
+                            runBusy(`${key}:tag:${list}`, () =>
+                              setNoteTag(e.reportId, e.allTags, e.note, list, on)
+                            )
+                          }
+                        />
                       </div>
                       {lastFromDirector(e.thread) && (
                         <Badge tone="coral" icon={<CornerDownRight className="size-3" />}>Replied</Badge>
@@ -480,6 +504,54 @@ function Composer({
         </Button>
         <span className="ml-auto text-[11px] text-[var(--color-mid-gray)]">⌘/Ctrl + Enter</span>
       </div>
+    </div>
+  )
+}
+
+const LIST_ICON: Record<RequestList, typeof ShoppingCart> = {
+  purchase: ShoppingCart,
+  maintenance: Wrench,
+}
+const LIST_ON_CLASS: Record<RequestList, string> = {
+  purchase: 'border-transparent bg-[var(--color-sky-deep)] text-white',
+  maintenance: 'border-transparent bg-[var(--color-yellow)] text-[var(--color-charcoal)]',
+}
+
+/** Buy / Fix toggles that file a note onto the dashboard request lists. */
+function ListToggles({
+  entry,
+  busy,
+  onToggle,
+}: {
+  entry: NoteEntry
+  busy: Set<string>
+  onToggle: (list: RequestList, on: boolean) => void
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-mid-gray)]">
+        Add to list
+      </span>
+      {REQUEST_LISTS.map(({ id, short }) => {
+        const on = entry.tags.includes(id)
+        const Icon = LIST_ICON[id]
+        return (
+          <button
+            key={id}
+            type="button"
+            disabled={busy.has(`${noteKey(entry)}:tag:${id}`)}
+            onClick={() => onToggle(id, !on)}
+            aria-pressed={on}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-50',
+              on ? LIST_ON_CLASS[id] : 'border-[var(--color-border)] text-[var(--color-dk-gray)] hover:border-[var(--color-charcoal)]'
+            )}
+          >
+            <Icon className="size-3.5" /> {short}
+            {on && <Check className="size-3" strokeWidth={3} />}
+          </button>
+        )
+      })}
     </div>
   )
 }
