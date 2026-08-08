@@ -4,6 +4,7 @@ import { AuthProvider } from '@/auth/AuthProvider'
 import { RequireAuth } from '@/auth/RequireAuth'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { AppShell } from '@/components/AppShell'
+import { InstallPrompt } from '@/components/InstallPrompt'
 import { Login } from '@/pages/Login'
 
 // Code-split the heavy authed pages (form + dashboard + Firestore/Framer usage).
@@ -62,6 +63,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/report" replace />} />
           </Routes>
         </BrowserRouter>
+        <InstallPrompt />
       </AuthProvider>
     </ErrorBoundary>
   )
