@@ -33,7 +33,11 @@ export function Performance() {
             <h1 className="text-2xl font-extrabold text-[var(--color-charcoal)]">Director Performance</h1>
             <p className="text-sm text-[var(--color-dk-gray)]">
               {hasData
-                ? `Since launch · ${formatShort(report.periodStart)} – ${formatShort(report.asOf)}`
+                ? `Since launch · ${formatShort(report.periodStart)} – ${formatShort(report.asOf)}${
+                    report.excludedWeeks.length
+                      ? ` · excludes wk of ${report.excludedWeeks.map(formatShort).join(', ')}`
+                      : ''
+                  }`
                 : 'Side-by-side view of every director'}
             </p>
           </div>

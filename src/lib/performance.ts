@@ -28,11 +28,21 @@ const sum = (ns: number[]) => ns.reduce((a, b) => a + b, 0)
 const qualityOf = (r: DailyOpsReport) => r.qualityScore ?? computeQualityScore(r)
 const round1 = (n: number) => Math.round(n * 10) / 10
 
-/** Inclusive count of Mon–Fri workdays between two ISO dates. */
+/**
+ * Weeks (keyed by Monday, 'YYYY-MM-DD') left out of the performance report —
+ * closures / anomalous weeks whose numbers would distort the comparison. These
+ * are dropped from the metrics, the expected-days denominator, and the trend,
+ * but NOT from streaks (a director who kept filing keeps their streak).
+ */
+export const EXCLUDED_WEEKS = new Set<string>(['2026-08-17'])
+
+const isExcludedDate = (iso: string) => EXCLUDED_WEEKS.has(weekOfFn(iso))
+
+/** Inclusive count of Mon–Fri workdays between two ISO dates, minus excluded weeks. */
 function countWorkdays(start: string, end: string): number {
   if (!start || start > end) return 0
   let n = 0
-  for (let d = start; d <= end; d = addIsoDays(d, 1)) if (isWorkday(d)) n++
+  for (let d = start; d <= end; d = addIsoDays(d, 1)) if (isWorkday(d) && !isExcludedDate(d)) n++
   return n
 }
 
@@ -92,6 +102,7 @@ export interface PerformanceReport {
   periodStart: string
   asOf: string
   weeks: string[]
+  excludedWeeks: string[] // excluded weeks that fall within the reported period
   cards: DirectorScorecard[]
 }
 
@@ -102,19 +113,28 @@ export function buildPerformanceReport(
   today: string
 ): PerformanceReport {
   const scope = new Set(sites.map((s) => s.id))
+  // Full submitted history (used for streaks, so an excluded week can't break one).
   const submitted = reports.filter((r) => r.status === 'submitted' && scope.has(r.siteId))
+  // Everything the report's metrics/trend are actually built from.
+  const included = submitted.filter((r) => !isExcludedDate(r.date))
   const asOf = today
 
-  const dates = submitted.map((r) => r.date).sort()
+  const dates = included.map((r) => r.date).sort()
   const periodStart = dates.length ? dates[0] : weekOfFn(today)
   const expectedWorkdays = countWorkdays(periodStart, asOf)
 
-  // Weeks spanning the period, for the trend sparklines.
+  // Weeks spanning the period (minus excluded), for the trend sparklines.
   const weeks: string[] = []
-  for (let w = weekOfFn(periodStart); w <= weekOfFn(asOf); w = addIsoDays(w, 7)) weeks.push(w)
+  for (let w = weekOfFn(periodStart); w <= weekOfFn(asOf); w = addIsoDays(w, 7)) {
+    if (!EXCLUDED_WEEKS.has(w)) weeks.push(w)
+  }
+  const excludedWeeks = [...EXCLUDED_WEEKS]
+    .filter((w) => w >= weekOfFn(periodStart) && w <= weekOfFn(asOf))
+    .sort()
 
   const cards: DirectorScorecard[] = sites.map((site) => {
-    const mine = submitted.filter((r) => r.siteId === site.id)
+    const mineAll = submitted.filter((r) => r.siteId === site.id) // for streaks
+    const mine = included.filter((r) => r.siteId === site.id)
     const filedCount = mine.length
     const workdayFilings = new Set(mine.filter((r) => isWorkday(r.date)).map((r) => r.date)).size
     const distinctDays = Math.max(1, new Set(mine.map((r) => r.date)).size)
@@ -122,7 +142,7 @@ export function buildPerformanceReport(
     const onTime = mine.filter(isOnTime).length
     const early = mine.filter(isEarlyBird).length
     const avgQuality = filedCount ? Math.round(sum(mine.map(qualityOf)) / filedCount) : 0
-    const streak = computeStreak(mine, asOf)
+    const streak = computeStreak(mineAll, asOf)
 
     const em = (k: keyof DailyOpsReport['enrollmentMarketing']) => sum(mine.map((r) => r.enrollmentMarketing[k].count))
     const st = (k: keyof DailyOpsReport['staff']) => sum(mine.map((r) => r.staff[k].count))
@@ -167,5 +187,5 @@ export function buildPerformanceReport(
     }
   })
 
-  return { periodStart, asOf, weeks, cards }
+  return { periodStart, asOf, weeks, excludedWeeks, cards }
 }
