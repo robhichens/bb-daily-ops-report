@@ -209,9 +209,12 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
                           entry={e}
                           busy={busy}
                           onToggle={(list, on) =>
-                            runBusy(`${key}:tag:${list}`, () =>
-                              setNoteTag(e.reportId, e.allTags, e.note, list, on)
-                            )
+                            runBusy(`${key}:tag:${list}`, async () => {
+                              await setNoteTag(e.reportId, e.allTags, e.note, list, on)
+                              // Filing a note as an action item = it's handled,
+                              // so auto-check it. (Un-filing leaves the check as-is.)
+                              if (on && !e.acked) await setNoteAck(e.reportId, e.note, true)
+                            })
                           }
                         />
                       </div>
@@ -228,16 +231,15 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
                         submitLabel="Send"
                         busy={busy.has(key)}
                         onSend={(text) =>
-                          runBusy(key, async () => {
-                            await addNoteComment(e.reportId, e.allComments, {
+                          runBusy(key, () =>
+                            addNoteComment(e.reportId, e.allComments, {
                               note: e.note,
                               text,
                               author,
                               at: new Date().toISOString(),
                               role: 'admin',
                             })
-                            if (user?.uid) markDayNotesSeen(user.uid, true)
-                          })
+                          )
                         }
                       />
                     </div>
@@ -351,16 +353,15 @@ function DirectorDayNotes({ reports }: { reports: DailyOpsReport[] }) {
                           submitLabel="Reply"
                           busy={busy.has(key)}
                           onSend={(text) =>
-                            runBusy(key, async () => {
-                              await addNoteComment(e.reportId, e.allComments, {
+                            runBusy(key, () =>
+                              addNoteComment(e.reportId, e.allComments, {
                                 note: e.note,
                                 text,
                                 author,
                                 at: new Date().toISOString(),
                                 role: 'director',
                               })
-                              if (user?.uid) markDayNotesSeen(user.uid, false)
-                            })
+                            )
                           }
                         />
                       </div>
