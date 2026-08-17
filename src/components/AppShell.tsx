@@ -116,8 +116,8 @@ export function AppShell() {
                     <span className="hidden sm:inline">{label}</span>
                     {badge && (
                       <span
-                        title={`${unread} new ${unread === 1 ? 'reply' : 'replies'}`}
-                        className="ml-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[var(--color-charcoal)] px-1 text-[10px] font-bold leading-none text-white ring-2 ring-[var(--color-cream)] max-sm:absolute max-sm:right-0.5 max-sm:top-0.5 max-sm:ml-0"
+                        title={`${unread} new ${unread === 1 ? 'message' : 'messages'}`}
+                        className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[var(--color-critical)] px-1 text-[10px] font-bold leading-none text-white ring-2 ring-[var(--color-cream)]"
                       >
                         {unread > 9 ? '9+' : unread}
                       </span>

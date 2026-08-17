@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { Filter, UserCog, ClipboardCheck } from 'lucide-react'
-import { Card } from '@/components/ui/card'
+import { CollapsibleCard } from './CollapsibleCard'
 import type { SiteFunnel, StaffWatchRow, PacketCompliance } from '@/lib/dashboard'
 import { formatShort } from '@/lib/dates'
 
@@ -17,15 +17,21 @@ function PanelShell({
 }) {
   const color = { coral: 'var(--color-coral)', yellow: 'var(--color-coral-dark)', sky: 'var(--color-sky-deep)', gray: 'var(--color-dk-gray)' }[accent]
   return (
-    <Card accent={accent} className="flex flex-col">
-      <div className="flex items-center gap-2 border-b border-[var(--color-border)] p-5">
-        <span style={{ color }}>{icon}</span>
-        <h2 className="text-xs font-extrabold uppercase tracking-[0.14em]" style={{ color }}>
-          {title}
-        </h2>
-      </div>
+    <CollapsibleCard
+      accent={accent}
+      storageKey={title}
+      className="flex flex-col"
+      header={
+        <>
+          <span style={{ color }}>{icon}</span>
+          <h2 className="text-xs font-extrabold uppercase tracking-[0.14em]" style={{ color }}>
+            {title}
+          </h2>
+        </>
+      }
+    >
       <div className="flex-1 p-5">{children}</div>
-    </Card>
+    </CollapsibleCard>
   )
 }
 

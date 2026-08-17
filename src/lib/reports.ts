@@ -246,9 +246,9 @@ export async function removeNoteComment(
 // Day Notes — file a note onto an admin request list (Buy / Fix)
 // ---------------------------------------------------------------------------
 
-/** Add/remove a note from a request list. Pass the report's current `noteTags`
- *  so we rewrite the array without a re-read. Admin-only single-field write,
- *  merge-safe against director autosaves — no rules change needed. */
+/** Add/remove a note from a request list (the Day Notes Buy/Fix toggle). One tag
+ *  per (note, list): turning it on revives a completed item back to active.
+ *  Admin-only single-field write, merge-safe against director autosaves. */
 export async function setNoteTag(
   reportId: string,
   existing: NoteTag[] | undefined,
@@ -257,7 +257,23 @@ export async function setNoteTag(
   on: boolean
 ): Promise<void> {
   const rest = (existing ?? []).filter((t) => !(t.note === note && t.list === list));
-  const next = on ? [...rest, { note, list }] : rest;
+  const next = on ? [...rest, { note, list, done: false }] : rest;
+  await updateDoc(reportRef(reportId), { noteTags: next });
+}
+
+/** Mark a request done (→ Completed section) or reopen it (→ active list). */
+export async function setRequestDone(
+  reportId: string,
+  existing: NoteTag[] | undefined,
+  note: string,
+  list: RequestList,
+  done: boolean
+): Promise<void> {
+  const next = (existing ?? []).map((t) =>
+    t.note === note && t.list === list
+      ? { note, list, done, ...(done ? { doneAt: new Date().toISOString() } : {}) }
+      : t
+  );
   await updateDoc(reportRef(reportId), { noteTags: next });
 }
 
@@ -269,26 +285,45 @@ export interface RequestItem {
   date: string;
   director: string;
   note: string;
-  tags: NoteTag[]; // the report's full tag array (for removal writes)
+  list: RequestList;
+  doneAt?: string;
+  tags: NoteTag[]; // the report's full tag array (for rewrite/removal writes)
 }
 
-/** Collect every note filed to `list`, newest first. */
+function toRequestItem(r: DailyOpsReport, t: NoteTag, tags: NoteTag[]): RequestItem {
+  return {
+    reportId: r.id,
+    siteId: r.siteId,
+    siteName: r.siteName || siteName(r.siteId),
+    date: r.date,
+    director: r.director,
+    note: t.note,
+    list: t.list,
+    doneAt: t.doneAt,
+    tags,
+  };
+}
+
+/** Active (not-done) notes filed to `list`, newest first. */
 export function collectRequests(reports: DailyOpsReport[], list: RequestList): RequestItem[] {
   const out: RequestItem[] = [];
   for (const r of reports) {
     const tags = r.noteTags ?? [];
     for (const t of tags) {
-      if (t.list !== list) continue;
-      out.push({
-        reportId: r.id,
-        siteId: r.siteId,
-        siteName: r.siteName || siteName(r.siteId),
-        date: r.date,
-        director: r.director,
-        note: t.note,
-        tags,
-      });
+      if (t.list === list && !t.done) out.push(toRequestItem(r, t, tags));
     }
   }
   return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.siteName.localeCompare(b.siteName)));
+}
+
+/** Completed notes across BOTH lists, most-recently-completed first. */
+export function collectCompletedRequests(reports: DailyOpsReport[]): RequestItem[] {
+  const out: RequestItem[] = [];
+  for (const r of reports) {
+    const tags = r.noteTags ?? [];
+    for (const t of tags) {
+      if (t.done) out.push(toRequestItem(r, t, tags));
+    }
+  }
+  return out.sort((a, b) => (a.doneAt ?? '') < (b.doneAt ?? '') ? 1 : (a.doneAt ?? '') > (b.doneAt ?? '') ? -1 : 0);
 }

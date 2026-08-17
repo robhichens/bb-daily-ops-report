@@ -108,10 +108,14 @@ export const REQUEST_LISTS: { id: RequestList; label: string; short: string }[] 
   { id: 'maintenance', label: 'Maintenance Requests', short: 'Fix' },
 ];
 
-/** Files one Director-Report line onto an admin request list (Day Notes → Dashboard). */
+/** Files one Director-Report line onto an admin request list (Day Notes → Dashboard).
+ *  `done` moves the item from the active list into the Completed section; it stays
+ *  there (with `doneAt`) until deleted. One tag per (note, list). */
 export interface NoteTag {
   note: string;      // the exact Director-Report line
   list: RequestList;
+  done?: boolean;
+  doneAt?: string;   // ISO — when it was marked done
 }
 
 /** One message in a Day-Notes thread hanging off a Director-Report line.

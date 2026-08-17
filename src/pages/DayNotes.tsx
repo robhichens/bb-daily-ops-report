@@ -79,7 +79,7 @@ function toEntries(reports: DailyOpsReport[]): NoteEntry[] {
           .filter((c) => c.note === note)
           .sort((a, b) => (a.at < b.at ? -1 : 1)),
         allComments: comments,
-        tags: allTags.filter((t) => t.note === note).map((t) => t.list),
+        tags: allTags.filter((t) => t.note === note && !t.done).map((t) => t.list),
         allTags,
       })
     }
@@ -115,12 +115,13 @@ export function DayNotes() {
   const [reports, setReports] = useState<DailyOpsReport[]>([])
   useEffect(() => subscribeRecentReports(300, setReports), [])
 
-  // Opening the tab clears the "you have replies" nudge; re-mark as new
-  // messages arrive while it's open, so it stays caught-up. Admins sync the
-  // "seen" timestamp to Firestore so the badge clears on their other devices.
+  // Opening the tab clears the "you have replies" nudge. We mark seen on open
+  // (not on every data change) so a reply that lands while you're idle here
+  // still counts as new next time. Posting in a thread also marks seen (below).
+  // Admins sync the "seen" timestamp to Firestore so it clears on their devices.
   useEffect(() => {
     if (user?.uid) markDayNotesSeen(user.uid, isAdmin(profile?.role))
-  }, [user?.uid, profile?.role, reports])
+  }, [user?.uid, profile?.role])
 
   return isAdmin(profile?.role) ? (
     <AdminDayNotes reports={reports} />
@@ -227,15 +228,16 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
                         submitLabel="Send"
                         busy={busy.has(key)}
                         onSend={(text) =>
-                          runBusy(key, () =>
-                            addNoteComment(e.reportId, e.allComments, {
+                          runBusy(key, async () => {
+                            await addNoteComment(e.reportId, e.allComments, {
                               note: e.note,
                               text,
                               author,
                               at: new Date().toISOString(),
                               role: 'admin',
                             })
-                          )
+                            if (user?.uid) markDayNotesSeen(user.uid, true)
+                          })
                         }
                       />
                     </div>
@@ -349,15 +351,16 @@ function DirectorDayNotes({ reports }: { reports: DailyOpsReport[] }) {
                           submitLabel="Reply"
                           busy={busy.has(key)}
                           onSend={(text) =>
-                            runBusy(key, () =>
-                              addNoteComment(e.reportId, e.allComments, {
+                            runBusy(key, async () => {
+                              await addNoteComment(e.reportId, e.allComments, {
                                 note: e.note,
                                 text,
                                 author,
                                 at: new Date().toISOString(),
                                 role: 'director',
                               })
-                            )
+                              if (user?.uid) markDayNotesSeen(user.uid, false)
+                            })
                           }
                         />
                       </div>
@@ -416,7 +419,7 @@ function Thread({
             className={cn(
               'group rounded-xl border px-3.5 py-2.5',
               fromAdmin
-                ? 'border-[var(--color-coral)]/25 bg-[var(--color-coral-soft)]'
+                ? 'border-[var(--color-good)]/30 bg-[var(--color-good-soft)]'
                 : 'border-[var(--color-border)] bg-[var(--color-secondary)]'
             )}
           >
@@ -424,7 +427,7 @@ function Thread({
               <p
                 className={cn(
                   'text-[11px] font-bold uppercase tracking-wide',
-                  fromAdmin ? 'text-[var(--color-coral-dark)]' : 'text-[var(--color-dk-gray)]'
+                  fromAdmin ? 'text-[var(--color-good)]' : 'text-[var(--color-dk-gray)]'
                 )}
               >
                 {fromAdmin ? <Flag className="mr-1 inline size-3" /> : <CornerDownRight className="mr-1 inline size-3" />}

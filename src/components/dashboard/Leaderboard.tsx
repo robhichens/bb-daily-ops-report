@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { Flame, Trophy } from 'lucide-react'
-import { Card } from '@/components/ui/card'
+import { CollapsibleCard } from './CollapsibleCard'
 import { siteName } from '@/lib/schema'
 import type { LeaderboardRow, Badge } from '@/lib/gamification'
 
@@ -17,21 +17,25 @@ export function Leaderboard({
 }) {
   const top = rows[0]
   return (
-    <Card accent="yellow" className="overflow-hidden">
-      <div className="flex items-center gap-2 border-b border-[var(--color-border)] p-5">
-        <span className="grid size-9 place-items-center rounded-xl bg-[var(--color-yellow)] text-[var(--color-charcoal)]">
-          <Trophy className="size-4" />
-        </span>
-        <div>
-          <h2 className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--color-coral-dark)]">
-            Weekly Leaderboard
-          </h2>
-          <p className="text-xs text-[var(--color-dk-gray)]">
-            Ranked by consistency — showing up & filing thoroughly
-          </p>
-        </div>
-      </div>
-
+    <CollapsibleCard
+      accent="yellow"
+      storageKey="leaderboard"
+      header={
+        <>
+          <span className="grid size-9 place-items-center rounded-xl bg-[var(--color-yellow)] text-[var(--color-charcoal)]">
+            <Trophy className="size-4" />
+          </span>
+          <div>
+            <h2 className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--color-coral-dark)]">
+              Weekly Leaderboard
+            </h2>
+            <p className="text-xs text-[var(--color-dk-gray)]">
+              Ranked by consistency — showing up & filing thoroughly
+            </p>
+          </div>
+        </>
+      }
+    >
       <div className="divide-y divide-[var(--color-border)]">
         {rows.map((row, i) => (
           <motion.div
@@ -90,6 +94,6 @@ export function Leaderboard({
           </span>
         )}
       </div>
-    </Card>
+    </CollapsibleCard>
   )
 }

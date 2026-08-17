@@ -24,7 +24,7 @@ export function DashboardSections({ view, sections }: { view: DashboardView; sec
       {sections.funnel && <EnrollmentFunnelBySite groups={view.funnelBySite} />}
 
       {opsRow && (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid items-start gap-4 lg:grid-cols-2">
           {sections.staffWatch && <StaffWatch rows={view.staff} />}
           {sections.packet && <PacketPanel data={view.packet} />}
         </div>
@@ -33,7 +33,7 @@ export function DashboardSections({ view, sections }: { view: DashboardView; sec
       {sections.redFlags && <RedFlags flags={view.flags} />}
 
       {gameRow && (
-        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <div className="grid items-start gap-4 lg:grid-cols-[1.4fr_1fr]">
           {sections.leaderboard && (
             <Leaderboard rows={view.board} badgesBySite={view.badgesBySite} mostImproved={view.improved} />
           )}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, Table2 } from 'lucide-react'
-import { Card } from '@/components/ui/card'
+import { CollapsibleCard } from './CollapsibleCard'
 import {
   ENROLLMENT_FIELDS,
   STAFF_FIELDS,
@@ -17,14 +17,18 @@ export function ReportsTable({ rows }: { rows: DailyOpsReport[] }) {
   const sorted = [...rows].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.siteName.localeCompare(b.siteName)))
 
   return (
-    <Card accent="gray" className="overflow-hidden">
-      <div className="flex items-center gap-2 border-b border-[var(--color-border)] p-5">
-        <Table2 className="size-4 text-[var(--color-dk-gray)]" />
-        <h2 className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--color-dk-gray)]">
-          Reports ({sorted.length})
-        </h2>
-      </div>
-
+    <CollapsibleCard
+      accent="gray"
+      storageKey="reports"
+      header={
+        <>
+          <Table2 className="size-4 text-[var(--color-dk-gray)]" />
+          <h2 className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--color-dk-gray)]">
+            Reports ({sorted.length})
+          </h2>
+        </>
+      }
+    >
       {sorted.length === 0 ? (
         <p className="p-5 text-sm text-[var(--color-dk-gray)]">No reports for this selection yet.</p>
       ) : (
@@ -127,7 +131,7 @@ export function ReportsTable({ rows }: { rows: DailyOpsReport[] }) {
           })}
         </div>
       )}
-    </Card>
+    </CollapsibleCard>
   )
 }
 

@@ -1,22 +1,28 @@
 import { motion } from 'framer-motion'
 import { PartyPopper, TriangleAlert } from 'lucide-react'
-import { Card } from '@/components/ui/card'
+import { CollapsibleCard } from './CollapsibleCard'
 import type { Flag } from '@/lib/dashboard'
 
 export function RedFlags({ flags }: { flags: Flag[] }) {
   return (
-    <Card accent="coral" className="flex flex-col">
-      <div className="flex items-center gap-2 border-b border-[var(--color-border)] p-5">
-        <TriangleAlert className="size-4 text-[var(--color-critical)]" />
-        <h2 className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--color-critical)]">
-          Red Flags
-        </h2>
-        {flags.length > 0 && (
-          <span className="ml-auto rounded-full bg-[var(--color-critical-soft)] px-2 py-0.5 text-xs font-bold text-[var(--color-critical)]">
-            {flags.length}
-          </span>
-        )}
-      </div>
+    <CollapsibleCard
+      accent="coral"
+      storageKey="redFlags"
+      className="flex flex-col"
+      header={
+        <>
+          <TriangleAlert className="size-4 text-[var(--color-critical)]" />
+          <h2 className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--color-critical)]">
+            Red Flags
+          </h2>
+          {flags.length > 0 && (
+            <span className="ml-auto rounded-full bg-[var(--color-critical-soft)] px-2 py-0.5 text-xs font-bold text-[var(--color-critical)]">
+              {flags.length}
+            </span>
+          )}
+        </>
+      }
+    >
       <div className="flex-1 p-5">
         {flags.length === 0 ? (
           <p className="text-sm text-[var(--color-good)]">All clear — nothing needs attention. ✅</p>
@@ -37,19 +43,25 @@ export function RedFlags({ flags }: { flags: Flag[] }) {
           </ul>
         )}
       </div>
-    </Card>
+    </CollapsibleCard>
   )
 }
 
 export function Celebrations({ items }: { items: Flag[] }) {
   return (
-    <Card accent="sky" className="flex flex-col">
-      <div className="flex items-center gap-2 border-b border-[var(--color-border)] p-5">
-        <PartyPopper className="size-4 text-[var(--color-sky-deep)]" />
-        <h2 className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--color-sky-deep)]">
-          Celebrations
-        </h2>
-      </div>
+    <CollapsibleCard
+      accent="sky"
+      storageKey="celebrations"
+      className="flex flex-col"
+      header={
+        <>
+          <PartyPopper className="size-4 text-[var(--color-sky-deep)]" />
+          <h2 className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--color-sky-deep)]">
+            Celebrations
+          </h2>
+        </>
+      }
+    >
       <div className="flex-1 p-5">
         {items.length === 0 ? (
           <p className="text-sm text-[var(--color-dk-gray)]">Wins will show up here as reports roll in.</p>
@@ -69,6 +81,6 @@ export function Celebrations({ items }: { items: Flag[] }) {
           </ul>
         )}
       </div>
-    </Card>
+    </CollapsibleCard>
   )
 }
