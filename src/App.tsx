@@ -11,6 +11,7 @@ import { Login } from '@/pages/Login'
 const Report = lazy(() => import('@/pages/Report').then((m) => ({ default: m.Report })))
 const Dashboard = lazy(() => import('@/pages/Dashboard').then((m) => ({ default: m.Dashboard })))
 const DayNotes = lazy(() => import('@/pages/DayNotes').then((m) => ({ default: m.DayNotes })))
+const Performance = lazy(() => import('@/pages/Performance').then((m) => ({ default: m.Performance })))
 
 function PageLoader() {
   return (
@@ -55,6 +56,14 @@ export default function App() {
                 element={
                   <Suspense fallback={<PageLoader />}>
                     <DayNotes />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/performance"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <Performance />
                   </Suspense>
                 }
               />

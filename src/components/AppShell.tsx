@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { ClipboardList, LayoutDashboard, LogOut, HelpCircle, NotebookPen } from 'lucide-react'
+import { ClipboardList, LayoutDashboard, LogOut, HelpCircle, NotebookPen, BarChart3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/auth/AuthProvider'
 import { isAdmin, userSites, subscribeDayNotesSeenAt } from '@/lib/users'
@@ -10,10 +10,11 @@ import { countUnreadReplies, getDayNotesSeen, laterIso } from '@/lib/dayNotesRea
 
 // Day Notes is a two-sided view: admins triage every school's notes; directors
 // see their own notes, whether they've been seen, and leadership's replies.
-const navItems = [
+const navItems: { to: string; label: string; icon: typeof ClipboardList; adminOnly?: boolean }[] = [
   { to: '/report', label: 'Daily Report', icon: ClipboardList },
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/day-notes', label: 'Day Notes', icon: NotebookPen },
+  { to: '/performance', label: 'Performance', icon: BarChart3, adminOnly: true },
 ]
 
 /** Unread Day-Notes replies from the other side — powers the nav nudge. */
@@ -60,6 +61,7 @@ function useDayNotesUnread(): number {
 export function AppShell() {
   const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
+  const admin = isAdmin(profile?.role)
   const unread = useDayNotesUnread()
 
   const name = profile?.displayName || user?.email || 'Signed in'
@@ -77,7 +79,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-svh bg-[var(--color-cream)]">
-      <header className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-[var(--color-cream)]/85 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-[var(--color-cream)]/85 backdrop-blur print:hidden">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <div className="flex items-center gap-2.5">
             <img
@@ -97,7 +99,7 @@ export function AppShell() {
 
           <div className="flex items-center gap-2 sm:gap-4">
             <nav className="flex items-center gap-1">
-              {navItems.map(({ to, label, icon: Icon }) => {
+              {navItems.filter((i) => !i.adminOnly || admin).map(({ to, label, icon: Icon }) => {
                 const badge = to === '/day-notes' && unread > 0
                 return (
                   <NavLink
