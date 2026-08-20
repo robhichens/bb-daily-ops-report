@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import { FirebaseError } from 'firebase/app'
+import { sendPasswordResetEmail } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useAuth } from '@/auth/AuthProvider'
@@ -33,6 +35,8 @@ export function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [resetNote, setResetNote] = useState<string | null>(null)
+  const [resetBusy, setResetBusy] = useState(false)
 
   const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/report'
 
@@ -44,6 +48,7 @@ export function Login() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
+    setResetNote(null)
     setBusy(true)
     try {
       await signIn(email, password)
@@ -52,6 +57,34 @@ export function Login() {
       setError(err instanceof FirebaseError ? messageFor(err.code) : 'Could not sign in.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function handleForgotPassword() {
+    setError(null)
+    setResetNote(null)
+    const addr = email.trim()
+    if (!addr) {
+      setError('Enter your email above first, then tap “Forgot password?”.')
+      return
+    }
+    setResetBusy(true)
+    try {
+      await sendPasswordResetEmail(auth, addr)
+      setResetNote(
+        `Reset email sent to ${addr}. Open it on this device and click the newest link — older reset links stop working.`
+      )
+    } catch (err) {
+      if (err instanceof FirebaseError && err.code === 'auth/invalid-email') {
+        setError('That doesn’t look like a valid email.')
+      } else if (err instanceof FirebaseError && err.code === 'auth/too-many-requests') {
+        setError('Too many reset requests. Wait a few minutes and try again.')
+      } else {
+        // Deliberately vague on user-not-found so the form can't be used to probe accounts.
+        setResetNote(`If an account exists for ${addr}, a reset email is on its way.`)
+      }
+    } finally {
+      setResetBusy(false)
     }
   }
 
@@ -109,10 +142,24 @@ export function Login() {
                 {error}
               </p>
             )}
+            {resetNote && (
+              <p className="rounded-lg bg-[var(--color-good-soft)] px-3 py-2 text-sm text-[var(--color-good)]">
+                {resetNote}
+              </p>
+            )}
 
             <Button type="submit" className="mt-1 w-full" disabled={busy}>
               {busy ? 'Signing in…' : 'Sign in'}
             </Button>
+
+            <button
+              type="button"
+              onClick={() => void handleForgotPassword()}
+              disabled={resetBusy}
+              className="mt-1 self-center text-sm font-semibold text-[var(--color-coral-dark)] underline-offset-2 hover:underline disabled:opacity-60"
+            >
+              {resetBusy ? 'Sending reset email…' : 'Forgot password?'}
+            </button>
           </form>
         </CardContent>
       </Card>
