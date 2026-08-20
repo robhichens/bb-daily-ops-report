@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { ClipboardList, LayoutDashboard, LogOut, HelpCircle, NotebookPen, BarChart3 } from 'lucide-react'
+import { ClipboardList, LayoutDashboard, LogOut, HelpCircle, NotebookPen, BarChart3, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/auth/AuthProvider'
 import { isAdmin, userSites, subscribeDayNotesSeenAt } from '@/lib/users'
@@ -14,6 +14,7 @@ const navItems: { to: string; label: string; icon: typeof ClipboardList; adminOn
   { to: '/report', label: 'Daily Report', icon: ClipboardList },
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/day-notes', label: 'Day Notes', icon: NotebookPen },
+  { to: '/finance', label: 'Finance', icon: Wallet, adminOnly: true },
   { to: '/performance', label: 'Performance', icon: BarChart3, adminOnly: true },
 ]
 

@@ -44,5 +44,13 @@ service cloud.firestore {
       allow read: if isSignedIn() && role() in ['admin', 'director'];
       allow write: if isSignedIn() && role() == 'admin';
     }
+
+    // Finance DOR (Alicia / Finance) — org-wide, admin-only. Directors never see it.
+    match /financeReports/{id} {
+      allow read, write: if isSignedIn() && role() == 'admin';
+    }
+    match /financeNotes/{id} {
+      allow read, write: if isSignedIn() && role() == 'admin';
+    }
   }
 }

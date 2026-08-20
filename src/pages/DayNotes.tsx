@@ -17,6 +17,7 @@ import { formatLong } from '@/lib/dates'
 import {
   subscribeRecentReports,
   setNoteAck,
+  setNoteFlag,
   addNoteComment,
   removeNoteComment,
   setNoteTag,
@@ -45,6 +46,7 @@ interface NoteEntry {
   date: string
   note: string
   acked: boolean
+  flagged: boolean // red-flagged "high alert"
   thread: NoteComment[]
   allComments: NoteComment[] // the whole report's comments (for array rewrites)
   tags: RequestList[] // which request lists this note is filed to
@@ -62,6 +64,7 @@ function toEntries(reports: DailyOpsReport[]): NoteEntry[] {
   const out: NoteEntry[] = []
   for (const r of reports) {
     const acks = r.acknowledgedNotes ?? []
+    const flags = r.flaggedNotes ?? []
     const comments = r.noteComments ?? []
     const allTags = r.noteTags ?? []
     for (const raw of r.directorReport ?? []) {
@@ -75,6 +78,7 @@ function toEntries(reports: DailyOpsReport[]): NoteEntry[] {
         date: r.date,
         note,
         acked: acks.includes(note),
+        flagged: flags.includes(note),
         thread: comments
           .filter((c) => c.note === note)
           .sort((a, b) => (a.at < b.at ? -1 : 1)),
@@ -100,6 +104,8 @@ function groupByDate(entries: NoteEntry[], pinFirst?: (e: NoteEntry) => boolean)
     .map(([date, list]) => ({
       date,
       entries: list.sort((a, b) => {
+        // Red-flagged notes always float to the top of the day.
+        if (a.flagged !== b.flagged) return a.flagged ? -1 : 1
         if (pinFirst && pinFirst(a) !== pinFirst(b)) return pinFirst(a) ? -1 : 1
         return a.siteName.localeCompare(b.siteName)
       }),
@@ -187,8 +193,17 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
                   <Card
                     key={key}
                     accent={SITE_ACCENT[e.siteId]}
-                    className={cn('p-4 transition-opacity', e.acked && 'opacity-60')}
+                    className={cn(
+                      'p-4 transition-opacity',
+                      e.acked && 'opacity-60',
+                      e.flagged && 'bg-[var(--color-critical-soft)] ring-1 ring-[var(--color-critical)]/50'
+                    )}
                   >
+                    {e.flagged && (
+                      <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-critical)] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
+                        <Flag className="size-3" /> High alert
+                      </p>
+                    )}
                     <div className="flex items-start gap-3">
                       <CheckButton
                         checked={e.acked}
@@ -218,9 +233,26 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
                           }
                         />
                       </div>
-                      {lastFromDirector(e.thread) && (
-                        <Badge tone="coral" icon={<CornerDownRight className="size-3" />}>Replied</Badge>
-                      )}
+                      <div className="flex shrink-0 items-center gap-2">
+                        {lastFromDirector(e.thread) && (
+                          <Badge tone="coral" icon={<CornerDownRight className="size-3" />}>Replied</Badge>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => runBusy(`${key}:flag`, () => setNoteFlag(e.reportId, e.note, !e.flagged))}
+                          disabled={busy.has(`${key}:flag`)}
+                          title={e.flagged ? 'Remove high alert' : 'Mark high alert'}
+                          aria-pressed={e.flagged}
+                          className={cn(
+                            'grid size-8 place-items-center rounded-lg transition-colors',
+                            e.flagged
+                              ? 'bg-[var(--color-critical)] text-white'
+                              : 'text-[var(--color-mid-gray)] hover:bg-[var(--color-critical-soft)] hover:text-[var(--color-critical)]'
+                          )}
+                        >
+                          <Flag className="size-4" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="mt-3 pl-9">
@@ -324,9 +356,19 @@ function DirectorDayNotes({ reports }: { reports: DailyOpsReport[] }) {
                 return (
                   <Card
                     key={key}
-                    accent={flagged ? 'coral' : 'gray'}
-                    className={cn('p-4', flagged && 'ring-1 ring-[var(--color-coral)]/30')}
+                    accent={e.flagged ? 'coral' : flagged ? 'coral' : 'gray'}
+                    className={cn(
+                      'p-4',
+                      e.flagged
+                        ? 'bg-[var(--color-critical-soft)] ring-1 ring-[var(--color-critical)]/50'
+                        : flagged && 'ring-1 ring-[var(--color-coral)]/30'
+                    )}
                   >
+                    {e.flagged && (
+                      <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-critical)] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
+                        <Flag className="size-3" /> High alert from leadership
+                      </p>
+                    )}
                     <div className="flex items-start justify-between gap-3">
                       <p className="min-w-0 flex-1 text-[15px] leading-snug text-[var(--color-charcoal)]">
                         {e.note}

@@ -162,6 +162,11 @@ export interface DailyOpsReport {
    *  Admin-only; derived into the dashboard's Purchase/Maintenance lists. */
   noteTags?: NoteTag[];
 
+  /** Day Notes: exact Director-Report lines an admin has RED-FLAGGED (high
+   *  alert). Flagged notes float to the top of Day Notes with a red border.
+   *  Written only from the Day Notes view via setNoteFlag. */
+  flaggedNotes?: string[];
+
   qualityScore?: number;   // derived 0–100 (gamification.ts); written on every save
 
   status: 'draft' | 'submitted';
@@ -241,6 +246,98 @@ function emptyMap<K extends string>(fields: CountNoteField<K>[]): Record<K, Coun
     acc[f.key] = emptyCountNote();
     return acc;
   }, {} as Record<K, CountNote>);
+}
+
+// ===========================================================================
+// FINANCE DAILY OPS REPORT — Alicia (Finance Director).
+// Org-wide (one report per DAY, not per site), admin-only. Lives alongside the
+// site DORs in its own `financeReports` collection. Deliberately lean: three
+// number sections + a running Flags & Notes list (see FinanceNote below).
+// ===========================================================================
+
+/** One org-wide finance line: an amount ($) and/or a count (#), plus a note. */
+export interface FinanceValue {
+  amount: number; // dollars
+  count: number;  // occurrences
+  note: string;
+}
+export const emptyFinanceValue = (): FinanceValue => ({ amount: 0, count: 0, note: '' });
+
+/** Money collected today, split per location (+ a shared note). Total is derived. */
+export interface MoneyIn {
+  crozet: number;
+  forestLakes: number;
+  millCreek: number;
+  note: string;
+}
+
+export interface FinanceReport {
+  id: string;      // = date 'YYYY-MM-DD' (one per day)
+  date: string;    // 'YYYY-MM-DD'
+  day: string;     // derived weekday
+  weekOf: string;  // derived Monday 'YYYY-MM-DD'
+  completedBy: string;
+
+  moneyIn: MoneyIn;        // per location $
+  collections: FinanceValue; // late fees / returned payments / AR $
+  dss: FinanceValue;         // subsidy $ posted / missed check-ins
+
+  status: 'draft' | 'submitted';
+  submittedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdByUid: string;
+}
+
+export const financeDocId = (date: string): string => date;
+
+/** Per-location money-in fields, for iterating the form + the total. */
+export const MONEY_IN_SITES: { key: keyof Omit<MoneyIn, 'note'>; label: string }[] = [
+  { key: 'crozet', label: 'Crozet' },
+  { key: 'forestLakes', label: 'Forest Lakes' },
+  { key: 'millCreek', label: 'Mill Creek' },
+];
+
+export const moneyInTotal = (m: MoneyIn): number =>
+  (m.crozet || 0) + (m.forestLakes || 0) + (m.millCreek || 0);
+
+export function emptyFinanceReport(date: string, uid = ''): FinanceReport {
+  const now = new Date().toISOString();
+  return {
+    id: financeDocId(date),
+    date,
+    day: '',
+    weekOf: '',
+    completedBy: '',
+    moneyIn: { crozet: 0, forestLakes: 0, millCreek: 0, note: '' },
+    collections: emptyFinanceValue(),
+    dss: emptyFinanceValue(),
+    status: 'draft',
+    submittedAt: null,
+    createdAt: now,
+    updatedAt: now,
+    createdByUid: uid,
+  };
+}
+
+/** One message in a Finance Flags-&-Notes thread (all authors are admins). */
+export interface FinanceNoteComment {
+  text: string;
+  author: string;
+  at: string; // ISO
+}
+
+/** A single Finance Flags-&-Notes entry — a running list (like Day Notes), with
+ *  a read check-off, a comment thread, and a red-flag that pins it to the top. */
+export interface FinanceNote {
+  id: string;
+  text: string;
+  author: string;
+  authorUid: string;
+  at: string;       // created ISO
+  acked: boolean;   // read / checked off
+  flagged: boolean; // red flag → pin to top, red border
+  comments: FinanceNoteComment[];
 }
 
 /** A blank report for a given site/date. Derived fields are filled by derive.ts. */

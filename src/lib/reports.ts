@@ -242,6 +242,21 @@ export async function removeNoteComment(
   await updateDoc(reportRef(reportId), { noteComments: next });
 }
 
+/**
+ * Red-flag / un-flag a Director-Report line (Day Notes "high alert"). Stored in
+ * the doc's `flaggedNotes` array via arrayUnion/arrayRemove — atomic single-field
+ * write, merge-safe against autosaves. Admin-only per firestore.rules.
+ */
+export async function setNoteFlag(
+  reportId: string,
+  note: string,
+  flagged: boolean
+): Promise<void> {
+  await updateDoc(reportRef(reportId), {
+    flaggedNotes: flagged ? arrayUnion(note) : arrayRemove(note),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Day Notes — file a note onto an admin request list (Buy / Fix)
 // ---------------------------------------------------------------------------
