@@ -13,7 +13,6 @@ import {
   type SiteId,
 } from './schema'
 import {
-  weekStatsForSite,
   computeStreak,
   isOnTime,
   isEarlyBird,
@@ -59,11 +58,6 @@ function modeDirector(rows: DailyOpsReport[]): string {
   return best
 }
 
-export interface WeeklyPoint {
-  weekOf: string
-  consistency: number // 0–100
-}
-
 export interface DirectorScorecard {
   siteId: SiteId
   siteName: string
@@ -94,14 +88,11 @@ export interface DirectorScorecard {
   callOuts: number
   commsOut: number
   timeRecruiting: number
-
-  weekly: WeeklyPoint[]
 }
 
 export interface PerformanceReport {
   periodStart: string
   asOf: string
-  weeks: string[]
   excludedWeeks: string[] // excluded weeks that fall within the reported period
   cards: DirectorScorecard[]
 }
@@ -123,11 +114,6 @@ export function buildPerformanceReport(
   const periodStart = dates.length ? dates[0] : weekOfFn(today)
   const expectedWorkdays = countWorkdays(periodStart, asOf)
 
-  // Weeks spanning the period (minus excluded), for the trend sparklines.
-  const weeks: string[] = []
-  for (let w = weekOfFn(periodStart); w <= weekOfFn(asOf); w = addIsoDays(w, 7)) {
-    if (!EXCLUDED_WEEKS.has(w)) weeks.push(w)
-  }
   const excludedWeeks = [...EXCLUDED_WEEKS]
     .filter((w) => w >= weekOfFn(periodStart) && w <= weekOfFn(asOf))
     .sort()
@@ -182,10 +168,8 @@ export function buildPerformanceReport(
       callOuts: st('callOutsLate'),
       commsOut: em('enrollmentCommsOut'),
       timeRecruiting: round1(st('timeSpentRecruiting')),
-
-      weekly: weeks.map((w) => ({ weekOf: w, consistency: weekStatsForSite(mine, site.id, w, asOf).consistency })),
     }
   })
 
-  return { periodStart, asOf, weeks, excludedWeeks, cards }
+  return { periodStart, asOf, excludedWeeks, cards }
 }

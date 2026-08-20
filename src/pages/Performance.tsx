@@ -55,8 +55,6 @@ export function Performance() {
         </Card>
       ) : (
         <>
-          <TrendSection cards={report.cards} weeks={report.weeks} />
-
           <MetricSection
             icon={<ClipboardCheck className="size-4 text-[var(--color-coral-dark)]" />}
             title="Report discipline & quality"
@@ -98,15 +96,15 @@ const DISCIPLINE_ROWS: Row[] = [
 
 const OPERATIONAL_ROWS: Row[] = [
   { label: 'Avg attendance', value: (c) => c.avgAttendance },
-  { label: 'Overtime', value: (c) => `${c.overtimePct}%` },
+  { label: 'Overtime (OT hours as % of all labor hours)', value: (c) => `${c.overtimePct}%` },
   { label: 'Tours scheduled', value: (c) => c.toursScheduled },
   { label: 'Tours given', value: (c) => c.toursGiven },
   { label: 'Reg fees paid', value: (c) => c.regFeesPaid },
   { label: 'New starts', value: (c) => c.newStarts },
   { label: 'Enrollments', value: (c) => c.enrollments },
   { label: 'Terminations', value: (c) => c.terminations },
-  { label: 'Net enrollment', value: (c) => (c.netEnrollment > 0 ? `+${c.netEnrollment}` : c.netEnrollment) },
-  { label: 'Packet compliance', value: (c) => `${c.packetPct}%` },
+  { label: 'Net enrollment (new starts − terminations)', value: (c) => (c.netEnrollment > 0 ? `+${c.netEnrollment}` : c.netEnrollment) },
+  { label: 'Packet compliance (% of filed days with packet done)', value: (c) => `${c.packetPct}%` },
   { label: 'Comms out', value: (c) => c.commsOut },
   { label: 'Call-outs / late', value: (c) => c.callOuts },
   { label: 'Time recruiting (hrs)', value: (c) => c.timeRecruiting },
@@ -173,61 +171,3 @@ function MetricSection({
   )
 }
 
-// --- Weekly trend ------------------------------------------------------------
-
-function TrendSection({ cards, weeks }: { cards: DirectorScorecard[]; weeks: string[] }) {
-  return (
-    <Card accent="coral" className="break-inside-avoid p-5">
-      <h2 className="mb-1 text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--color-coral-dark)]">
-        Weekly consistency trend
-      </h2>
-      <p className="mb-4 text-xs text-[var(--color-dk-gray)]">
-        Consistency (0–100) blends completion, timeliness and quality, week by week
-        {weeks.length > 1 ? ` · ${formatShort(weeks[0])} → ${formatShort(weeks[weeks.length - 1])}` : ''}.
-      </p>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {cards.map((c) => {
-          const series = c.weekly.map((w) => w.consistency)
-          const latest = series.length ? series[series.length - 1] : 0
-          return (
-            <div key={c.siteId} className="rounded-xl border border-[var(--color-border)] p-4">
-              <div className="flex items-baseline justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate font-bold text-[var(--color-charcoal)]">{c.director || c.siteName}</p>
-                  <p className="text-xs text-[var(--color-dk-gray)]">{c.siteName}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-2xl font-extrabold tabular-nums text-[var(--color-charcoal)]">{latest}</p>
-                  <p className="text-[10px] uppercase tracking-wide text-[var(--color-mid-gray)]">latest</p>
-                </div>
-              </div>
-              <div className="mt-3">
-                <Sparkline data={series} />
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </Card>
-  )
-}
-
-function Sparkline({ data, width = 240, height = 44 }: { data: number[]; width?: number; height?: number }) {
-  if (data.length === 0) return null
-  const clamp = (v: number) => Math.max(0, Math.min(100, v))
-  const stepX = data.length > 1 ? width / (data.length - 1) : 0
-  const y = (v: number) => height - (clamp(v) / 100) * height
-  const coords = data.map((v, i) => [data.length > 1 ? i * stepX : width / 2, y(v)] as const)
-  const path = coords.map(([x, yy], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${yy.toFixed(1)}`).join(' ')
-  const [lx, ly] = coords[coords.length - 1]
-  return (
-    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="block">
-      {/* baseline at 50 for reference */}
-      <line x1="0" y1={y(50)} x2={width} y2={y(50)} stroke="var(--color-border)" strokeWidth="1" strokeDasharray="3 3" />
-      {data.length > 1 && (
-        <path d={path} fill="none" stroke="var(--color-coral)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-      )}
-      <circle cx={lx} cy={ly} r="3" fill="var(--color-coral)" />
-    </svg>
-  )
-}
