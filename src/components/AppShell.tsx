@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { ClipboardList, LayoutDashboard, LogOut, HelpCircle, NotebookPen, BarChart3, ChevronDown } from 'lucide-react'
+import { ClipboardList, LayoutDashboard, LogOut, HelpCircle, NotebookPen, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/auth/AuthProvider'
 import { isAdmin, userSites, subscribeDayNotesSeenAt, accessibleReportKeys, type UserProfile } from '@/lib/users'
@@ -13,7 +13,6 @@ import { countUnreadReplies, getDayNotesSeen, laterIso } from '@/lib/dayNotesRea
 const navItems: { to: string; label: string; icon: typeof ClipboardList; adminOnly?: boolean }[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/day-notes', label: 'Day Notes', icon: NotebookPen },
-  { to: '/performance', label: 'Performance', icon: BarChart3, adminOnly: true },
 ]
 
 /** Reports the user can reach, in registry order. */
