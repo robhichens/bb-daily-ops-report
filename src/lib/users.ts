@@ -6,14 +6,16 @@
 
 import {
   collection,
+  deleteField,
   doc,
   getDoc,
   onSnapshot,
   setDoc,
+  updateDoc,
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from './firebase'
-import type { SiteId } from './schema'
+import type { ReportAccessLevel, ReportKey, SiteId } from './schema'
 
 export type UserRole =
   | 'admin'
@@ -31,6 +33,10 @@ export interface UserProfile {
   displayName?: string
   email?: string
   dayNotesSeenAt?: string // ISO — last time this user opened Day Notes (nudge sync)
+  /** Per-report grants for NON-admins: 'fill' (submit) or 'view' (read-only).
+   *  Admins implicitly have 'fill' on everything; directors implicitly have
+   *  'fill' on DDR for their site(s). Managed from Users & Access. */
+  reportAccess?: Partial<Record<ReportKey, ReportAccessLevel>>
 }
 
 /** Roles permitted to open the Daily Ops Report app at all. */
@@ -46,6 +52,30 @@ export function userSites(profile: UserProfile | null): SiteId[] {
   if (!profile) return []
   if (profile.siteIds?.length) return profile.siteIds
   return profile.siteId ? [profile.siteId] : []
+}
+
+/**
+ * A user's access level to one report, or null for none.
+ *  - Admins (all leadership): 'fill' on everything.
+ *  - DDR: directors get 'fill' if they have any site; else per-user grant.
+ *  - FDR/ADR/MDR/EDR: the per-user grant in reportAccess.
+ * Assigning a report to a user also makes that report's dashboard data visible.
+ */
+export function reportAccessLevel(
+  profile: UserProfile | null,
+  key: ReportKey
+): ReportAccessLevel | null {
+  if (!profile) return null
+  if (isAdmin(profile.role)) return 'fill'
+  if (key === 'ddr' && userSites(profile).length > 0) return 'fill'
+  return profile.reportAccess?.[key] ?? null
+}
+
+/** All reports a user can reach (fill OR view), in registry order isn't known here
+ *  so callers order via the registry; this just filters. */
+export function accessibleReportKeys(profile: UserProfile | null): ReportKey[] {
+  const all: ReportKey[] = ['ddr', 'adr', 'mdr', 'edr', 'fdr']
+  return all.filter((k) => reportAccessLevel(profile, k) !== null)
 }
 
 const usersRef = (uid: string) => doc(db, 'users', uid)
@@ -73,6 +103,17 @@ export function subscribeUsers(cb: (users: UserProfile[]) => void): Unsubscribe 
 /** Set a director's site access. Keeps legacy `siteId` synced to the first site. */
 export async function updateUserSites(uid: string, siteIds: SiteId[]): Promise<void> {
   await setDoc(usersRef(uid), { siteIds, siteId: siteIds[0] ?? null }, { merge: true })
+}
+
+/** Grant/revoke one report for a user. `null` removes the grant entirely. */
+export async function updateUserReportAccess(
+  uid: string,
+  key: ReportKey,
+  level: ReportAccessLevel | null
+): Promise<void> {
+  await updateDoc(usersRef(uid), {
+    [`reportAccess.${key}`]: level ?? deleteField(),
+  })
 }
 
 /** Live subscription to just this user's Day-Notes "last seen" timestamp, so the

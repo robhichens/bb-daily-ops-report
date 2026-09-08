@@ -130,6 +130,14 @@ export interface NoteComment {
   role?: 'admin' | 'director';
 }
 
+/** When a Director-Report line was first written, for the Day Notes timestamp.
+ *  Stored as an array (not a keyed map) because note text can contain characters
+ *  illegal in Firestore field keys. Stamped on autosave/submit in reports.ts. */
+export interface NoteStamp {
+  note: string; // the exact Director-Report line
+  at: string;   // ISO — first time this exact line was saved non-empty
+}
+
 export interface DailyOpsReport {
   id: string;        // `${siteId}_${date}`
   siteId: SiteId;
@@ -166,6 +174,10 @@ export interface DailyOpsReport {
    *  alert). Flagged notes float to the top of Day Notes with a red border.
    *  Written only from the Day Notes view via setNoteFlag. */
   flaggedNotes?: string[];
+
+  /** Day Notes: first-written timestamp per Director-Report line. Stamped on
+   *  autosave/submit (reports.ts), shown on the Day Notes ledger. */
+  noteCreatedAt?: NoteStamp[];
 
   qualityScore?: number;   // derived 0–100 (gamification.ts); written on every save
 
@@ -249,39 +261,47 @@ function emptyMap<K extends string>(fields: CountNoteField<K>[]): Record<K, Coun
 }
 
 // ===========================================================================
-// FINANCE DAILY OPS REPORT — Alicia (Finance Director).
-// Org-wide (one report per DAY, not per site), admin-only. Lives alongside the
-// site DORs in its own `financeReports` collection. Deliberately lean: three
-// number sections + a running Flags & Notes list (see FinanceNote below).
+// FINANCE DAILY OPS REPORT (FDR) — Alicia (Finance Director).
+// One doc per DAY (`financeReports/{date}`); Billing & Deposits captured
+// PER LOCATION. Line lists (charges, credits, checks, agency payments) auto-add
+// a blank row as you type, like the Director Report. Totals are derived, never
+// stored. Flags & Notes feed the central Day Notes board (source 'fdr').
 // ===========================================================================
 
-/** One org-wide finance line: an amount ($) and/or a count (#), plus a note. */
-export interface FinanceValue {
-  amount: number; // dollars
-  count: number;  // occurrences
-  note: string;
-}
-export const emptyFinanceValue = (): FinanceValue => ({ amount: 0, count: 0, note: '' });
+/** A description + amount line (auto-adds a blank row as you fill it). */
+export interface FinanceLine { description: string; amount: number }
+/** An agency payment line: agency + parent + amount. */
+export interface AgencyLine { agency: string; parent: string; amount: number }
+/** A names + amount block (single line — current or former families outstanding). */
+export interface Outstanding { names: string; amount: number }
+/** Tuition Express daily totals (not itemized). */
+export interface TuitionExpress { achBatch: number; ccBatch: number; ccPos: number; note: string }
 
-/** Money collected today, split per location (+ a shared note). Total is derived. */
-export interface MoneyIn {
-  crozet: number;
-  forestLakes: number;
-  millCreek: number;
-  note: string;
+/** Everything captured for one location on one day. */
+export interface FinanceLocation {
+  // Billing
+  tuitionCharges: FinanceLine[];
+  otherCharges: FinanceLine[];
+  credits: FinanceLine[];
+  outstandingCurrent: Outstanding;
+  outstandingFormer: Outstanding;
+  // Deposits
+  paymentsByCheck: FinanceLine[];
+  paymentsByAgency: AgencyLine[];
+  tuitionExpress: TuitionExpress;
+  declinesRefunds: number;
 }
+
+/** Agency dropdown options for Payment by Agency (plus a free-type "Other"). */
+export const FINANCE_AGENCIES = ['CCA', 'DSS', 'United Way', 'Foster'] as const;
 
 export interface FinanceReport {
   id: string;      // = date 'YYYY-MM-DD' (one per day)
-  date: string;    // 'YYYY-MM-DD'
-  day: string;     // derived weekday
-  weekOf: string;  // derived Monday 'YYYY-MM-DD'
+  date: string;
+  day: string;
+  weekOf: string;
   completedBy: string;
-
-  moneyIn: MoneyIn;        // per location $
-  collections: FinanceValue; // late fees / returned payments / AR $
-  dss: FinanceValue;         // subsidy $ posted / missed check-ins
-
+  locations: Record<SiteId, FinanceLocation>;
   status: 'draft' | 'submitted';
   submittedAt: string | null;
   createdAt: string;
@@ -291,53 +311,114 @@ export interface FinanceReport {
 
 export const financeDocId = (date: string): string => date;
 
-/** Per-location money-in fields, for iterating the form + the total. */
-export const MONEY_IN_SITES: { key: keyof Omit<MoneyIn, 'note'>; label: string }[] = [
-  { key: 'crozet', label: 'Crozet' },
-  { key: 'forestLakes', label: 'Forest Lakes' },
-  { key: 'millCreek', label: 'Mill Creek' },
-];
-
-export const moneyInTotal = (m: MoneyIn): number =>
-  (m.crozet || 0) + (m.forestLakes || 0) + (m.millCreek || 0);
-
-export function emptyFinanceReport(date: string, uid = ''): FinanceReport {
-  const now = new Date().toISOString();
+export function emptyFinanceLocation(): FinanceLocation {
   return {
-    id: financeDocId(date),
-    date,
-    day: '',
-    weekOf: '',
-    completedBy: '',
-    moneyIn: { crozet: 0, forestLakes: 0, millCreek: 0, note: '' },
-    collections: emptyFinanceValue(),
-    dss: emptyFinanceValue(),
-    status: 'draft',
-    submittedAt: null,
-    createdAt: now,
-    updatedAt: now,
-    createdByUid: uid,
+    tuitionCharges: [],
+    otherCharges: [],
+    credits: [],
+    outstandingCurrent: { names: '', amount: 0 },
+    outstandingFormer: { names: '', amount: 0 },
+    paymentsByCheck: [],
+    paymentsByAgency: [],
+    tuitionExpress: { achBatch: 0, ccBatch: 0, ccPos: 0, note: '' },
+    declinesRefunds: 0,
   };
 }
 
-/** One message in a Finance Flags-&-Notes thread (all authors are admins). */
-export interface FinanceNoteComment {
-  text: string;
-  author: string;
-  at: string; // ISO
+export function emptyFinanceReport(date: string, uid = ''): FinanceReport {
+  const now = new Date().toISOString();
+  const locations = {} as Record<SiteId, FinanceLocation>;
+  for (const s of SITES) locations[s.id] = emptyFinanceLocation();
+  return {
+    id: financeDocId(date), date, day: '', weekOf: '', completedBy: '',
+    locations,
+    status: 'draft', submittedAt: null, createdAt: now, updatedAt: now, createdByUid: uid,
+  };
 }
 
-/** A single Finance Flags-&-Notes entry — a running list (like Day Notes), with
- *  a read check-off, a comment thread, and a red-flag that pins it to the top. */
-export interface FinanceNote {
+// Derived finance totals (computed in the UI, never stored).
+export const sumLines = (ls: { amount: number }[]): number =>
+  ls.reduce((a, l) => a + (Number(l.amount) || 0), 0);
+export const totalBilling = (loc: FinanceLocation): number =>
+  sumLines(loc.tuitionCharges) + sumLines(loc.otherCharges) - sumLines(loc.credits);
+export const totalOutstanding = (loc: FinanceLocation): number =>
+  (loc.outstandingCurrent.amount || 0) + (loc.outstandingFormer.amount || 0);
+export const tuitionExpressTotal = (te: TuitionExpress): number =>
+  (te.achBatch || 0) + (te.ccBatch || 0) + (te.ccPos || 0);
+export const subtotalDeposits = (loc: FinanceLocation): number =>
+  sumLines(loc.paymentsByCheck) + sumLines(loc.paymentsByAgency) + tuitionExpressTotal(loc.tuitionExpress);
+export const totalDeposits = (loc: FinanceLocation): number =>
+  subtotalDeposits(loc) - (loc.declinesRefunds || 0);
+
+// ===========================================================================
+// REPORT SUITE — generic, config-driven org-wide daily reports (ADR/MDR/EDR).
+// DDR (dailyOpsReports) and FDR (financeReports) stay bespoke; these three
+// share one engine. A report = a set of sections, each a set of typed fields.
+// ===========================================================================
+
+export type ReportKey = 'ddr' | 'fdr' | 'adr' | 'mdr' | 'edr';
+export type ReportAccessLevel = 'view' | 'fill';
+
+/** Field input kinds. dollar/count clamp ≥ 0; number allows decimals + negatives. */
+export type FieldKind = 'dollar' | 'count' | 'number' | 'text';
+
+export interface OrgFieldDef {
+  key: string;
+  label: string;
+  kind: FieldKind;
+}
+export interface OrgSectionDef {
+  key: string;
+  title: string;
+  hint?: string;
+  fields: OrgFieldDef[];
+  note?: boolean; // append a free-text "Note" field
+}
+export interface OrgReportDef {
+  key: 'adr' | 'mdr' | 'edr';
+  short: string;   // "ADR"
+  title: string;   // "Admissions Daily Report"
+  accent: 'coral' | 'yellow' | 'sky' | 'gray';
+  collection: string;      // e.g. 'admissionsReports'
+  notesCollection: string; // e.g. 'admissionsNotes'
+  sections: OrgSectionDef[];
+}
+
+/** One org-report doc (one per DAY). `data[sectionKey][fieldKey]` holds values. */
+export interface OrgReport {
+  id: string;     // = date 'YYYY-MM-DD'
+  date: string;
+  day: string;
+  weekOf: string;
+  completedBy: string;
+  data: Record<string, Record<string, number | string>>;
+  status: 'draft' | 'submitted';
+  submittedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdByUid: string;
+}
+
+/** One message in any Flags-&-Notes ledger thread. */
+export interface LedgerNoteComment {
+  text: string;
+  author: string;
+  at: string;
+}
+/** A running Flags-&-Notes entry. All reports write these to ONE central
+ *  `orgDayNotes` collection, tagged by `source` (report) + optional `siteId`,
+ *  so they aggregate onto the main Day Notes board. Red-flag pins to the top. */
+export interface LedgerNote {
   id: string;
+  source: ReportKey;        // which report this note came from
+  siteId?: SiteId | null;   // optional location tag (org reports usually null)
   text: string;
   author: string;
   authorUid: string;
-  at: string;       // created ISO
-  acked: boolean;   // read / checked off
-  flagged: boolean; // red flag → pin to top, red border
-  comments: FinanceNoteComment[];
+  at: string;
+  acked: boolean;
+  flagged: boolean;
+  comments: LedgerNoteComment[];
 }
 
 /** A blank report for a given site/date. Derived fields are filled by derive.ts. */

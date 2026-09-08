@@ -12,8 +12,12 @@ import {
   type NoteComment,
   type NoteTag,
   type RequestList,
+  type LedgerNote,
+  type ReportKey,
 } from '@/lib/schema'
+import { REPORTS, reportMeta } from '@/lib/reportRegistry'
 import { formatLong } from '@/lib/dates'
+import { inputClass } from '@/components/ui/input'
 import {
   subscribeRecentReports,
   setNoteAck,
@@ -22,6 +26,13 @@ import {
   removeNoteComment,
   setNoteTag,
 } from '@/lib/reports'
+import {
+  subscribeAllOrgNotes,
+  setOrgNoteAck,
+  setOrgNoteFlag,
+  addOrgNoteComment,
+  deleteOrgNote,
+} from '@/lib/orgReports'
 import { markDayNotesSeen } from '@/lib/dayNotesRead'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -45,6 +56,7 @@ interface NoteEntry {
   director: string
   date: string
   note: string
+  at: string // ISO — when the note was first written (Day Notes stamp)
   acked: boolean
   flagged: boolean // red-flagged "high alert"
   thread: NoteComment[]
@@ -65,6 +77,7 @@ function toEntries(reports: DailyOpsReport[]): NoteEntry[] {
   for (const r of reports) {
     const acks = r.acknowledgedNotes ?? []
     const flags = r.flaggedNotes ?? []
+    const stamps = r.noteCreatedAt ?? []
     const comments = r.noteComments ?? []
     const allTags = r.noteTags ?? []
     for (const raw of r.directorReport ?? []) {
@@ -77,6 +90,9 @@ function toEntries(reports: DailyOpsReport[]): NoteEntry[] {
         director: r.director,
         date: r.date,
         note,
+        // Prefer the first-written stamp; fall back for notes saved before the
+        // feature (submit time, then last-save time).
+        at: stamps.find((s) => s.note === note)?.at ?? r.submittedAt ?? r.updatedAt ?? '',
         acked: acks.includes(note),
         flagged: flags.includes(note),
         thread: comments
@@ -140,24 +156,58 @@ export function DayNotes() {
 // Admin (Rob): cross-school triage — check off, comment, see replies.
 // ===========================================================================
 
+type RunBusy = (key: string, fn: () => Promise<void>) => Promise<void>
+
+/** A merged Day-Notes board item: a director note or an org-report note. */
+type BoardItem =
+  | { kind: 'director'; date: string; at: string; flagged: boolean; entry: NoteEntry }
+  | { kind: 'org'; date: string; at: string; flagged: boolean; note: LedgerNote }
+
+/** Group merged items by date (newest first); flagged float to the top of the day. */
+function groupItemsByDate(items: BoardItem[]) {
+  const byDate = new Map<string, BoardItem[]>()
+  for (const it of items) {
+    const list = byDate.get(it.date) ?? []
+    list.push(it)
+    byDate.set(it.date, list)
+  }
+  return Array.from(byDate.entries())
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .map(([date, list]) => ({
+      date,
+      items: list.sort((a, b) => {
+        if (a.flagged !== b.flagged) return a.flagged ? -1 : 1
+        return a.at < b.at ? 1 : -1
+      }),
+    }))
+}
+
 function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
   const { user, profile } = useAuth()
   const author = profile?.displayName || user?.email || 'Leadership'
 
   const [site, setSite] = useState<SiteId | 'all'>('all')
+  const [source, setSource] = useState<ReportKey | 'all'>('all')
   const [hideAcked, setHideAcked] = useState(false)
   const [busy, setBusy] = useState<Set<string>>(new Set())
+  const [orgNotes, setOrgNotes] = useState<LedgerNote[]>([])
+  useEffect(() => subscribeAllOrgNotes(setOrgNotes), [])
 
-  const allEntries = useMemo(() => toEntries(reports), [reports])
-  const openCount = allEntries.filter((e) => !e.acked).length
+  const directorEntries = useMemo(() => toEntries(reports), [reports])
+  const openCount =
+    directorEntries.filter((e) => !e.acked).length + orgNotes.filter((n) => !n.acked).length
 
-  const visible = useMemo(
-    () => allEntries.filter((e) => (site === 'all' || e.siteId === site) && (!hideAcked || !e.acked)),
-    [allEntries, site, hideAcked]
-  )
-  // Notes where the director replied last float up — the ball's in Rob's court.
-  const groups = useMemo(() => groupByDate(visible, (e) => lastFromDirector(e.thread)), [visible])
+  const items = useMemo<BoardItem[]>(() => {
+    const dir: BoardItem[] = directorEntries
+      .filter((e) => (source === 'all' || source === 'ddr') && (site === 'all' || e.siteId === site) && (!hideAcked || !e.acked))
+      .map((e) => ({ kind: 'director', date: e.date, at: e.at || e.date, flagged: e.flagged, entry: e }))
+    const org: BoardItem[] = orgNotes
+      .filter((n) => (source === 'all' || n.source === source) && (!hideAcked || !n.acked))
+      .map((n) => ({ kind: 'org', date: n.at.slice(0, 10), at: n.at, flagged: n.flagged, note: n }))
+    return [...dir, ...org]
+  }, [directorEntries, orgNotes, site, source, hideAcked])
 
+  const groups = useMemo(() => groupItemsByDate(items), [items])
   const runBusy = useBusy(setBusy)
 
   return (
@@ -166,122 +216,185 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
         title="Day Notes"
         subtitle={
           <>
-            What directors flagged for you — across every school.{' '}
+            Everything flagged across the org.{' '}
             <span className="font-semibold text-[var(--color-charcoal)]">{openCount} open</span>
           </>
         }
       >
-        <SiteFilter sites={SITES} value={site} onChange={setSite} allLabel="All" />
+        <SourceFilter value={source} onChange={setSource} />
+        <SiteFilter sites={SITES} value={site} onChange={setSite} allLabel="All sites" />
         <HideCheckedToggle checked={hideAcked} onChange={setHideAcked} />
       </FeedHeader>
 
       {groups.length === 0 ? (
         <EmptyCard>
-          {allEntries.length === 0
-            ? 'No director notes have come in yet. They’ll show up here as reports are submitted.'
+          {directorEntries.length === 0 && orgNotes.length === 0
+            ? 'No notes yet. They’ll show up here as reports are filed.'
             : hideAcked
               ? 'All caught up — every note is checked off. 🎉'
-              : 'No notes for this school yet.'}
+              : 'Nothing matches this filter.'}
         </EmptyCard>
       ) : (
         <div className="space-y-8">
           {groups.map((g) => (
             <DateSection key={g.date} date={g.date}>
-              {g.entries.map((e) => {
-                const key = noteKey(e)
-                return (
-                  <Card
-                    key={key}
-                    accent={SITE_ACCENT[e.siteId]}
-                    className={cn(
-                      'p-4 transition-opacity',
-                      e.acked && 'opacity-60',
-                      e.flagged && 'bg-[var(--color-critical-soft)] ring-1 ring-[var(--color-critical)]/50'
-                    )}
-                  >
-                    {e.flagged && (
-                      <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-critical)] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
-                        <Flag className="size-3" /> High alert
-                      </p>
-                    )}
-                    <div className="flex items-start gap-3">
-                      <CheckButton
-                        checked={e.acked}
-                        busy={busy.has(key)}
-                        onClick={() => runBusy(key, () => setNoteAck(e.reportId, e.note, !e.acked))}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p
-                          className={cn(
-                            'text-[15px] leading-snug text-[var(--color-charcoal)]',
-                            e.acked && 'text-[var(--color-dk-gray)] line-through'
-                          )}
-                        >
-                          {e.note}
-                        </p>
-                        <NoteMeta entry={e} />
-                        <ListToggles
-                          entry={e}
-                          busy={busy}
-                          onToggle={(list, on) =>
-                            runBusy(`${key}:tag:${list}`, async () => {
-                              await setNoteTag(e.reportId, e.allTags, e.note, list, on)
-                              // Filing a note as an action item = it's handled,
-                              // so auto-check it. (Un-filing leaves the check as-is.)
-                              if (on && !e.acked) await setNoteAck(e.reportId, e.note, true)
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        {lastFromDirector(e.thread) && (
-                          <Badge tone="coral" icon={<CornerDownRight className="size-3" />}>Replied</Badge>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => runBusy(`${key}:flag`, () => setNoteFlag(e.reportId, e.note, !e.flagged))}
-                          disabled={busy.has(`${key}:flag`)}
-                          title={e.flagged ? 'Remove high alert' : 'Mark high alert'}
-                          aria-pressed={e.flagged}
-                          className={cn(
-                            'grid size-8 place-items-center rounded-lg transition-colors',
-                            e.flagged
-                              ? 'bg-[var(--color-critical)] text-white'
-                              : 'text-[var(--color-mid-gray)] hover:bg-[var(--color-critical-soft)] hover:text-[var(--color-critical)]'
-                          )}
-                        >
-                          <Flag className="size-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 pl-9">
-                      <Thread thread={e.thread} viewerRole="admin" onDelete={(c) =>
-                        runBusy(key, () => removeNoteComment(e.reportId, e.allComments, c))} />
-                      <Composer
-                        placeholder="Comment or question for the director…"
-                        submitLabel="Send"
-                        busy={busy.has(key)}
-                        onSend={(text) =>
-                          runBusy(key, () =>
-                            addNoteComment(e.reportId, e.allComments, {
-                              note: e.note,
-                              text,
-                              author,
-                              at: new Date().toISOString(),
-                              role: 'admin',
-                            })
-                          )
-                        }
-                      />
-                    </div>
-                  </Card>
+              {g.items.map((it) =>
+                it.kind === 'director' ? (
+                  <AdminDirectorCard key={noteKey(it.entry)} e={it.entry} busy={busy} runBusy={runBusy} author={author} />
+                ) : (
+                  <AdminOrgCard key={it.note.id} note={it.note} busy={busy} runBusy={runBusy} author={author} />
                 )
-              })}
+              )}
             </DateSection>
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+/** A director-report note on the admin board (check off, tag, comment, flag). */
+function AdminDirectorCard({ e, busy, runBusy, author }: { e: NoteEntry; busy: Set<string>; runBusy: RunBusy; author: string }) {
+  const key = noteKey(e)
+  return (
+    <Card
+      accent={SITE_ACCENT[e.siteId]}
+      className={cn(
+        'p-4 transition-opacity',
+        e.acked && 'opacity-60',
+        e.flagged && 'bg-[var(--color-critical-soft)] ring-1 ring-[var(--color-critical)]/50'
+      )}
+    >
+      {e.flagged && (
+        <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-critical)] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
+          <Flag className="size-3" /> High alert
+        </p>
+      )}
+      <div className="flex items-start gap-3">
+        <CheckButton checked={e.acked} busy={busy.has(key)} onClick={() => runBusy(key, () => setNoteAck(e.reportId, e.note, !e.acked))} />
+        <div className="min-w-0 flex-1">
+          <p className={cn('text-[15px] leading-snug text-[var(--color-charcoal)]', e.acked && 'text-[var(--color-dk-gray)] line-through')}>{e.note}</p>
+          <NoteMeta entry={e} />
+          <ListToggles
+            entry={e}
+            busy={busy}
+            onToggle={(list, on) =>
+              runBusy(`${key}:tag:${list}`, async () => {
+                await setNoteTag(e.reportId, e.allTags, e.note, list, on)
+                if (on && !e.acked) await setNoteAck(e.reportId, e.note, true)
+              })
+            }
+          />
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {lastFromDirector(e.thread) && <Badge tone="coral" icon={<CornerDownRight className="size-3" />}>Replied</Badge>}
+          <FlagButton flagged={e.flagged} busy={busy.has(`${key}:flag`)} onClick={() => runBusy(`${key}:flag`, () => setNoteFlag(e.reportId, e.note, !e.flagged))} />
+        </div>
+      </div>
+      <div className="mt-3 pl-9">
+        <Thread thread={e.thread} viewerRole="admin" onDelete={(c) => runBusy(key, () => removeNoteComment(e.reportId, e.allComments, c))} />
+        <Composer
+          placeholder="Comment or question for the director…"
+          submitLabel="Send"
+          busy={busy.has(key)}
+          onSend={(text) => runBusy(key, () => addNoteComment(e.reportId, e.allComments, { note: e.note, text, author, at: new Date().toISOString(), role: 'admin' }))}
+        />
+      </div>
+    </Card>
+  )
+}
+
+/** An org-report note (FDR/ADR/MDR/EDR) on the admin board. */
+function AdminOrgCard({ note, busy, runBusy, author }: { note: LedgerNote; busy: Set<string>; runBusy: RunBusy; author: string }) {
+  const [reply, setReply] = useState('')
+  const meta = reportMeta(note.source)
+  return (
+    <Card
+      accent="gray"
+      className={cn('p-4 transition-opacity', note.acked && 'opacity-60', note.flagged && 'bg-[var(--color-critical-soft)] ring-1 ring-[var(--color-critical)]/50')}
+    >
+      {note.flagged && (
+        <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-critical)] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
+          <Flag className="size-3" /> High alert
+        </p>
+      )}
+      <div className="flex items-start gap-3">
+        <CheckButton checked={note.acked} busy={busy.has(note.id)} onClick={() => runBusy(note.id, () => setOrgNoteAck(note.id, !note.acked))} />
+        <div className="min-w-0 flex-1">
+          <p className={cn('whitespace-pre-wrap text-[15px] leading-snug text-[var(--color-charcoal)]', note.acked && 'text-[var(--color-dk-gray)] line-through')}>{note.text}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-dk-gray)]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-secondary)] px-2 py-0.5 font-bold uppercase tracking-wide text-[var(--color-charcoal)]">
+              {meta?.short ?? note.source.toUpperCase()}
+            </span>
+            {note.siteId && <span>{siteName(note.siteId)}</span>}
+            <span>· {note.author} · {new Date(note.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+          </div>
+        </div>
+        <FlagButton flagged={note.flagged} busy={busy.has(`${note.id}:flag`)} onClick={() => runBusy(`${note.id}:flag`, () => setOrgNoteFlag(note.id, !note.flagged))} />
+      </div>
+      <div className="mt-3 pl-9">
+        {note.comments.length > 0 && (
+          <div className="mb-2 space-y-2">
+            {note.comments.map((c, i) => (
+              <div key={`${c.at}-${i}`} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-secondary)] px-3.5 py-2.5">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-dk-gray)]"><CornerDownRight className="mr-1 inline size-3" />{c.author}</p>
+                <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--color-charcoal)]">{c.text}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex items-start gap-2">
+          <input
+            value={reply}
+            onChange={(ev) => setReply(ev.target.value)}
+            placeholder="Comment…"
+            className={cn(inputClass, 'h-9 flex-1')}
+            onKeyDown={(ev) => {
+              if (ev.key === 'Enter' && reply.trim()) {
+                const t = reply.trim(); setReply('')
+                void runBusy(note.id, () => addOrgNoteComment(note.id, note.comments, { text: t, author, at: new Date().toISOString() }))
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => runBusy(note.id, () => deleteOrgNote(note.id))}
+            title="Delete note"
+            className="mt-1 grid size-7 shrink-0 place-items-center rounded-md text-[var(--color-mid-gray)] hover:text-[var(--color-coral)]"
+          >
+            <Trash2 className="size-4" />
+          </button>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+function FlagButton({ flagged, busy, onClick }: { flagged: boolean; busy: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      title={flagged ? 'Remove high alert' : 'Mark high alert'}
+      aria-pressed={flagged}
+      className={cn(
+        'grid size-8 shrink-0 place-items-center rounded-lg transition-colors',
+        flagged ? 'bg-[var(--color-critical)] text-white' : 'text-[var(--color-mid-gray)] hover:bg-[var(--color-critical-soft)] hover:text-[var(--color-critical)]'
+      )}
+    >
+      <Flag className="size-4" />
+    </button>
+  )
+}
+
+function SourceFilter({ value, onChange }: { value: ReportKey | 'all'; onChange: (v: ReportKey | 'all') => void }) {
+  return (
+    <div className="flex flex-wrap rounded-lg bg-[var(--color-secondary)] p-0.5">
+      <Chip label="All" active={value === 'all'} onClick={() => onChange('all')} />
+      {REPORTS.map((r) => (
+        <Chip key={r.key} label={r.short} active={value === r.key} onClick={() => onChange(r.key)} />
+      ))}
     </div>
   )
 }
@@ -720,13 +833,29 @@ function CheckButton({ checked, busy, onClick }: { checked: boolean; busy: boole
   )
 }
 
+const fmtStamp = (iso: string): string =>
+  iso
+    ? new Date(iso).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : ''
+
 function NoteMeta({ entry, showDirector = true }: { entry: NoteEntry; showDirector?: boolean }) {
   return (
-    <div className="mt-1 flex items-center gap-2 text-xs text-[var(--color-dk-gray)]">
+    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-dk-gray)]">
       <span>
         <span className="font-semibold text-[var(--color-charcoal)]">{entry.siteName}</span>
         {showDirector && entry.director && <span> · {entry.director}</span>}
       </span>
+      {entry.at && (
+        <>
+          <span aria-hidden>·</span>
+          <span title={new Date(entry.at).toLocaleString()}>{fmtStamp(entry.at)}</span>
+        </>
+      )}
       <span aria-hidden>·</span>
       <Link
         to={reportHref(entry.siteId, entry.date)}

@@ -13,6 +13,7 @@ const Dashboard = lazy(() => import('@/pages/Dashboard').then((m) => ({ default:
 const DayNotes = lazy(() => import('@/pages/DayNotes').then((m) => ({ default: m.DayNotes })))
 const Performance = lazy(() => import('@/pages/Performance').then((m) => ({ default: m.Performance })))
 const FinanceReport = lazy(() => import('@/pages/FinanceReport').then((m) => ({ default: m.FinanceReport })))
+const OrgReport = lazy(() => import('@/pages/OrgReport').then((m) => ({ default: m.OrgReport })))
 
 function PageLoader() {
   return (
@@ -73,6 +74,14 @@ export default function App() {
                 element={
                   <Suspense fallback={<PageLoader />}>
                     <FinanceReport />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/r/:key"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <OrgReport />
                   </Suspense>
                 }
               />

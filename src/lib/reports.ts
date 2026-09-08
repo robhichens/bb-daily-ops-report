@@ -28,10 +28,31 @@ import {
   siteName,
   type DailyOpsReport,
   type NoteComment,
+  type NoteStamp,
   type NoteTag,
   type RequestList,
   type SiteId,
 } from './schema';
+
+/**
+ * First-written timestamps for Day Notes. Keeps the existing `at` for any line
+ * we've already stamped and stamps newly-appeared non-empty lines with `now`.
+ * Rebuilt from the current lines each save, so deleted lines drop out (no orphan
+ * growth); editing a line's text stamps it fresh (it's effectively a new note).
+ */
+function stampNotes(existing: NoteStamp[] | undefined, lines: string[]): NoteStamp[] {
+  const known = new Map((existing ?? []).map((s) => [s.note, s.at]));
+  const now = new Date().toISOString();
+  const seen = new Set<string>();
+  const out: NoteStamp[] = [];
+  for (const raw of lines) {
+    const note = raw.trim();
+    if (!note || seen.has(note)) continue;
+    seen.add(note);
+    out.push({ note, at: known.get(note) ?? now });
+  }
+  return out;
+}
 
 const COL = 'dailyOpsReports';
 const reportsCol = () => collection(db, COL);
@@ -69,6 +90,7 @@ export async function upsertDraft(report: DailyOpsReport): Promise<void> {
   const derived = withDerived(report);
   const payload: DailyOpsReport = {
     ...derived,
+    noteCreatedAt: stampNotes(derived.noteCreatedAt, derived.directorReport),
     status: derived.status === 'submitted' ? 'submitted' : 'draft',
     updatedAt: new Date().toISOString(),
   };
@@ -130,9 +152,11 @@ export async function submitReport(
 
   const now = new Date().toISOString();
   const derived = withDerived(report);
+  const cleanedReport = derived.directorReport.map((s) => s.trim()).filter(Boolean);
   const payload: DailyOpsReport = {
     ...derived,
-    directorReport: derived.directorReport.map((s) => s.trim()).filter(Boolean),
+    directorReport: cleanedReport,
+    noteCreatedAt: stampNotes(derived.noteCreatedAt, cleanedReport),
     status: 'submitted',
     submittedAt: now,
     updatedAt: now,

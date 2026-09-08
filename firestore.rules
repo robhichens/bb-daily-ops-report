@@ -22,6 +22,16 @@ service cloud.firestore {
     function userSites() {
       return userDoc().get('siteIds', [userDoc().siteId]);
     }
+    // Per-report grant for non-admins: '', 'view', or 'fill'.
+    function reportLevel(k) {
+      return userDoc().get('reportAccess', {}).get(k, '');
+    }
+    function canViewReport(k) {
+      return role() == 'admin' || reportLevel(k) == 'view' || reportLevel(k) == 'fill';
+    }
+    function canFillReport(k) {
+      return role() == 'admin' || reportLevel(k) == 'fill';
+    }
 
     match /dailyOpsReports/{id} {
       allow read: if isSignedIn() && role() in ['admin', 'director'];
@@ -45,12 +55,31 @@ service cloud.firestore {
       allow write: if isSignedIn() && role() == 'admin';
     }
 
-    // Finance DOR (Alicia / Finance) — org-wide, admin-only. Directors never see it.
+    // Report data docs — admins, plus anyone granted access to that report.
     match /financeReports/{id} {
-      allow read, write: if isSignedIn() && role() == 'admin';
+      allow read: if isSignedIn() && canViewReport('fdr');
+      allow write: if isSignedIn() && canFillReport('fdr');
     }
-    match /financeNotes/{id} {
-      allow read, write: if isSignedIn() && role() == 'admin';
+    match /admissionsReports/{id} {
+      allow read: if isSignedIn() && canViewReport('adr');
+      allow write: if isSignedIn() && canFillReport('adr');
+    }
+    match /marketingReports/{id} {
+      allow read: if isSignedIn() && canViewReport('mdr');
+      allow write: if isSignedIn() && canFillReport('mdr');
+    }
+    match /executiveReports/{id} {
+      allow read: if isSignedIn() && canViewReport('edr');
+      allow write: if isSignedIn() && canFillReport('edr');
+    }
+
+    // Central Flags & Notes ledger for every report (tagged by `source`).
+    // Admins read all (the Day Notes board); others read only a report they can
+    // view (report page queries filter by source). Writers need fill on the source.
+    match /orgDayNotes/{id} {
+      allow read: if isSignedIn() && (role() == 'admin' || canViewReport(resource.data.source));
+      allow create: if isSignedIn() && (role() == 'admin' || canFillReport(request.resource.data.source));
+      allow update, delete: if isSignedIn() && (role() == 'admin' || canFillReport(resource.data.source));
     }
   }
 }

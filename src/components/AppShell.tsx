@@ -1,22 +1,101 @@
-import { useEffect, useMemo, useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { ClipboardList, LayoutDashboard, LogOut, HelpCircle, NotebookPen, BarChart3, Wallet } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { ClipboardList, LayoutDashboard, LogOut, HelpCircle, NotebookPen, BarChart3, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/auth/AuthProvider'
-import { isAdmin, userSites, subscribeDayNotesSeenAt } from '@/lib/users'
+import { isAdmin, userSites, subscribeDayNotesSeenAt, accessibleReportKeys, type UserProfile } from '@/lib/users'
 import { siteName, type DailyOpsReport } from '@/lib/schema'
+import { REPORTS } from '@/lib/reportRegistry'
 import { subscribeRecentReports } from '@/lib/reports'
 import { countUnreadReplies, getDayNotesSeen, laterIso } from '@/lib/dayNotesRead'
 
-// Day Notes is a two-sided view: admins triage every school's notes; directors
-// see their own notes, whether they've been seen, and leadership's replies.
+// The report picker lives where "Daily Report" used to; other views stay flat.
 const navItems: { to: string; label: string; icon: typeof ClipboardList; adminOnly?: boolean }[] = [
-  { to: '/report', label: 'Daily Report', icon: ClipboardList },
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/day-notes', label: 'Day Notes', icon: NotebookPen },
-  { to: '/finance', label: 'Finance', icon: Wallet, adminOnly: true },
   { to: '/performance', label: 'Performance', icon: BarChart3, adminOnly: true },
 ]
+
+/** Reports the user can reach, in registry order. */
+function useMyReports(profile: UserProfile | null) {
+  return useMemo(() => {
+    const keys = accessibleReportKeys(profile)
+    return REPORTS.filter((r) => keys.includes(r.key))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.role, profile?.siteIds?.join(), profile?.siteId, JSON.stringify(profile?.reportAccess)])
+}
+
+/** The report dropdown (or a single direct link when only one report). */
+function ReportsMenu() {
+  const { profile } = useAuth()
+  const location = useLocation()
+  const myReports = useMyReports(profile)
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  if (myReports.length === 0) return null
+
+  const activeCls = 'bg-[var(--color-coral)] text-white'
+  const idleCls = 'text-[var(--color-charcoal)] hover:bg-[var(--color-secondary)]'
+
+  // One report → a plain link (most directors).
+  if (myReports.length === 1) {
+    const r = myReports[0]
+    const Icon = r.icon
+    return (
+      <NavLink
+        to={r.route}
+        className={({ isActive }) => cn('flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors', isActive ? activeCls : idleCls)}
+      >
+        <Icon className="size-4" /><span className="hidden sm:inline">{r.short}</span>
+      </NavLink>
+    )
+  }
+
+  const onReport = myReports.some((r) => location.pathname === r.route)
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={cn('flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors', onReport ? activeCls : idleCls)}
+      >
+        <ClipboardList className="size-4" />
+        <span className="hidden sm:inline">Reports</span>
+        <ChevronDown className={cn('size-3.5 transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div className="absolute left-0 z-30 mt-1 w-60 overflow-hidden rounded-xl border border-[var(--color-border)] bg-white py-1 shadow-lg">
+          {myReports.map((r) => {
+            const Icon = r.icon
+            const active = location.pathname === r.route
+            return (
+              <NavLink
+                key={r.key}
+                to={r.route}
+                onClick={() => setOpen(false)}
+                className={cn('flex items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-[var(--color-secondary)]', active && 'bg-[var(--color-coral-soft)]')}
+              >
+                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--color-secondary)] text-[var(--color-charcoal)]"><Icon className="size-4" /></span>
+                <span className="min-w-0">
+                  <span className="block font-semibold text-[var(--color-charcoal)]">{r.short}</span>
+                  <span className="block truncate text-xs text-[var(--color-dk-gray)]">{r.title}</span>
+                </span>
+              </NavLink>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 /** Unread Day-Notes replies from the other side — powers the nav nudge. */
 function useDayNotesUnread(): number {
@@ -100,6 +179,7 @@ export function AppShell() {
 
           <div className="flex items-center gap-2 sm:gap-4">
             <nav className="flex items-center gap-1">
+              <ReportsMenu />
               {navItems.filter((i) => !i.adminOnly || admin).map(({ to, label, icon: Icon }) => {
                 const badge = to === '/day-notes' && unread > 0
                 return (
