@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { NotebookPen, Check, Send, Eye, Flag, ArrowUpRight, Trash2, CornerDownRight, ShoppingCart, Wrench } from 'lucide-react'
+import { NotebookPen, Check, Send, Eye, Flag, ArrowUpRight, Trash2, CornerDownRight, ShoppingCart, Wrench, Search, X } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { isAdmin, userSites } from '@/lib/users'
 import {
@@ -189,6 +189,8 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
   const [site, setSite] = useState<SiteId | 'all'>('all')
   const [source, setSource] = useState<ReportKey | 'all'>('all')
   const [hideAcked, setHideAcked] = useState(false)
+  const [query, setQuery] = useState('')
+  const [dateFilter, setDateFilter] = useState('')
   const [busy, setBusy] = useState<Set<string>>(new Set())
   const [orgNotes, setOrgNotes] = useState<LedgerNote[]>([])
   useEffect(() => subscribeAllOrgNotes(setOrgNotes), [])
@@ -198,14 +200,20 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
     directorEntries.filter((e) => !e.acked).length + orgNotes.filter((n) => !n.acked).length
 
   const items = useMemo<BoardItem[]>(() => {
+    const q = query.trim().toLowerCase()
+    const hitDir = (e: NoteEntry) =>
+      !q || [e.note, e.director, e.siteName, ...e.thread.map((c) => `${c.text} ${c.author}`)].join(' ').toLowerCase().includes(q)
+    const hitOrg = (n: LedgerNote) =>
+      !q || [n.text, n.author, reportMeta(n.source)?.short ?? n.source, n.siteId ? siteName(n.siteId) : '', ...n.comments.map((c) => `${c.text} ${c.author}`)].join(' ').toLowerCase().includes(q)
+
     const dir: BoardItem[] = directorEntries
-      .filter((e) => (source === 'all' || source === 'ddr') && (site === 'all' || e.siteId === site) && (!hideAcked || !e.acked))
+      .filter((e) => (source === 'all' || source === 'ddr') && (site === 'all' || e.siteId === site) && (!hideAcked || !e.acked) && (!dateFilter || e.date === dateFilter) && hitDir(e))
       .map((e) => ({ kind: 'director', date: e.date, at: e.at || e.date, flagged: e.flagged, entry: e }))
     const org: BoardItem[] = orgNotes
-      .filter((n) => (source === 'all' || n.source === source) && (!hideAcked || !n.acked))
+      .filter((n) => (source === 'all' || n.source === source) && (!hideAcked || !n.acked) && (!dateFilter || n.at.slice(0, 10) === dateFilter) && hitOrg(n))
       .map((n) => ({ kind: 'org', date: n.at.slice(0, 10), at: n.at, flagged: n.flagged, note: n }))
     return [...dir, ...org]
-  }, [directorEntries, orgNotes, site, source, hideAcked])
+  }, [directorEntries, orgNotes, site, source, hideAcked, query, dateFilter])
 
   const groups = useMemo(() => groupItemsByDate(items), [items])
   const runBusy = useBusy(setBusy)
@@ -226,13 +234,46 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
         <HideCheckedToggle checked={hideAcked} onChange={setHideAcked} />
       </FeedHeader>
 
+      {/* Search + date filter */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-mid-gray)]" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search notes, names, comments…"
+            aria-label="Search Day Notes"
+            className={cn(inputClass, 'h-10 w-full pl-9 pr-9')}
+          />
+          {query && (
+            <button type="button" onClick={() => setQuery('')} aria-label="Clear search"
+              className="absolute right-2.5 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-md text-[var(--color-mid-gray)] hover:text-[var(--color-coral)]">
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
+        <input
+          type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}
+          aria-label="Filter by date"
+          className={cn(inputClass, 'h-10 w-auto')}
+        />
+        {dateFilter && (
+          <button type="button" onClick={() => setDateFilter('')}
+            className="text-sm font-semibold text-[var(--color-coral)] hover:underline">
+            Clear date
+          </button>
+        )}
+      </div>
+
       {groups.length === 0 ? (
         <EmptyCard>
           {directorEntries.length === 0 && orgNotes.length === 0
             ? 'No notes yet. They’ll show up here as reports are filed.'
-            : hideAcked
-              ? 'All caught up — every note is checked off. 🎉'
-              : 'Nothing matches this filter.'}
+            : query || dateFilter
+              ? 'No notes match your search.'
+              : hideAcked
+                ? 'All caught up — every note is checked off. 🎉'
+                : 'Nothing matches this filter.'}
         </EmptyCard>
       ) : (
         <div className="space-y-8">

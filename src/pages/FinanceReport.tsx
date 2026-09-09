@@ -10,7 +10,7 @@ import {
   totalBilling, totalOutstanding, subtotalDeposits, totalDeposits,
   emptyFinanceReport,
   type FinanceReport as TFinanceReport, type FinanceLocation, type FinanceLine,
-  type AgencyLine, type SiteId,
+  type AgencyLine, type DeclineRefund, type SiteId,
 } from '@/lib/schema'
 import { getFinanceReport, upsertFinanceDraft, submitFinanceReport } from '@/lib/finance'
 import { todayIso, formatLong } from '@/lib/dates'
@@ -209,11 +209,11 @@ function LocationPanel({
 function BillingFields({ loc, disabled, onLoc }: { loc: FinanceLocation; disabled: boolean; onLoc: (p: Partial<FinanceLocation>) => void }) {
   return (
     <div className="space-y-5">
-      <LineList label="Tuition Charges" hint="Charged to the Procare ledger (prorate or full)" placeholder="Who + what for"
+      <LineList label="Tuition Charges" hint="Charged to the Procare ledger (prorate or full)" whoPlaceholder="Who" whatPlaceholder="What for"
         value={loc.tuitionCharges} disabled={disabled} onChange={(tuitionCharges) => onLoc({ tuitionCharges })} />
-      <LineList label="Other Charges" hint="Reg / Enhancement / Late / CC-decline fees" placeholder="Who + what for"
+      <LineList label="Other Charges" hint="Reg / Enhancement / Late / CC-decline fees" whoPlaceholder="Who" whatPlaceholder="What for"
         value={loc.otherCharges} disabled={disabled} onChange={(otherCharges) => onLoc({ otherCharges })} />
-      <LineList label="Credits" hint="Any credits added to the ledger (subtracts from billing)" placeholder="Who + what for"
+      <LineList label="Credits" hint="Any credits added to the ledger (subtracts from billing)" whoPlaceholder="Who" whatPlaceholder="What for"
         value={loc.credits} disabled={disabled} onChange={(credits) => onLoc({ credits })} />
 
       <TotalRow label="Total Billing" value={money(totalBilling(loc))} strong />
@@ -236,7 +236,7 @@ function DepositFields({ loc, disabled, onLoc }: { loc: FinanceLocation; disable
   const te = loc.tuitionExpress
   return (
     <div className="space-y-5">
-      <LineList label="Payment by Check" placeholder="Who paid"
+      <LineList label="Payment by Check" whoPlaceholder="Who paid" whatPlaceholder="For what"
         value={loc.paymentsByCheck} disabled={disabled} onChange={(paymentsByCheck) => onLoc({ paymentsByCheck })} />
       <AgencyLineList label="Payment by Agency" value={loc.paymentsByAgency} disabled={disabled}
         onChange={(paymentsByAgency) => onLoc({ paymentsByAgency })} />
@@ -255,9 +255,7 @@ function DepositFields({ loc, disabled, onLoc }: { loc: FinanceLocation; disable
       </div>
 
       <TotalRow label="SubTotal Deposits" value={money(subtotalDeposits(loc))} />
-      <div className="max-w-xs">
-        <MoneyField label="Less Declines / Refunds" value={loc.declinesRefunds} disabled={disabled} onChange={(declinesRefunds) => onLoc({ declinesRefunds })} />
-      </div>
+      <DeclineRefundList value={loc.declinesRefunds} disabled={disabled} onChange={(declinesRefunds) => onLoc({ declinesRefunds })} />
       <TotalRow label="Total Deposits" value={money(totalDeposits(loc))} strong />
     </div>
   )
@@ -265,17 +263,17 @@ function DepositFields({ loc, disabled, onLoc }: { loc: FinanceLocation; disable
 
 // --- Reusable line lists + fields -------------------------------------------
 
-/** description + amount list that auto-adds a trailing blank row as you type. */
+/** who + what + amount list that auto-adds a trailing blank row as you type. */
 function LineList({
-  label, hint, placeholder, value, disabled, onChange,
+  label, hint, whoPlaceholder, whatPlaceholder, value, disabled, onChange,
 }: {
-  label: string; hint?: string; placeholder: string
+  label: string; hint?: string; whoPlaceholder: string; whatPlaceholder: string
   value: FinanceLine[]; disabled: boolean; onChange: (rows: FinanceLine[]) => void
 }) {
-  const rows = disabled ? value : [...value, { description: '', amount: 0 }]
+  const rows = disabled ? value : [...value, { who: '', what: '', amount: 0 }]
   const setRow = (i: number, patch: Partial<FinanceLine>) => {
     if (i < value.length) onChange(value.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
-    else onChange([...value, { description: '', amount: 0, ...patch }])
+    else onChange([...value, { who: '', what: '', amount: 0, ...patch }])
   }
   return (
     <div>
@@ -284,9 +282,11 @@ function LineList({
       <div className="space-y-2">
         {rows.map((r, i) => (
           <div key={i} className="flex items-center gap-2">
-            <Input value={r.description} placeholder={placeholder} disabled={disabled}
-              onChange={(e) => setRow(i, { description: e.target.value })} className="flex-1" />
-            <MoneyInput value={r.amount} disabled={disabled} onChange={(n) => setRow(i, { amount: n })} className="w-32" />
+            <Input value={r.who} placeholder={whoPlaceholder} disabled={disabled}
+              onChange={(e) => setRow(i, { who: e.target.value })} className="min-w-0 flex-1" />
+            <Input value={r.what} placeholder={whatPlaceholder} disabled={disabled}
+              onChange={(e) => setRow(i, { what: e.target.value })} className="min-w-0 flex-1" />
+            <MoneyInput value={r.amount} disabled={disabled} onChange={(n) => setRow(i, { amount: n })} className="w-28 shrink-0" />
             {!disabled && i < value.length && (
               <button type="button" onClick={() => onChange(value.filter((_, idx) => idx !== i))}
                 className="grid size-8 shrink-0 place-items-center rounded-md text-[var(--color-mid-gray)] hover:bg-[var(--color-secondary)] hover:text-[var(--color-coral)]" title="Remove">
@@ -301,14 +301,14 @@ function LineList({
   )
 }
 
-/** agency + parent + amount list (agency free-type with suggestions). */
+/** agency + parent + child + amount list (agency free-type with suggestions). */
 function AgencyLineList({
   label, value, disabled, onChange,
 }: { label: string; value: AgencyLine[]; disabled: boolean; onChange: (rows: AgencyLine[]) => void }) {
-  const rows = disabled ? value : [...value, { agency: '', parent: '', amount: 0 }]
+  const rows = disabled ? value : [...value, { agency: '', parent: '', child: '', amount: 0 }]
   const setRow = (i: number, patch: Partial<AgencyLine>) => {
     if (i < value.length) onChange(value.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
-    else onChange([...value, { agency: '', parent: '', amount: 0, ...patch }])
+    else onChange([...value, { agency: '', parent: '', child: '', amount: 0, ...patch }])
   }
   return (
     <div>
@@ -318,10 +318,57 @@ function AgencyLineList({
         {rows.map((r, i) => (
           <div key={i} className="flex items-center gap-2">
             <Input list="fdr-agencies" value={r.agency} placeholder="Agency" disabled={disabled}
-              onChange={(e) => setRow(i, { agency: e.target.value })} className="w-32 shrink-0" />
+              onChange={(e) => setRow(i, { agency: e.target.value })} className="w-28 shrink-0" />
             <Input value={r.parent} placeholder="Parent name" disabled={disabled}
-              onChange={(e) => setRow(i, { parent: e.target.value })} className="flex-1" />
-            <MoneyInput value={r.amount} disabled={disabled} onChange={(n) => setRow(i, { amount: n })} className="w-28" />
+              onChange={(e) => setRow(i, { parent: e.target.value })} className="min-w-0 flex-1" />
+            <Input value={r.child} placeholder="Child name" disabled={disabled}
+              onChange={(e) => setRow(i, { child: e.target.value })} className="min-w-0 flex-1" />
+            <MoneyInput value={r.amount} disabled={disabled} onChange={(n) => setRow(i, { amount: n })} className="w-28 shrink-0" />
+            {!disabled && i < value.length && (
+              <button type="button" onClick={() => onChange(value.filter((_, idx) => idx !== i))}
+                className="grid size-8 shrink-0 place-items-center rounded-md text-[var(--color-mid-gray)] hover:bg-[var(--color-secondary)] hover:text-[var(--color-coral)]" title="Remove">
+                <X className="size-4" />
+              </button>
+            )}
+          </div>
+        ))}
+        {disabled && value.length === 0 && <p className="text-xs text-[var(--color-mid-gray)]">—</p>}
+      </div>
+    </div>
+  )
+}
+
+/** Less Declines / Refunds — a type toggle + parent + amount, auto-adding. */
+function DeclineRefundList({
+  value, disabled, onChange,
+}: { value: DeclineRefund[]; disabled: boolean; onChange: (rows: DeclineRefund[]) => void }) {
+  const rows = disabled ? value : [...value, { type: 'Decline' as const, parent: '', amount: 0 }]
+  const setRow = (i: number, patch: Partial<DeclineRefund>) => {
+    if (i < value.length) onChange(value.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
+    else onChange([...value, { type: 'Decline', parent: '', amount: 0, ...patch }])
+  }
+  return (
+    <div>
+      <p className="mb-1.5 text-sm font-bold text-[var(--color-charcoal)]">
+        Less Declines / Refunds <span className="font-normal text-[var(--color-dk-gray)]">— subtracts from deposits</span>
+      </p>
+      <div className="space-y-2">
+        {rows.map((r, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <div className="flex shrink-0 rounded-lg bg-[var(--color-secondary)] p-0.5">
+              {(['Decline', 'Refund'] as const).map((t) => (
+                <button key={t} type="button" disabled={disabled} onClick={() => setRow(i, { type: t })}
+                  className={cn('rounded-md px-2.5 py-1 text-xs font-semibold transition-colors',
+                    r.type === t
+                      ? (t === 'Decline' ? 'bg-[var(--color-critical)] text-white' : 'bg-[var(--color-sky-deep)] text-white')
+                      : 'text-[var(--color-dk-gray)]')}>
+                  {t}
+                </button>
+              ))}
+            </div>
+            <Input value={r.parent} placeholder="Parent name" disabled={disabled}
+              onChange={(e) => setRow(i, { parent: e.target.value })} className="min-w-0 flex-1" />
+            <MoneyInput value={r.amount} disabled={disabled} onChange={(n) => setRow(i, { amount: n })} className="w-28 shrink-0" />
             {!disabled && i < value.length && (
               <button type="button" onClick={() => onChange(value.filter((_, idx) => idx !== i))}
                 className="grid size-8 shrink-0 place-items-center rounded-md text-[var(--color-mid-gray)] hover:bg-[var(--color-secondary)] hover:text-[var(--color-coral)]" title="Remove">

@@ -268,10 +268,14 @@ function emptyMap<K extends string>(fields: CountNoteField<K>[]): Record<K, Coun
 // stored. Flags & Notes feed the central Day Notes board (source 'fdr').
 // ===========================================================================
 
-/** A description + amount line (auto-adds a blank row as you fill it). */
-export interface FinanceLine { description: string; amount: number }
-/** An agency payment line: agency + parent + amount. */
-export interface AgencyLine { agency: string; parent: string; amount: number }
+/** A who + what + amount line (auto-adds a blank row as you fill it). Used for
+ *  billing charges/credits ([Who] + [What for]) and check deposits ([Who paid]
+ *  + [For what]). */
+export interface FinanceLine { who: string; what: string; amount: number }
+/** An agency payment line: agency + parent + child + amount. */
+export interface AgencyLine { agency: string; parent: string; child: string; amount: number }
+/** A decline or refund line: type toggle + parent + amount (subtracts from deposits). */
+export interface DeclineRefund { type: 'Decline' | 'Refund'; parent: string; amount: number }
 /** A names + amount block (single line — current or former families outstanding). */
 export interface Outstanding { names: string; amount: number }
 /** Tuition Express daily totals (not itemized). */
@@ -289,7 +293,7 @@ export interface FinanceLocation {
   paymentsByCheck: FinanceLine[];
   paymentsByAgency: AgencyLine[];
   tuitionExpress: TuitionExpress;
-  declinesRefunds: number;
+  declinesRefunds: DeclineRefund[];
 }
 
 /** Agency dropdown options for Payment by Agency (plus a free-type "Other"). */
@@ -321,7 +325,7 @@ export function emptyFinanceLocation(): FinanceLocation {
     paymentsByCheck: [],
     paymentsByAgency: [],
     tuitionExpress: { achBatch: 0, ccBatch: 0, ccPos: 0, note: '' },
-    declinesRefunds: 0,
+    declinesRefunds: [],
   };
 }
 
@@ -348,7 +352,7 @@ export const tuitionExpressTotal = (te: TuitionExpress): number =>
 export const subtotalDeposits = (loc: FinanceLocation): number =>
   sumLines(loc.paymentsByCheck) + sumLines(loc.paymentsByAgency) + tuitionExpressTotal(loc.tuitionExpress);
 export const totalDeposits = (loc: FinanceLocation): number =>
-  subtotalDeposits(loc) - (loc.declinesRefunds || 0);
+  subtotalDeposits(loc) - sumLines(loc.declinesRefunds);
 
 // ===========================================================================
 // REPORT SUITE — generic, config-driven org-wide daily reports (ADR/MDR/EDR).
