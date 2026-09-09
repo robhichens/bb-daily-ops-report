@@ -409,9 +409,14 @@ export interface LedgerNoteComment {
   author: string;
   at: string;
 }
+/** A Buy/Fix request-list tag on an org note. Mirrors NoteTag but scoped to the
+ *  single note it lives on, so it needs no note-text key. */
+export interface RequestTag { list: RequestList; done?: boolean; doneAt?: string }
+
 /** A running Flags-&-Notes entry. All reports write these to ONE central
  *  `orgDayNotes` collection, tagged by `source` (report) + optional `siteId`,
- *  so they aggregate onto the main Day Notes board. Red-flag pins to the top. */
+ *  so they aggregate onto the main Day Notes board. Red-flag pins to the top;
+ *  `requests` files it onto the dashboard Purchase/Maintenance lists. */
 export interface LedgerNote {
   id: string;
   source: ReportKey;        // which report this note came from
@@ -423,6 +428,7 @@ export interface LedgerNote {
   acked: boolean;
   flagged: boolean;
   comments: LedgerNoteComment[];
+  requests?: RequestTag[];  // Buy/Fix list tags (dashboard request lists)
 }
 
 /** A blank report for a given site/date. Derived fields are filled by derive.ts. */

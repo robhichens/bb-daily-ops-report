@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Flag, Trash2, Send, CornerDownRight, AlertTriangle, Check } from 'lucide-react'
-import type { LedgerNote, ReportKey } from '@/lib/schema'
+import { Flag, Trash2, Send, CornerDownRight, AlertTriangle, Check, ShoppingCart, Wrench } from 'lucide-react'
+import { REQUEST_LISTS, type LedgerNote, type ReportKey } from '@/lib/schema'
 import {
   subscribeOrgNotesBySource, addOrgNote, setOrgNoteAck, setOrgNoteFlag,
-  addOrgNoteComment, deleteOrgNote,
+  addOrgNoteComment, deleteOrgNote, setOrgNoteRequest,
 } from '@/lib/orgReports'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -144,6 +144,25 @@ function NoteCard({
           <p className="mt-1 text-xs text-[var(--color-dk-gray)]">
             {note.author} · {new Date(note.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
           </p>
+          {!readOnly && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-mid-gray)]">Add to list</span>
+              {REQUEST_LISTS.map(({ id, short }) => {
+                const on = (note.requests ?? []).some((t) => t.list === id && !t.done)
+                const Icon = id === 'purchase' ? ShoppingCart : Wrench
+                return (
+                  <button key={id} type="button" disabled={busy.has(`${note.id}:req:${id}`)} aria-pressed={on}
+                    onClick={() => void run(`${note.id}:req:${id}`, () => setOrgNoteRequest(note.id, note.requests, id, !on))}
+                    className={cn('inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-50',
+                      on
+                        ? (id === 'purchase' ? 'border-transparent bg-[var(--color-sky-deep)] text-white' : 'border-transparent bg-[var(--color-yellow)] text-[var(--color-charcoal)]')
+                        : 'border-[var(--color-border)] text-[var(--color-dk-gray)] hover:border-[var(--color-charcoal)]')}>
+                    <Icon className="size-3.5" /> {short}{on && <Check className="size-3" strokeWidth={3} />}
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         <button

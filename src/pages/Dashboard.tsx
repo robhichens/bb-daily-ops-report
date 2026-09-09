@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { LayoutDashboard, Download, FileText, Sparkles } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { isAdmin as isAdminRole, userSites } from '@/lib/users'
-import { SITES, siteName, type SiteId, type DailyOpsReport, type SiteConfig } from '@/lib/schema'
+import { SITES, siteName, type SiteId, type DailyOpsReport, type SiteConfig, type LedgerNote } from '@/lib/schema'
 import { weekOf as weekOfFn } from '@/lib/derive'
 import { todayIso, addIsoDays, formatShort } from '@/lib/dates'
 import {
@@ -28,6 +28,7 @@ import { DashboardSections } from '@/components/dashboard/DashboardSections'
 import { DirectorViewConfig } from '@/components/dashboard/DirectorViewConfig'
 import { ReportsTable } from '@/components/dashboard/ReportsTable'
 import { RequestLists } from '@/components/dashboard/RequestLists'
+import { subscribeAllOrgNotes } from '@/lib/orgReports'
 import { UsersPanel } from '@/components/dashboard/UsersPanel'
 
 const ALL_ON = Object.fromEntries(SECTION_META.map((s) => [s.key, true])) as Record<DashboardSection, boolean>
@@ -66,6 +67,7 @@ function FullDashboard({ sites, admin }: { sites: SiteConfig[]; admin: boolean }
   const [site, setSite] = useState<SiteId | 'all'>('all')
   const [config, setConfig] = useState<Config>(DEFAULT_DIRECTOR_VIEW)
   const [recentRows, setRecentRows] = useState<DailyOpsReport[]>([])
+  const [orgNotes, setOrgNotes] = useState<LedgerNote[]>([])
   const { rows, lastWeekRows } = useWeekData(weekOf)
 
   useEffect(
@@ -77,6 +79,7 @@ function FullDashboard({ sites, admin }: { sites: SiteConfig[]; admin: boolean }
     [currentWeek]
   )
   useEffect(() => (admin ? subscribeDirectorView(setConfig) : undefined), [admin])
+  useEffect(() => (admin ? subscribeAllOrgNotes(setOrgNotes) : undefined), [admin])
 
   const view = useMemo(
     () => buildDashboardView(rows, lastWeekRows, weekOf, site, today, scope),
@@ -109,7 +112,7 @@ function FullDashboard({ sites, admin }: { sites: SiteConfig[]; admin: boolean }
 
       <DashboardSections view={view} sections={ALL_ON} />
       <ReportsTable rows={view.tableRows} />
-      {admin && <RequestLists reports={recentRows} />}
+      {admin && <RequestLists reports={recentRows} orgNotes={orgNotes} />}
       {admin && <DirectorViewConfig config={config} />}
       {admin && <UsersPanel />}
     </div>

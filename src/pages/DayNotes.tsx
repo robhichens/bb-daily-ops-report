@@ -32,6 +32,7 @@ import {
   setOrgNoteFlag,
   addOrgNoteComment,
   deleteOrgNote,
+  setOrgNoteRequest,
 } from '@/lib/orgReports'
 import { markDayNotesSeen } from '@/lib/dayNotesRead'
 import { Card } from '@/components/ui/card'
@@ -369,6 +370,21 @@ function AdminOrgCard({ note, busy, runBusy, author }: { note: LedgerNote; busy:
             </span>
             {note.siteId && <span>{siteName(note.siteId)}</span>}
             <span>· {note.author} · {new Date(note.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-mid-gray)]">Add to list</span>
+            {REQUEST_LISTS.map(({ id, short }) => {
+              const on = (note.requests ?? []).some((t) => t.list === id && !t.done)
+              const Icon = LIST_ICON[id]
+              return (
+                <button key={id} type="button" disabled={busy.has(`${note.id}:req:${id}`)} aria-pressed={on}
+                  onClick={() => runBusy(`${note.id}:req:${id}`, () => setOrgNoteRequest(note.id, note.requests, id, !on))}
+                  className={cn('inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-50',
+                    on ? LIST_ON_CLASS[id] : 'border-[var(--color-border)] text-[var(--color-dk-gray)] hover:border-[var(--color-charcoal)]')}>
+                  <Icon className="size-3.5" /> {short}{on && <Check className="size-3" strokeWidth={3} />}
+                </button>
+              )
+            })}
           </div>
         </div>
         <FlagButton flagged={note.flagged} busy={busy.has(`${note.id}:flag`)} onClick={() => runBusy(`${note.id}:flag`, () => setOrgNoteFlag(note.id, !note.flagged))} />

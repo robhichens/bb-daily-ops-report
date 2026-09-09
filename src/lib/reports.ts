@@ -31,6 +31,7 @@ import {
   type NoteStamp,
   type NoteTag,
   type RequestList,
+  type RequestTag,
   type SiteId,
 } from './schema';
 
@@ -316,34 +317,38 @@ export async function setRequestDone(
   await updateDoc(reportRef(reportId), { noteTags: next });
 }
 
-/** One filed request, flattened from the reports for a dashboard list. */
+/** One filed request for a dashboard list — from a DDR note or an org note. */
 export interface RequestItem {
-  reportId: string;
-  siteId: SiteId;
-  siteName: string;
-  date: string;
-  director: string;
-  note: string;
+  key: string;              // stable unique key
+  kind: 'ddr' | 'org';
+  note: string;             // display text
   list: RequestList;
+  contextLabel: string;     // "Crozet · Jacqueline" or "FDR · Crozet"
+  date: string;
   doneAt?: string;
-  tags: NoteTag[]; // the report's full tag array (for rewrite/removal writes)
+  // DDR action payload
+  reportId?: string;
+  tags?: NoteTag[];
+  // Org action payload
+  noteId?: string;
+  requests?: RequestTag[];
 }
 
 function toRequestItem(r: DailyOpsReport, t: NoteTag, tags: NoteTag[]): RequestItem {
   return {
-    reportId: r.id,
-    siteId: r.siteId,
-    siteName: r.siteName || siteName(r.siteId),
-    date: r.date,
-    director: r.director,
+    key: `ddr:${r.id}:${t.list}:${t.note}`,
+    kind: 'ddr',
     note: t.note,
     list: t.list,
+    contextLabel: `${r.siteName || siteName(r.siteId)}${r.director ? ` · ${r.director}` : ''}`,
+    date: r.date,
     doneAt: t.doneAt,
+    reportId: r.id,
     tags,
   };
 }
 
-/** Active (not-done) notes filed to `list`, newest first. */
+/** Active (not-done) DDR notes filed to `list`, newest first. */
 export function collectRequests(reports: DailyOpsReport[], list: RequestList): RequestItem[] {
   const out: RequestItem[] = [];
   for (const r of reports) {
@@ -352,10 +357,10 @@ export function collectRequests(reports: DailyOpsReport[], list: RequestList): R
       if (t.list === list && !t.done) out.push(toRequestItem(r, t, tags));
     }
   }
-  return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.siteName.localeCompare(b.siteName)));
+  return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.contextLabel.localeCompare(b.contextLabel)));
 }
 
-/** Completed notes across BOTH lists, most-recently-completed first. */
+/** Completed DDR notes across BOTH lists, most-recently-completed first. */
 export function collectCompletedRequests(reports: DailyOpsReport[]): RequestItem[] {
   const out: RequestItem[] = [];
   for (const r of reports) {

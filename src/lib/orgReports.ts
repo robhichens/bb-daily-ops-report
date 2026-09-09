@@ -23,7 +23,9 @@ import {
 import { where } from 'firebase/firestore'
 import { db } from './firebase'
 import { weekOf as weekOfFn, weekdayName } from './derive'
-import type { LedgerNote, LedgerNoteComment, OrgReport, OrgReportDef, ReportKey, SiteId } from './schema'
+import { siteName } from './schema'
+import type { LedgerNote, LedgerNoteComment, OrgReport, OrgReportDef, ReportKey, RequestList, RequestTag, SiteId } from './schema'
+import type { RequestItem } from './reports'
 
 // --- Daily report doc -------------------------------------------------------
 
@@ -140,4 +142,59 @@ export async function addOrgNoteComment(
 
 export async function deleteOrgNote(id: string): Promise<void> {
   await deleteDoc(noteRef(id))
+}
+
+// --- Org notes → Buy/Fix request lists --------------------------------------
+
+/** Add/remove one request-list tag (Buy/Fix) on an org note. */
+export async function setOrgNoteRequest(
+  id: string,
+  existing: RequestTag[] | undefined,
+  list: RequestList,
+  on: boolean
+): Promise<void> {
+  const rest = (existing ?? []).filter((t) => t.list !== list)
+  const next = on ? [...rest, { list, done: false }] : rest
+  await updateDoc(noteRef(id), { requests: next })
+}
+
+/** Mark a request done (→ Completed) or reopen it (→ active list). */
+export async function setOrgRequestDone(
+  id: string,
+  existing: RequestTag[] | undefined,
+  list: RequestList,
+  done: boolean
+): Promise<void> {
+  const next = (existing ?? []).map((t) =>
+    t.list === list ? { list, done, ...(done ? { doneAt: new Date().toISOString() } : {}) } : t
+  )
+  await updateDoc(noteRef(id), { requests: next })
+}
+
+function toOrgRequestItem(n: LedgerNote, t: RequestTag): RequestItem {
+  return {
+    key: `org:${n.id}:${t.list}`,
+    kind: 'org',
+    note: n.text,
+    list: t.list,
+    contextLabel: `${n.source.toUpperCase()}${n.siteId ? ` · ${siteName(n.siteId)}` : ''}`,
+    date: n.at.slice(0, 10),
+    doneAt: t.doneAt,
+    noteId: n.id,
+    requests: n.requests ?? [],
+  }
+}
+
+/** Active (not-done) org-note requests for `list`, newest first. */
+export function collectOrgRequests(notes: LedgerNote[], list: RequestList): RequestItem[] {
+  const out: RequestItem[] = []
+  for (const n of notes) for (const t of n.requests ?? []) if (t.list === list && !t.done) out.push(toOrgRequestItem(n, t))
+  return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.contextLabel.localeCompare(b.contextLabel)))
+}
+
+/** Completed org-note requests across both lists, most-recently-completed first. */
+export function collectOrgCompletedRequests(notes: LedgerNote[]): RequestItem[] {
+  const out: RequestItem[] = []
+  for (const n of notes) for (const t of n.requests ?? []) if (t.done) out.push(toOrgRequestItem(n, t))
+  return out.sort((a, b) => ((a.doneAt ?? '') < (b.doneAt ?? '') ? 1 : (a.doneAt ?? '') > (b.doneAt ?? '') ? -1 : 0))
 }
