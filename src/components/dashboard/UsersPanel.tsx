@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ShieldCheck, UsersRound } from 'lucide-react'
+import { Loader2, Mail, ShieldCheck, UserPlus, UsersRound } from 'lucide-react'
+import { useAuth } from '@/auth/AuthProvider'
 import { Card } from '@/components/ui/card'
 import { SITES, type ReportAccessLevel, type ReportKey, type SiteId } from '@/lib/schema'
 import { REPORTS } from '@/lib/reportRegistry'
@@ -8,9 +9,11 @@ import {
   updateUserSites,
   updateUserReportAccess,
   userSites,
+  inviteUser,
   type UserProfile,
 } from '@/lib/users'
-import { inputClass } from '@/components/ui/input'
+import { Input, inputClass } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 const ROLE_ORDER: Record<string, number> = { admin: 0, director: 1 }
@@ -60,6 +63,8 @@ export function UsersPanel() {
           Grant schools (DDR) &amp; reports · assigning a report shows its dashboard data
         </span>
       </div>
+
+      <InviteForm />
 
       <div className="divide-y divide-[var(--color-border)]">
         {sorted.map((u) => {
@@ -131,5 +136,116 @@ export function UsersPanel() {
         )}
       </div>
     </Card>
+  )
+}
+
+type InviteStatus = { kind: 'idle' } | { kind: 'sending' } | { kind: 'error'; message: string } | { kind: 'sent'; email: string; reused: boolean }
+
+/** Admin enters an email + role (+ schools, for a director) and sends an
+ *  invite: the invite-user function creates the account, then the browser
+ *  sends the person the same "set your password" email as Forgot password.
+ *  They pick their own password on first login — this never touches one. */
+function InviteForm() {
+  const { user } = useAuth()
+  const [open, setOpen] = useState(false)
+  const [email, setEmail] = useState('')
+  const [role, setRole] = useState<'director' | 'admin'>('director')
+  const [siteIds, setSiteIds] = useState<SiteId[]>([])
+  const [status, setStatus] = useState<InviteStatus>({ kind: 'idle' })
+
+  function toggleSite(site: SiteId) {
+    setSiteIds((prev) => (prev.includes(site) ? prev.filter((s) => s !== site) : [...prev, site]))
+  }
+
+  async function send() {
+    if (!user) return
+    const trimmed = email.trim()
+    if (!trimmed) { setStatus({ kind: 'error', message: 'Enter an email address' }); return }
+    if (role === 'director' && siteIds.length === 0) { setStatus({ kind: 'error', message: 'Pick at least one school' }); return }
+
+    setStatus({ kind: 'sending' })
+    try {
+      const idToken = await user.getIdToken()
+      const result = await inviteUser(idToken, trimmed, role, siteIds)
+      setStatus({ kind: 'sent', email: trimmed, reused: result.reused })
+      setEmail(''); setRole('director'); setSiteIds([])
+    } catch (err) {
+      setStatus({ kind: 'error', message: err instanceof Error ? err.message : 'Invite failed' })
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="border-b border-[var(--color-border)] p-5">
+        <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+          <UserPlus className="size-3.5" /> Invite someone
+        </Button>
+      </div>
+    )
+  }
+
+  const sending = status.kind === 'sending'
+
+  return (
+    <div className="space-y-3 border-b border-[var(--color-border)] bg-[var(--color-secondary)]/40 p-5">
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex min-w-48 flex-1 flex-col gap-1">
+          <span className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-mid-gray)]">Email</span>
+          <Input
+            type="email"
+            value={email}
+            placeholder="name@brightbeginningsva.com"
+            disabled={sending}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-mid-gray)]">Role</span>
+          <select
+            value={role}
+            disabled={sending}
+            onChange={(e) => setRole(e.target.value as 'director' | 'admin')}
+            className={cn(inputClass, 'h-11 w-auto')}
+          >
+            <option value="director">Director</option>
+            <option value="admin">Admin</option>
+          </select>
+        </label>
+        <Button size="default" onClick={() => void send()} disabled={sending}>
+          {sending ? <Loader2 className="size-3.5 animate-spin" /> : <Mail className="size-3.5" />}
+          Send invite
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={sending}>Cancel</Button>
+      </div>
+
+      {role === 'director' && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          <span className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-mid-gray)]">Schools</span>
+          {SITES.map((s) => (
+            <label key={s.id} className="flex cursor-pointer items-center gap-1.5 text-sm text-[var(--color-charcoal)]">
+              <input
+                type="checkbox"
+                checked={siteIds.includes(s.id)}
+                disabled={sending}
+                onChange={() => toggleSite(s.id)}
+                className="size-4 accent-[var(--color-coral)]"
+              />
+              {s.name}
+            </label>
+          ))}
+        </div>
+      )}
+
+      {status.kind === 'error' && (
+        <p className="text-xs font-semibold text-[var(--color-coral-dark)]">{status.message}</p>
+      )}
+      {status.kind === 'sent' && (
+        <p className="text-xs font-semibold text-[var(--color-good)]">
+          {status.reused
+            ? `${status.email} already had an account — resent the set-password email.`
+            : `Invite sent to ${status.email} — they'll get an email to set their password.`}
+        </p>
+      )}
+    </div>
   )
 }

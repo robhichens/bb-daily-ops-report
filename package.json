@@ -16,6 +16,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "firebase": "^12.15.0",
+    "firebase-admin": "^14.3.0",
     "framer-motion": "^12.41.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",

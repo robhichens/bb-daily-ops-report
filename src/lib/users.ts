@@ -14,7 +14,8 @@ import {
   updateDoc,
   type Unsubscribe,
 } from 'firebase/firestore'
-import { db } from './firebase'
+import { sendPasswordResetEmail } from 'firebase/auth'
+import { auth, db } from './firebase'
 import type { ReportAccessLevel, ReportKey, SiteId } from './schema'
 
 export type UserRole =
@@ -129,4 +130,31 @@ export function subscribeDayNotesSeenAt(uid: string, cb: (iso: string) => void):
 /** Persist the Day-Notes "last seen" timestamp on the user doc (admins only). */
 export async function setDayNotesSeenAt(uid: string, iso: string): Promise<void> {
   await setDoc(usersRef(uid), { dayNotesSeenAt: iso }, { merge: true })
+}
+
+export interface InviteResult {
+  uid: string
+  reused: boolean // true = the email already had an account; we just resent the set-password email
+}
+
+/** Admin-only: invite someone by email from Users & Access. Creates their
+ *  Firebase Auth account + Firestore profile via the invite-user Netlify
+ *  Function (privileged — needs firebase-admin, can't run client-side), then
+ *  sends the same password-reset email "Forgot password?" uses, so they land
+ *  on the set-password screen themselves. This code never sees a password. */
+export async function inviteUser(
+  idToken: string,
+  email: string,
+  role: 'admin' | 'director',
+  siteIds: SiteId[]
+): Promise<InviteResult> {
+  const res = await fetch('/api/invite-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ email, role, siteIds }),
+  })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(body.error || `Invite failed (${res.status})`)
+  await sendPasswordResetEmail(auth, email)
+  return body as InviteResult
 }
