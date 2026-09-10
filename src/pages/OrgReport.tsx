@@ -4,7 +4,8 @@ import { Check, Lock, Pencil, Loader2, CloudOff, Eye } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { reportAccessLevel } from '@/lib/users'
 import { ORG_DEFS, reportMeta } from '@/lib/reportRegistry'
-import type { FieldKind, OrgReport as TOrgReport, OrgReportDef, OrgSectionDef } from '@/lib/schema'
+import { matrixCellKey } from '@/lib/schema'
+import type { FieldKind, MatrixDef, OrgReport as TOrgReport, OrgReportDef, OrgSectionDef } from '@/lib/schema'
 import {
   getOrgReport, upsertOrgDraft, submitOrgReport, emptyOrgReport,
 } from '@/lib/orgReports'
@@ -170,18 +171,27 @@ function SectionCard({
         <h2 className="text-sm font-extrabold uppercase tracking-[0.14em] text-[var(--color-charcoal)]">{section.title}</h2>
         {section.hint && <p className="mt-0.5 text-xs text-[var(--color-dk-gray)]">{section.hint}</p>}
       </div>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        {section.fields.map((f) => (
-          <ValueField
-            key={f.key}
-            label={f.label}
-            kind={f.kind}
-            value={vals[f.key] ?? (f.kind === 'text' ? '' : 0)}
-            disabled={locked}
-            onChange={(v) => setField(section.key, f.key, v)}
-          />
-        ))}
-      </div>
+      {section.matrix ? (
+        <MatrixGrid
+          matrix={section.matrix}
+          vals={vals}
+          disabled={locked}
+          onChange={(cellKey, v) => setField(section.key, cellKey, v)}
+        />
+      ) : (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {section.fields.map((f) => (
+            <ValueField
+              key={f.key}
+              label={f.label}
+              kind={f.kind}
+              value={vals[f.key] ?? (f.kind === 'text' ? '' : 0)}
+              disabled={locked}
+              onChange={(v) => setField(section.key, f.key, v)}
+            />
+          ))}
+        </div>
+      )}
       {section.note && (
         <label className="mt-3 flex flex-col gap-1">
           <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">Note</span>
@@ -194,6 +204,61 @@ function SectionCard({
         </label>
       )}
     </Card>
+  )
+}
+
+/** Row (e.g. classroom) × column (e.g. site) number grid. Cell values live
+ *  flat in the section's data, keyed by `matrixCellKey(colKey, rowKey)`. */
+function MatrixGrid({
+  matrix, vals, disabled, onChange,
+}: {
+  matrix: MatrixDef
+  vals: Record<string, number | string>
+  disabled: boolean
+  onChange: (cellKey: string, value: number) => void
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <div
+        className="grid min-w-[420px] items-center gap-x-3 gap-y-2"
+        style={{ gridTemplateColumns: `minmax(104px,1fr) repeat(${matrix.columns.length}, minmax(76px,1fr))` }}
+      >
+        <div />
+        {matrix.columns.map((c) => (
+          <div key={c.key} className="text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">
+            {c.label}
+          </div>
+        ))}
+        {matrix.rows.flatMap((r) => [
+          <div key={`${r.key}-label`} className="leading-tight">
+            <div className="text-sm font-semibold text-[var(--color-charcoal)]">{r.label}</div>
+            {r.sub && <div className="text-[10px] text-[var(--color-mid-gray)]">{r.sub}</div>}
+          </div>,
+          ...matrix.columns.map((c) => {
+            const cellKey = matrixCellKey(c.key, r.key)
+            const raw = vals[cellKey]
+            const value = typeof raw === 'number' ? raw : 0
+            return (
+              <Input
+                key={cellKey}
+                type="number"
+                inputMode="numeric"
+                step="1"
+                value={value === 0 ? '' : value}
+                placeholder="0"
+                disabled={disabled}
+                onChange={(e) => {
+                  const raw2 = e.target.value
+                  const n = raw2 === '' ? 0 : parseInt(raw2, 10)
+                  if (!Number.isNaN(n)) onChange(cellKey, n)
+                }}
+                className="h-9 px-2 text-center font-semibold"
+              />
+            )
+          }),
+        ])}
+      </div>
+    </div>
   )
 }
 

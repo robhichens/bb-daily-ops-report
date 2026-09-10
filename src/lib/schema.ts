@@ -21,6 +21,22 @@ export const SITES: SiteConfig[] = [
 export const siteName = (id: SiteId): string =>
   SITES.find((s) => s.id === id)?.name ?? id;
 
+/** Standard 7-room scheme, identical across all 3 campuses (as of 2026-08-17). */
+export interface ClassroomConfig {
+  key: string;
+  name: string;
+  ageGroup: string;
+}
+export const CLASSROOMS: ClassroomConfig[] = [
+  { key: 'lions', name: 'Lions', ageGroup: '0–8mo' },
+  { key: 'hippos', name: 'Hippos', ageGroup: '9–16mo' },
+  { key: 'elephants', name: 'Elephants', ageGroup: 'Toddlers' },
+  { key: 'monkeys', name: 'Monkeys', ageGroup: '2s' },
+  { key: 'tigers', name: 'Tigers', ageGroup: 'Early 3s' },
+  { key: 'zebras', name: 'Zebras', ageGroup: 'Late 3s/Early 4s' },
+  { key: 'cheetahs', name: 'Cheetahs', ageGroup: 'Jr. Kindergarten' },
+];
+
 /** Directors for the autocomplete (as of June 2026). */
 export const DIRECTORS = ['Jacqueline Lang', 'Jess Rybak', 'Laura Baker'];
 
@@ -371,11 +387,23 @@ export interface OrgFieldDef {
   label: string;
   kind: FieldKind;
 }
+
+/** A row × column number grid (e.g. classrooms × sites). Renders instead of
+ *  `fields` when present — `fields` should be left empty on a matrix section.
+ *  Cell values are stored flat in the section's data under `${col}_${row}`. */
+export interface MatrixDef {
+  rows: { key: string; label: string; sub?: string }[];
+  columns: { key: string; label: string }[];
+  kind: FieldKind; // typically 'number' so short-staffed (negative) rooms aren't clamped to 0
+}
+export const matrixCellKey = (colKey: string, rowKey: string): string => `${colKey}_${rowKey}`;
+
 export interface OrgSectionDef {
   key: string;
   title: string;
   hint?: string;
   fields: OrgFieldDef[];
+  matrix?: MatrixDef;
   note?: boolean; // append a free-text "Note" field
 }
 export interface OrgReportDef {

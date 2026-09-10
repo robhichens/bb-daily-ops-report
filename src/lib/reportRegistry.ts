@@ -5,6 +5,7 @@
 // through the generic OrgReport engine at /r/:key.
 
 import { ClipboardList, Wallet, Ticket, Megaphone, Compass } from 'lucide-react'
+import { CLASSROOMS, SITES } from './schema'
 import type { OrgReportDef, ReportKey } from './schema'
 
 export interface ReportMeta {
@@ -48,6 +49,10 @@ const ADR: OrgReportDef = {
       { key: 'regFeesAmt', label: 'Reg fees $', kind: 'dollar' },
       { key: 'newEnrollments', label: 'New enrollments', kind: 'count' },
     ], note: true },
+    { key: 'outreach', title: 'Community Outreach', hint: 'Flyer drops & local business visits — name the spots in the note', fields: [
+      { key: 'locationsVisited', label: 'Locations visited', kind: 'count' },
+      { key: 'flyersDistributed', label: 'Flyers distributed', kind: 'count' },
+    ], note: true },
     { key: 'pipeline', title: 'Pipeline', hint: 'Snapshot of where the funnel stands', fields: [
       { key: 'activeLeads', label: 'Active leads', kind: 'count' },
       { key: 'toursPending', label: 'Tours pending', kind: 'count' },
@@ -57,6 +62,9 @@ const ADR: OrgReportDef = {
       { key: 'withdrawals', label: 'Withdrawals', kind: 'count' },
       { key: 'followUps', label: 'Follow-ups outstanding', kind: 'count' },
     ], note: true },
+    { key: 'openingsToStaff', title: 'Openings to Staff', hint: 'Spots open per room based on today’s teacher count + ratio — not raw licensed capacity. Can go negative if a room is over ratio for its current staffing.', fields: [],
+      matrix: { rows: CLASSROOMS.map((c) => ({ key: c.key, label: c.name, sub: c.ageGroup })), columns: SITES.map((s) => ({ key: s.id, label: s.name })), kind: 'number' },
+      note: true },
   ],
 }
 
