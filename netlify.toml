@@ -6,13 +6,6 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
-
-# SPA fallback so /report and /dashboard resolve on direct load / refresh.
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# Redirects (including /api/* -> functions and the SPA fallback) live in
+# public/_redirects, not here — a _redirects file always wins over
+# netlify.toml [[redirects]], so keeping both was silently no-op-ing this one.
