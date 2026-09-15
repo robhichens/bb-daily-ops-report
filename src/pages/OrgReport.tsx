@@ -15,6 +15,8 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NotesLedger } from '@/components/report/NotesLedger'
+import { PrintableReport, PrintButton } from '@/components/report/PrintableReport'
+import { buildOrgPrintModel } from '@/lib/printModel'
 import { cn } from '@/lib/utils'
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
@@ -36,7 +38,7 @@ export function OrgReport() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 print:hidden">
         <span className="grid size-10 place-items-center rounded-xl bg-[var(--color-charcoal)] text-white">
           <Icon className="size-5" />
         </span>
@@ -46,10 +48,13 @@ export function OrgReport() {
             {formatLong(date)} · org-wide{readOnly && ' · view only'}
           </p>
         </div>
+        <PrintButton className="ml-auto" />
       </div>
 
       <OrgForm def={def} date={date} onDate={setDate} uid={user?.uid ?? ''} author={author} readOnly={readOnly} />
-      <NotesLedger source={def.key} author={author} uid={user?.uid ?? ''} readOnly={readOnly} />
+      <div className="print:hidden">
+        <NotesLedger source={def.key} author={author} uid={user?.uid ?? ''} readOnly={readOnly} />
+      </div>
     </div>
   )
 }
@@ -121,7 +126,8 @@ function OrgForm({
   const submitted = draft.status === 'submitted'
 
   return (
-    <div className="space-y-5">
+    <>
+    <div className="space-y-5 print:hidden">
       <Card accent="gray" className="flex flex-wrap items-end justify-between gap-4 p-5">
         <label className="flex flex-col gap-1.5">
           <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">Date</span>
@@ -152,6 +158,8 @@ function OrgForm({
         </div>
       )}
     </div>
+    <PrintableReport model={buildOrgPrintModel(def, draft)} />
+    </>
   )
 }
 

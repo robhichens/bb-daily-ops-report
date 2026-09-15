@@ -19,6 +19,8 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NotesLedger } from '@/components/report/NotesLedger'
+import { PrintableReport, PrintButton } from '@/components/report/PrintableReport'
+import { buildFdrPrintModel } from '@/lib/printModel'
 import { cn } from '@/lib/utils'
 
 const money = (n: number) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -36,16 +38,19 @@ export function FinanceReport() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 print:hidden">
         <span className="grid size-10 place-items-center rounded-xl bg-[var(--color-sky-deep)] text-white"><Wallet className="size-5" /></span>
         <div>
           <h1 className="text-2xl font-extrabold text-[var(--color-charcoal)]">Finance Report</h1>
           <p className="text-sm text-[var(--color-dk-gray)]">{formatLong(date)} · per location{readOnly && ' · view only'}</p>
         </div>
+        <PrintButton className="ml-auto" />
       </div>
 
       <FinanceForm date={date} onDate={setDate} uid={user?.uid ?? ''} author={author} readOnly={readOnly} />
-      <NotesLedger source="fdr" author={author} uid={user?.uid ?? ''} readOnly={readOnly} />
+      <div className="print:hidden">
+        <NotesLedger source="fdr" author={author} uid={user?.uid ?? ''} readOnly={readOnly} />
+      </div>
     </div>
   )
 }
@@ -106,7 +111,8 @@ function FinanceForm({
   const submitted = draft.status === 'submitted'
 
   return (
-    <div className="space-y-5">
+    <>
+    <div className="space-y-5 print:hidden">
       <Card accent="gray" className="flex flex-wrap items-end justify-between gap-4 p-5">
         <label className="flex flex-col gap-1.5">
           <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">Date</span>
@@ -163,6 +169,8 @@ function FinanceForm({
         </div>
       )}
     </div>
+    <PrintableReport model={buildFdrPrintModel(draft)} />
+    </>
   )
 }
 

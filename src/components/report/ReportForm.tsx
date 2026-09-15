@@ -21,6 +21,8 @@ import { StaffSection } from './StaffSection'
 import { DirectorPacketSection } from './DirectorPacketSection'
 import { DirectorReportList } from './DirectorReportList'
 import { CelebrationOverlay } from './CelebrationOverlay'
+import { PrintableReport } from './PrintableReport'
+import { buildDdrPrintModel } from '@/lib/printModel'
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
@@ -148,7 +150,8 @@ export function ReportForm({ siteId, date, isAdmin, sites, uid, onSite, onDate }
   const submitted = draft.status === 'submitted'
 
   return (
-    <div className="space-y-5">
+    <>
+    <div className="space-y-5 print:hidden">
       <CelebrationOverlay show={celebrate} onDone={() => setCelebrate(false)} />
 
       {/* Status banner for an already-submitted report */}
@@ -235,6 +238,8 @@ export function ReportForm({ siteId, date, isAdmin, sites, uid, onSite, onDate }
         </div>
       )}
     </div>
+    <PrintableReport model={buildDdrPrintModel(draft)} />
+    </>
   )
 }
 

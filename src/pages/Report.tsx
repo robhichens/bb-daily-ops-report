@@ -6,6 +6,7 @@ import { isAdmin as isAdminRole, userSites } from '@/lib/users'
 import { SITES, type SiteId } from '@/lib/schema'
 import { todayIso, formatLong } from '@/lib/dates'
 import { ReportForm } from '@/components/report/ReportForm'
+import { PrintButton } from '@/components/report/PrintableReport'
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -31,7 +32,7 @@ export function Report() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 print:hidden">
         <span className="grid size-10 place-items-center rounded-xl bg-[var(--color-coral)] text-white">
           <ClipboardList className="size-5" />
         </span>
@@ -41,6 +42,7 @@ export function Report() {
           </h1>
           <p className="text-sm text-[var(--color-dk-gray)]">{formatLong(date)}</p>
         </div>
+        <PrintButton className="ml-auto" />
       </div>
 
       <ReportForm

@@ -155,3 +155,13 @@
     font-family: var(--font-brand);
   }
 }
+
+/* Print: clean white page for the PrintableReport sheet (see print:block). */
+@media print {
+  @page {
+    margin: 0.5in;
+  }
+  body {
+    background: #fff !important;
+  }
+}
