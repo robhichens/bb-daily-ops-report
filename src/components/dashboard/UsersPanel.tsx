@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Loader2, Mail, ShieldCheck, UserPlus, UsersRound } from 'lucide-react'
+import { Ban, Loader2, Mail, RotateCcw, ShieldCheck, Trash2, UserPlus, UsersRound } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { Card } from '@/components/ui/card'
 import { SITES, type ReportAccessLevel, type ReportKey, type SiteId } from '@/lib/schema'
@@ -10,6 +10,8 @@ import {
   updateUserReportAccess,
   userSites,
   inviteUser,
+  setUserDisabled,
+  deleteUser,
   type UserProfile,
 } from '@/lib/users'
 import { Input, inputClass } from '@/components/ui/input'
@@ -26,6 +28,7 @@ const ASSIGNABLE = REPORTS.filter((r) => r.key !== 'ddr')
 /** Admin-only: every user, their school access (DDR), and per-report Fill/View
  *  grants. Assigning a report also reveals its dashboard data to that user. */
 export function UsersPanel() {
+  const { user } = useAuth()
   const [users, setUsers] = useState<UserProfile[]>([])
   const [savingUid, setSavingUid] = useState<string | null>(null)
 
@@ -54,6 +57,27 @@ export function UsersPanel() {
     await withSave(u.uid, () => updateUserReportAccess(u.uid, key, level))
   }
 
+  async function toggleActive(u: UserProfile) {
+    if (!user) return
+    await withSave(u.uid, async () => {
+      const idToken = await user.getIdToken()
+      await setUserDisabled(idToken, u.uid, !u.disabled)
+    })
+  }
+
+  async function removeUser(u: UserProfile) {
+    if (!user) return
+    if (!window.confirm(`Delete ${u.displayName || u.email || 'this account'}? This removes their login and profile and can’t be undone.`)) return
+    try {
+      await withSave(u.uid, async () => {
+        const idToken = await user.getIdToken()
+        await deleteUser(idToken, u.uid)
+      })
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Could not delete that account')
+    }
+  }
+
   return (
     <Card accent="gray" className="overflow-hidden">
       <div className="flex items-center gap-2 border-b border-[var(--color-border)] p-5">
@@ -73,8 +97,9 @@ export function UsersPanel() {
           const access = userSites(u)
           const saving = savingUid === u.uid
           const isAdminUser = u.role === 'admin'
+          const isSelf = user?.uid === u.uid
           return (
-            <div key={u.uid} className="px-5 py-4">
+            <div key={u.uid} className={cn('px-5 py-4', u.disabled && 'opacity-60')}>
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-[var(--color-charcoal)]">
@@ -82,15 +107,48 @@ export function UsersPanel() {
                   </p>
                   <p className="text-xs text-[var(--color-dk-gray)]">{u.email}</p>
                 </div>
-                {isAdminUser ? (
-                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--color-coral-soft)] px-2.5 py-1 text-xs font-bold text-[var(--color-coral-dark)]">
-                    <ShieldCheck className="size-3.5" /> Admin · full access
-                  </span>
-                ) : (
-                  <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--color-secondary)] px-2.5 py-1 text-xs font-bold text-[var(--color-dk-gray)]">
-                    {humanRole(u.role)}
-                  </span>
-                )}
+                <div className="flex shrink-0 items-center gap-2">
+                  {u.disabled && (
+                    <span className="inline-flex items-center rounded-full bg-[var(--color-secondary)] px-2.5 py-1 text-xs font-bold text-[var(--color-dk-gray)]">
+                      Deactivated
+                    </span>
+                  )}
+                  {isAdminUser ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-coral-soft)] px-2.5 py-1 text-xs font-bold text-[var(--color-coral-dark)]">
+                      <ShieldCheck className="size-3.5" /> Admin
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full bg-[var(--color-secondary)] px-2.5 py-1 text-xs font-bold text-[var(--color-dk-gray)]">
+                      {humanRole(u.role)}
+                    </span>
+                  )}
+                  {isSelf ? (
+                    <span className="text-xs text-[var(--color-mid-gray)]">You</span>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => void toggleActive(u)}
+                        disabled={saving}
+                        title={u.disabled ? 'Reactivate — allow sign-in' : 'Deactivate — block sign-in'}
+                        aria-label={u.disabled ? 'Reactivate account' : 'Deactivate account'}
+                        className="grid size-8 place-items-center rounded-lg text-[var(--color-mid-gray)] transition-colors hover:bg-[var(--color-secondary)] hover:text-[var(--color-charcoal)] disabled:opacity-50"
+                      >
+                        {u.disabled ? <RotateCcw className="size-4" /> : <Ban className="size-4" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void removeUser(u)}
+                        disabled={saving}
+                        title="Delete account"
+                        aria-label="Delete account"
+                        className="grid size-8 place-items-center rounded-lg text-[var(--color-mid-gray)] transition-colors hover:bg-[var(--color-critical-soft)] hover:text-[var(--color-critical)] disabled:opacity-50"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
               {!isAdminUser && (

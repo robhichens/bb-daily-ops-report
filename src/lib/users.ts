@@ -36,6 +36,7 @@ export interface UserProfile {
   displayName?: string
   email?: string
   dayNotesSeenAt?: string // ISO — last time this user opened Day Notes (nudge sync)
+  disabled?: boolean // deactivated: can't sign in (mirrored from Auth by manage-user)
   /** Per-report grants for NON-admins: 'fill' (submit) or 'view' (read-only).
    *  Admins implicitly have 'fill' on everything; directors implicitly have
    *  'fill' on DDR for their site(s). Managed from Users & Access. */
@@ -163,3 +164,22 @@ export async function inviteUser(
   await sendPasswordResetEmail(auth, email)
   return body as InviteResult
 }
+
+/** Admin-only: deactivate (block sign-in), reactivate, or delete an account.
+ *  Routes to the manage-user Netlify Function (privileged). Delete also removes
+ *  the Firestore profile — use it to clear a mistyped invite. */
+async function manageUser(idToken: string, action: 'disable' | 'enable' | 'delete', uid: string): Promise<void> {
+  const res = await fetch('/api/manage-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ action, uid }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || `Action failed (${res.status})`)
+  }
+}
+
+export const setUserDisabled = (idToken: string, uid: string, disabled: boolean) =>
+  manageUser(idToken, disabled ? 'disable' : 'enable', uid)
+export const deleteUser = (idToken: string, uid: string) => manageUser(idToken, 'delete', uid)
