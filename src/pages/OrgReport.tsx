@@ -2,10 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 import { Check, Lock, Pencil, Loader2, CloudOff, Eye } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
-import { reportAccessLevel } from '@/lib/users'
+import { reportAccessLevel, userSites } from '@/lib/users'
 import { ORG_DEFS, reportMeta } from '@/lib/reportRegistry'
-import { matrixCellKey } from '@/lib/schema'
-import type { FieldKind, MatrixDef, OrgReport as TOrgReport, OrgReportDef, OrgSectionDef } from '@/lib/schema'
+import { matrixCellKey, orgDocId, SITES, siteName } from '@/lib/schema'
+import type {
+  FieldKind, MatrixDef, OrgFieldDef, OrgFieldValue, OrgListItem,
+  OrgReport as TOrgReport, OrgReportDef, OrgSectionDef, OrgSubField, SiteId,
+} from '@/lib/schema'
 import {
   getOrgReport, upsertOrgDraft, submitOrgReport, emptyOrgReport,
 } from '@/lib/orgReports'
@@ -13,7 +16,7 @@ import { todayIso, formatLong } from '@/lib/dates'
 import { weekdayName } from '@/lib/derive'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input, inputClass } from '@/components/ui/input'
 import { NotesLedger } from '@/components/report/NotesLedger'
 import { PrintableReport, PrintButton } from '@/components/report/PrintableReport'
 import { buildOrgPrintModel } from '@/lib/printModel'
@@ -26,6 +29,7 @@ export function OrgReport() {
   const { user, profile } = useAuth()
   const def = ORG_DEFS[key as 'adr' | 'mdr' | 'edr']
   const [date, setDate] = useState(todayIso())
+  const [siteId, setSiteId] = useState<SiteId>(userSites(profile)[0] ?? SITES[0].id)
 
   if (!def) return <Navigate to="/dashboard" replace />
   const access = reportAccessLevel(profile, def.key)
@@ -45,13 +49,16 @@ export function OrgReport() {
         <div>
           <h1 className="text-2xl font-extrabold text-[var(--color-charcoal)]">{def.title}</h1>
           <p className="text-sm text-[var(--color-dk-gray)]">
-            {formatLong(date)} · org-wide{readOnly && ' · view only'}
+            {formatLong(date)} · {def.siteScoped ? siteName(siteId) : 'org-wide'}{readOnly && ' · view only'}
           </p>
         </div>
         <PrintButton className="ml-auto" />
       </div>
 
-      <OrgForm def={def} date={date} onDate={setDate} uid={user?.uid ?? ''} author={author} readOnly={readOnly} />
+      <OrgForm
+        def={def} date={date} onDate={setDate} siteId={siteId} onSiteId={setSiteId}
+        uid={user?.uid ?? ''} author={author} readOnly={readOnly}
+      />
       <div className="print:hidden">
         <NotesLedger source={def.key} author={author} uid={user?.uid ?? ''} readOnly={readOnly} />
       </div>
@@ -60,11 +67,13 @@ export function OrgReport() {
 }
 
 function OrgForm({
-  def, date, onDate, uid, author, readOnly,
+  def, date, onDate, siteId, onSiteId, uid, author, readOnly,
 }: {
   def: OrgReportDef
   date: string
   onDate: (d: string) => void
+  siteId: SiteId
+  onSiteId: (s: SiteId) => void
   uid: string
   author: string
   readOnly: boolean
@@ -80,18 +89,27 @@ function OrgForm({
     setLoading(true); setEditing(false); setSaveState('idle')
     ;(async () => {
       let remote: TOrgReport | null = null
-      try { remote = await getOrgReport(def.collection, date) } catch { /* offline */ }
+      try { remote = await getOrgReport(def.collection, orgDocId(def, date, siteId)) } catch { /* offline */ }
       if (!cancelled) {
-        setDraft(remote ?? emptyOrgReport(def, date, uid))
+        setDraft(remote ?? emptyOrgReport(def, date, uid, siteId))
         setLoading(false)
       }
     })()
     return () => { cancelled = true; if (saveTimer.current) clearTimeout(saveTimer.current) }
-  }, [def, date, uid])
+  }, [def, date, siteId, uid])
 
   const locked = readOnly || (!!draft && draft.status === 'submitted' && !editing)
 
-  const setField = useCallback((section: string, field: string, value: number | string) => {
+  const queueSave = useCallback((next: TOrgReport) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    setSaveState('saving')
+    saveTimer.current = setTimeout(async () => {
+      try { await upsertOrgDraft(def.collection, next); setSaveState('saved') }
+      catch { setSaveState('error') }
+    }, 700)
+  }, [def.collection])
+
+  const setField = useCallback((section: string, field: string, value: OrgFieldValue) => {
     setDraft((prev) => {
       if (!prev) return prev
       const next: TOrgReport = {
@@ -99,15 +117,19 @@ function OrgForm({
         completedBy: prev.completedBy || author,
         data: { ...prev.data, [section]: { ...prev.data[section], [field]: value } },
       }
-      if (saveTimer.current) clearTimeout(saveTimer.current)
-      setSaveState('saving')
-      saveTimer.current = setTimeout(async () => {
-        try { await upsertOrgDraft(def.collection, next); setSaveState('saved') }
-        catch { setSaveState('error') }
-      }, 700)
+      queueSave(next)
       return next
     })
-  }, [author, def.collection])
+  }, [author, queueSave])
+
+  const setCompletedBy = useCallback((name: string) => {
+    setDraft((prev) => {
+      if (!prev) return prev
+      const next = { ...prev, completedBy: name }
+      queueSave(next)
+      return next
+    })
+  }, [queueSave])
 
   async function handleSubmit() {
     if (!draft) return
@@ -129,11 +151,38 @@ function OrgForm({
     <>
     <div className="space-y-5 print:hidden">
       <Card accent="gray" className="flex flex-wrap items-end justify-between gap-4 p-5">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">Date</span>
-          <Input type="date" value={date} onChange={(e) => onDate(e.target.value)} className="w-auto" />
-          <span className="text-xs text-[var(--color-mid-gray)]">{weekdayName(date)}</span>
-        </label>
+        <div className="flex flex-wrap items-end gap-4">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">Date</span>
+            <Input type="date" value={date} onChange={(e) => onDate(e.target.value)} className="w-auto" />
+            <span className="text-xs text-[var(--color-mid-gray)]">{weekdayName(date)}</span>
+          </label>
+          {def.siteScoped && (
+            <>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">Campus</span>
+                <select
+                  value={siteId}
+                  disabled={readOnly}
+                  onChange={(e) => onSiteId(e.target.value as SiteId)}
+                  className={cn(inputClass, 'w-auto')}
+                >
+                  {SITES.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">Name</span>
+                <Input
+                  value={draft.completedBy}
+                  disabled={locked}
+                  placeholder="Who’s filing this"
+                  onChange={(e) => setCompletedBy(e.target.value)}
+                  className="w-auto"
+                />
+              </label>
+            </>
+          )}
+        </div>
         {readOnly ? (
           <span className="flex items-center gap-2 text-sm font-semibold text-[var(--color-dk-gray)]"><Eye className="size-4" /> View only</span>
         ) : submitted && (
@@ -170,9 +219,11 @@ function SectionCard({
   section: OrgSectionDef
   draft: TOrgReport
   locked: boolean
-  setField: (section: string, field: string, value: number | string) => void
+  setField: (section: string, field: string, value: OrgFieldValue) => void
 }) {
   const vals = draft.data[section.key] ?? {}
+  // Conditional fields (e.g. a "reason" shown only when a toggle is No).
+  const visible = section.fields.filter((f) => !f.showWhen || vals[f.showWhen.key] === f.showWhen.equals)
   return (
     <Card accent={def.accent} className="p-5">
       <div className="mb-4">
@@ -188,12 +239,11 @@ function SectionCard({
         />
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {section.fields.map((f) => (
-            <ValueField
+          {visible.map((f) => (
+            <OrgField
               key={f.key}
-              label={f.label}
-              kind={f.kind}
-              value={vals[f.key] ?? (f.kind === 'text' ? '' : 0)}
+              field={f}
+              value={vals[f.key]}
               disabled={locked}
               onChange={(v) => setField(section.key, f.key, v)}
             />
@@ -215,13 +265,152 @@ function SectionCard({
   )
 }
 
+/** Dispatches one field to the right control based on its kind. */
+function OrgField({
+  field, value, disabled, onChange,
+}: {
+  field: OrgFieldDef
+  value: OrgFieldValue | undefined
+  disabled: boolean
+  onChange: (v: OrgFieldValue) => void
+}) {
+  if (field.kind === 'toggle') {
+    return <ToggleField label={field.label} value={value === true} disabled={disabled} onChange={onChange} />
+  }
+  if (field.kind === 'list') {
+    return (
+      <ListField
+        label={field.label}
+        subFields={field.subFields ?? []}
+        items={Array.isArray(value) ? (value as OrgListItem[]) : []}
+        disabled={disabled}
+        onChange={onChange}
+      />
+    )
+  }
+  const scalar = typeof value === 'number' || typeof value === 'string' ? value : field.kind === 'text' ? '' : 0
+  return <ValueField label={field.label} kind={field.kind} value={scalar} disabled={disabled} onChange={(v) => onChange(v)} />
+}
+
+/** Yes/No toggle (mirrors the DDR's Director Packet). Full-width in the grid. */
+function ToggleField({
+  label, value, disabled, onChange,
+}: {
+  label: string
+  value: boolean
+  disabled: boolean
+  onChange: (v: boolean) => void
+}) {
+  return (
+    <div className="col-span-2 flex flex-wrap items-center justify-between gap-3 sm:col-span-3 lg:col-span-4">
+      <span className="text-sm font-semibold text-[var(--color-charcoal)]">{label}</span>
+      <div className="inline-flex rounded-lg border border-[var(--color-border)] bg-white p-0.5">
+        {[{ label: 'Yes', val: true }, { label: 'No', val: false }].map((opt) => {
+          const active = value === opt.val
+          return (
+            <button
+              key={opt.label}
+              type="button"
+              disabled={disabled}
+              onClick={() => onChange(opt.val)}
+              className="rounded-md px-5 py-1.5 text-sm font-bold transition-colors disabled:cursor-not-allowed"
+              style={
+                active
+                  ? opt.val
+                    ? { background: 'var(--color-good)', color: 'white' }
+                    : { background: 'var(--color-coral)', color: 'white' }
+                  : { color: 'var(--color-dk-gray)' }
+              }
+            >
+              {opt.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/** Repeating named rows that auto-add a blank row as you type. Full-width. */
+function ListField({
+  label, subFields, items, disabled, onChange,
+}: {
+  label: string
+  subFields: OrgSubField[]
+  items: OrgListItem[]
+  disabled: boolean
+  onChange: (v: OrgListItem[]) => void
+}) {
+  const display = disabled ? items : [...items, {} as OrgListItem]
+  const setCell = (i: number, key: string, v: string) => {
+    const next = display.map((it, idx) => (idx === i ? { ...it, [key]: v } : { ...it }))
+    // Keep only rows with at least one non-empty value; the trailing blank re-appears on render.
+    onChange(next.filter((it) => Object.values(it).some((val) => (val ?? '').trim() !== '')))
+  }
+  const cols = subFields.length >= 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
+  return (
+    <div className="col-span-2 sm:col-span-3 lg:col-span-4">
+      <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">{label}</span>
+      {display.length > 0 && (
+        <div className="mt-2 space-y-2">
+          {display.map((item, i) => (
+            <div key={i} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-secondary)]/50 p-2.5">
+              <div className="flex items-start gap-2.5">
+                <span className="mt-1 grid size-5 shrink-0 place-items-center rounded-full bg-[var(--color-coral-soft)] text-[10px] font-bold text-[var(--color-coral-dark)]">
+                  {i + 1}
+                </span>
+                <div className={cn('grid flex-1 gap-2', cols)}>
+                  {subFields.map((sf) => {
+                    const val = item[sf.key] ?? ''
+                    const options =
+                      sf.optionSet === 'sites'
+                        ? SITES.map((s) => ({ value: s.id as string, label: s.name }))
+                        : (sf.options ?? []).map((o) => ({ value: o, label: o }))
+                    return (
+                      <div key={sf.key} className="flex flex-col">
+                        {sf.type === 'select' ? (
+                          <select
+                            value={val}
+                            disabled={disabled}
+                            onChange={(e) => setCell(i, sf.key, e.target.value)}
+                            className={cn(inputClass, 'h-9')}
+                          >
+                            <option value="">Select…</option>
+                            {options.map((o) => (
+                              <option key={o.value} value={o.value}>{o.label}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <Input
+                            value={val}
+                            disabled={disabled}
+                            onChange={(e) => setCell(i, sf.key, e.target.value)}
+                            className="h-9"
+                          />
+                        )}
+                        <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--color-mid-gray)]">
+                          {sf.label}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /** Row (e.g. classroom) × column (e.g. site) number grid. Cell values live
  *  flat in the section's data, keyed by `matrixCellKey(colKey, rowKey)`. */
 function MatrixGrid({
   matrix, vals, disabled, onChange,
 }: {
   matrix: MatrixDef
-  vals: Record<string, number | string>
+  vals: Record<string, OrgFieldValue>
   disabled: boolean
   onChange: (cellKey: string, value: number) => void
 }) {

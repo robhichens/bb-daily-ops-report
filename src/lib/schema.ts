@@ -379,13 +379,30 @@ export const totalDeposits = (loc: FinanceLocation): number =>
 export type ReportKey = 'ddr' | 'fdr' | 'adr' | 'mdr' | 'edr';
 export type ReportAccessLevel = 'view' | 'fill';
 
-/** Field input kinds. dollar/count clamp ≥ 0; number allows decimals + negatives. */
-export type FieldKind = 'dollar' | 'count' | 'number' | 'text';
+/** Field input kinds. dollar/count clamp ≥ 0; number allows decimals + negatives;
+ *  text is free text; toggle is a Yes/No boolean; list is a set of repeating
+ *  named rows (subFields) that auto-adds a blank row as you type. */
+export type FieldKind = 'dollar' | 'count' | 'number' | 'text' | 'toggle' | 'list';
+
+/** One column inside a `list` field's row. `optionSet: 'sites'` renders a campus
+ *  dropdown from SITES (stored value = SiteId); `options` is a static select. */
+export interface OrgSubField {
+  key: string;
+  label: string;
+  type: 'text' | 'select';
+  optionSet?: 'sites';
+  options?: string[];
+}
 
 export interface OrgFieldDef {
   key: string;
   label: string;
   kind: FieldKind;
+  /** kind 'list': the columns each row captures. */
+  subFields?: OrgSubField[];
+  /** Render this field only when another field in the same section equals a value
+   *  (e.g. a reason text that shows only when a toggle is set to No). */
+  showWhen?: { key: string; equals: string | number | boolean };
 }
 
 /** A row × column number grid (e.g. classrooms × sites). Renders instead of
@@ -414,22 +431,37 @@ export interface OrgReportDef {
   collection: string;      // e.g. 'admissionsReports'
   notesCollection: string; // e.g. 'admissionsNotes'
   sections: OrgSectionDef[];
+  /** When true the report is filed PER CAMPUS: the header shows a Name + Campus
+   *  picker and each site/day gets its own doc (`${siteId}_${date}`), so multiple
+   *  co-directors don't overwrite one shared day. Used by the CDR. */
+  siteScoped?: boolean;
 }
 
-/** One org-report doc (one per DAY). `data[sectionKey][fieldKey]` holds values. */
+/** One row of a `list` field, keyed by OrgSubField.key. */
+export type OrgListItem = Record<string, string>;
+/** Any value a config-driven report field can hold. */
+export type OrgFieldValue = number | string | boolean | OrgListItem[];
+
+/** One org-report doc. Per DAY, or per (campus, day) when the def is siteScoped.
+ *  `data[sectionKey][fieldKey]` holds the values. */
 export interface OrgReport {
-  id: string;     // = date 'YYYY-MM-DD'
+  id: string;     // date 'YYYY-MM-DD', or `${siteId}_${date}` when siteScoped
   date: string;
   day: string;
   weekOf: string;
+  siteId?: SiteId | null; // set when the report's def is siteScoped
   completedBy: string;
-  data: Record<string, Record<string, number | string>>;
+  data: Record<string, Record<string, OrgFieldValue>>;
   status: 'draft' | 'submitted';
   submittedAt: string | null;
   createdAt: string;
   updatedAt: string;
   createdByUid: string;
 }
+
+/** Doc id for a config-driven report: per-campus when siteScoped, else per-day. */
+export const orgDocId = (def: OrgReportDef, date: string, siteId?: SiteId | null): string =>
+  def.siteScoped && siteId ? `${siteId}_${date}` : date;
 
 /** One message in any Flags-&-Notes ledger thread. */
 export interface LedgerNoteComment {

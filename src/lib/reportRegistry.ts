@@ -12,7 +12,7 @@
 
 import { ClipboardList, Wallet, Ticket, Users } from 'lucide-react'
 import { CLASSROOMS, SITES } from './schema'
-import type { OrgReportDef, ReportKey } from './schema'
+import type { OrgReportDef, OrgSubField, ReportKey } from './schema'
 
 export interface ReportMeta {
   key: ReportKey
@@ -73,12 +73,17 @@ const ADR: OrgReportDef = {
   ],
 }
 
+// Reusable list sub-fields for the CDR.
+const NAME_SF: OrgSubField = { key: 'name', label: 'Name', type: 'text' }
+const CAMPUS_SF: OrgSubField = { key: 'campus', label: 'Campus', type: 'select', optionSet: 'sites' }
+
 // CDR — Co-Director Daily Report (Front Desk / Office Manager / Assistant Director).
 // Repurposed from the retired Executive report, so its key stays 'edr' and it writes
-// to executiveReports / executiveNotes (no rules change). Kept deliberately lean per
-// Rob: a few counts per area plus one note. The Facility checklist collapses into a
-// single confirm-and-list-exceptions note — the engine has no checkbox field by design,
-// which keeps the daily report fast rather than a 30-field chore.
+// to executiveReports / executiveNotes (no rules change). siteScoped: one co-director
+// per campus, so each files their own day (header Name + Campus; doc = site_date).
+// Hiring & Social use named line-lists with a per-row campus (a co-director may cover
+// another school). Facility & Closing is a Yes/No toggle + a reason shown only on No
+// (mirrors the DDR's Director Packet). Kept lean per Rob — no checkbox sprawl.
 const CDR: OrgReportDef = {
   key: 'edr',
   short: 'CDR',
@@ -86,6 +91,7 @@ const CDR: OrgReportDef = {
   accent: 'sky',
   collection: 'executiveReports',
   notesCollection: 'executiveNotes',
+  siteScoped: true,
   sections: [
     { key: 'communication', title: 'Communication', hint: 'Emails & voicemails handled today — list any urgent emails (who & what) in the note', fields: [
       { key: 'emails', label: 'Emails answered', kind: 'count' },
@@ -97,17 +103,23 @@ const CDR: OrgReportDef = {
       { key: 'toursDone', label: 'Tours completed', kind: 'count' },
       { key: 'toursScheduled', label: 'Tours scheduled', kind: 'count' },
     ], note: true },
-    { key: 'hiring', title: 'Hiring', hint: 'Pipeline movement — names, interviews & offers out go in the note', fields: [
+    { key: 'hiring', title: 'Hiring', hint: 'Count new applicants; add a named row for each phone screen, interview & onboard — tag the campus if it was for another school', fields: [
       { key: 'applicants', label: 'New applicants', kind: 'count' },
-      { key: 'phoneScreens', label: 'Phone screens', kind: 'count' },
-      { key: 'interviews', label: 'Interviews', kind: 'count' },
-      { key: 'onboarded', label: 'Oriented / onboarded', kind: 'count' },
+      { key: 'phoneScreens', label: 'Phone screens', kind: 'list', subFields: [NAME_SF, CAMPUS_SF] },
+      { key: 'interviews', label: 'Interviews', kind: 'list', subFields: [NAME_SF, CAMPUS_SF] },
+      { key: 'onboarded', label: 'Oriented / onboarded', kind: 'list', subFields: [NAME_SF, CAMPUS_SF] },
     ], note: true },
-    { key: 'social', title: 'Social', hint: 'Facebook activity — note the headline and which page', fields: [
-      { key: 'posts', label: 'FB posts', kind: 'count' },
-      { key: 'events', label: 'FB events', kind: 'count' },
+    { key: 'social', title: 'Social', hint: 'One row per Facebook post or event — the headline, which page, and the campus it was for', fields: [
+      { key: 'posts', label: 'Facebook posts & events', kind: 'list', subFields: [
+        { key: 'what', label: 'Headline / what', type: 'text' },
+        { key: 'page', label: 'FB page', type: 'text' },
+        CAMPUS_SF,
+      ] },
     ], note: true },
-    { key: 'facility', title: 'Facility & Closing', hint: 'Whiteboards, lobby, trash, 4:30 playground & room check, tour-ready — confirm the walkthrough is done and list any exceptions in the note', fields: [], note: true },
+    { key: 'facility', title: 'Facility & Closing', hint: 'Whiteboards, lobby, trash, 4:30 playground & room check, tour-ready', fields: [
+      { key: 'complete', label: 'Closing checklist complete?', kind: 'toggle' },
+      { key: 'reason', label: 'What got in the way?', kind: 'text', showWhen: { key: 'complete', equals: false } },
+    ] },
     { key: 'tasks', title: 'Tasks & Projects', hint: 'Director-binder tasks (matrix / day-of-week / 1–31), minutes in a classroom + why, and projects assigned or completed', fields: [], note: true },
   ],
 }

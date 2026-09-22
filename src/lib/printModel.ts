@@ -6,7 +6,7 @@
 import {
   ENROLLMENT_FIELDS, STAFF_FIELDS, SITES, countNoteSummary, matrixCellKey, siteName,
   type DailyOpsReport, type EnrollmentMarketing, type Staff,
-  type FinanceReport, type OrgReport, type OrgReportDef,
+  type FinanceReport, type OrgListItem, type OrgReport, type OrgReportDef, type SiteId,
   totalBilling, totalOutstanding, subtotalDeposits, totalDeposits,
 } from './schema'
 import { formatLong } from './dates'
@@ -132,6 +132,7 @@ export function buildFdrPrintModel(r: FinanceReport): PrintModel {
 // --- ADR / MDR / EDR (config-driven) ----------------------------------------
 
 export function buildOrgPrintModel(def: OrgReportDef, r: OrgReport): PrintModel {
+  const submitted = r.status === 'submitted'
   const sections: PrintSection[] = def.sections.map((s) => {
     const vals = r.data[s.key] ?? {}
     const blocks: PrintBlock[] = []
@@ -145,13 +146,31 @@ export function buildOrgPrintModel(def: OrgReportDef, r: OrgReport): PrintModel 
         ]),
       } })
     } else {
-      blocks.push({ kind: 'fields', fields: s.fields.map((f) => {
-        const v = vals[f.key]
-        let value = ''
-        if (f.kind === 'text') value = v ? String(v) : ''
-        else { const n = typeof v === 'number' ? v : Number(v || 0); value = n ? (f.kind === 'dollar' ? moneyStr(n) : String(n)) : '' }
-        return { label: f.label, value }
-      }) })
+      // Scalar fields (count/dollar/number/text/toggle) render as a fields block;
+      // each list field renders as its own table below.
+      const scalar = s.fields.filter((f) => f.kind !== 'list')
+      const lists = s.fields.filter((f) => f.kind === 'list')
+      if (scalar.length) {
+        blocks.push({ kind: 'fields', fields: scalar.map((f) => {
+          const v = vals[f.key]
+          let value = ''
+          if (f.kind === 'toggle') value = submitted ? (v ? 'Yes' : 'No') : ''
+          else if (f.kind === 'text') value = v ? String(v) : ''
+          else { const n = typeof v === 'number' ? v : Number(v || 0); value = n ? (f.kind === 'dollar' ? moneyStr(n) : String(n)) : '' }
+          return { label: f.label, value }
+        }) })
+      }
+      for (const f of lists) {
+        const items = Array.isArray(vals[f.key]) ? (vals[f.key] as OrgListItem[]) : []
+        const subs = f.subFields ?? []
+        blocks.push({ kind: 'table', table: {
+          columns: subs.map((sf) => sf.label),
+          rows: items
+            .map((it) => subs.map((sf) => (sf.optionSet === 'sites' && it[sf.key] ? siteName(it[sf.key] as SiteId) : (it[sf.key] ?? ''))))
+            .filter((row) => row.some((cell) => cell.trim() !== '')),
+          minRows: 3,
+        } })
+      }
     }
     if (s.note) blocks.push({ kind: 'note', label: 'Note', value: String(vals.note ?? '') })
     return { title: s.title, hint: s.hint, blocks }
@@ -159,7 +178,11 @@ export function buildOrgPrintModel(def: OrgReportDef, r: OrgReport): PrintModel 
   return {
     reportName: def.title,
     short: def.short,
-    meta: [...dateMeta(r.date), { label: 'Completed by', value: r.completedBy }],
+    meta: [
+      ...(def.siteScoped && r.siteId ? [{ label: 'Campus', value: siteName(r.siteId) }] : []),
+      ...dateMeta(r.date),
+      { label: 'Completed by', value: r.completedBy },
+    ],
     sections,
   }
 }

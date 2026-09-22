@@ -1,7 +1,8 @@
 // src/lib/orgReports.ts
-// Generic Firestore layer for the config-driven org reports (ADR/MDR/EDR).
+// Generic Firestore layer for the config-driven org reports (ADR/CDR).
 // Each report has two collections named in its OrgReportDef:
-//   • <collection>       — one doc per DAY (id = 'YYYY-MM-DD'); the field values.
+//   • <collection>       — one doc per DAY (id = 'YYYY-MM-DD'), or per (campus, day)
+//                          (id = `${siteId}_${date}`) when the def is siteScoped.
 //   • <notesCollection>  — one doc per note; the running Flags & Notes ledger.
 // All admin/assignment gating is enforced in firestore.rules.
 
@@ -23,26 +24,31 @@ import {
 import { where } from 'firebase/firestore'
 import { db } from './firebase'
 import { weekOf as weekOfFn, weekdayName } from './derive'
-import { siteName } from './schema'
-import type { LedgerNote, LedgerNoteComment, OrgReport, OrgReportDef, ReportKey, RequestList, RequestTag, SiteId } from './schema'
+import { orgDocId, siteName } from './schema'
+import type { FieldKind, LedgerNote, LedgerNoteComment, OrgFieldValue, OrgReport, OrgReportDef, ReportKey, RequestList, RequestTag, SiteId } from './schema'
 import type { RequestItem } from './reports'
 
 // --- Daily report doc -------------------------------------------------------
 
-const reportRef = (col: string, date: string) => doc(db, col, date)
+const reportRef = (col: string, id: string) => doc(db, col, id)
 
-/** A blank report for a def/date — every field seeded (0 for numeric, '' text). */
-export function emptyOrgReport(def: OrgReportDef, date: string, uid = ''): OrgReport {
+/** Blank value for a field kind: '' text, false toggle, [] list, 0 numeric. */
+const seedFor = (kind: FieldKind): OrgFieldValue =>
+  kind === 'text' ? '' : kind === 'toggle' ? false : kind === 'list' ? [] : 0
+
+/** A blank report for a def/date (and campus, when siteScoped) — every field seeded. */
+export function emptyOrgReport(def: OrgReportDef, date: string, uid = '', siteId: SiteId | null = null): OrgReport {
   const now = new Date().toISOString()
-  const data: Record<string, Record<string, number | string>> = {}
+  const data: Record<string, Record<string, OrgFieldValue>> = {}
   for (const s of def.sections) {
     data[s.key] = {}
-    for (const f of s.fields) data[s.key][f.key] = f.kind === 'text' ? '' : 0
+    for (const f of s.fields) data[s.key][f.key] = seedFor(f.kind)
     if (s.note) data[s.key].note = ''
   }
   return {
-    id: date, date, day: '', weekOf: '', completedBy: '',
-    data,
+    id: orgDocId(def, date, siteId), date, day: '', weekOf: '',
+    siteId: def.siteScoped ? siteId : null,
+    completedBy: '', data,
     status: 'draft', submittedAt: null, createdAt: now, updatedAt: now, createdByUid: uid,
   }
 }
@@ -61,8 +67,8 @@ export function subscribeOrgReport(
   )
 }
 
-export async function getOrgReport(col: string, date: string): Promise<OrgReport | null> {
-  const snap = await getDoc(reportRef(col, date))
+export async function getOrgReport(col: string, docId: string): Promise<OrgReport | null> {
+  const snap = await getDoc(reportRef(col, docId))
   return snap.exists() ? (snap.data() as OrgReport) : null
 }
 
@@ -72,7 +78,7 @@ export async function upsertOrgDraft(col: string, report: OrgReport): Promise<vo
     status: report.status === 'submitted' ? 'submitted' : 'draft',
     updatedAt: new Date().toISOString(),
   }
-  await setDoc(reportRef(col, payload.date), payload, { merge: true })
+  await setDoc(reportRef(col, payload.id), payload, { merge: true })
 }
 
 export async function submitOrgReport(col: string, report: OrgReport, uid: string): Promise<void> {
@@ -82,7 +88,7 @@ export async function submitOrgReport(col: string, report: OrgReport, uid: strin
     status: 'submitted', submittedAt: now, updatedAt: now,
     createdByUid: report.createdByUid || uid,
   }
-  await setDoc(reportRef(col, payload.date), payload, { merge: true })
+  await setDoc(reportRef(col, payload.id), payload, { merge: true })
 }
 
 // --- Flags & Notes — ONE central ledger for every report --------------------
