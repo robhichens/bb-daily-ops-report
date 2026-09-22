@@ -13,7 +13,7 @@ import { formatLong } from './dates'
 import { weekdayName } from './derive'
 
 export interface PrintField { label: string; value?: string }
-export interface PrintTable { columns: string[]; rows: string[][]; minRows?: number }
+export interface PrintTable { label?: string; columns: string[]; rows: string[][]; minRows?: number }
 export type PrintBlock =
   | { kind: 'fields'; fields: PrintField[] }
   | { kind: 'table'; table: PrintTable }
@@ -164,6 +164,7 @@ export function buildOrgPrintModel(def: OrgReportDef, r: OrgReport): PrintModel 
         const items = Array.isArray(vals[f.key]) ? (vals[f.key] as OrgListItem[]) : []
         const subs = f.subFields ?? []
         blocks.push({ kind: 'table', table: {
+          label: f.label,
           columns: subs.map((sf) => sf.label),
           rows: items
             .map((it) => subs.map((sf) => (sf.optionSet === 'sites' && it[sf.key] ? siteName(it[sf.key] as SiteId) : (it[sf.key] ?? ''))))

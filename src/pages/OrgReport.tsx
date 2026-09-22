@@ -350,7 +350,7 @@ function ListField({
   const cols = subFields.length >= 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
   return (
     <div className="col-span-2 sm:col-span-3 lg:col-span-4">
-      <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">{label}</span>
+      {label && <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">{label}</span>}
       {display.length > 0 && (
         <div className="mt-2 space-y-2">
           {display.map((item, i) => (

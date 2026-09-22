@@ -97,9 +97,10 @@ const CDR: OrgReportDef = {
       { key: 'emails', label: 'Emails answered', kind: 'count' },
       { key: 'voicemails', label: 'Voicemails returned', kind: 'count' },
     ], note: true },
-    { key: 'enrollment', title: 'Enrollment / IKS', hint: 'Leads, calls & tours — put names and follow-ups in the note', fields: [
+    { key: 'enrollment', title: 'Enrollment / IKS', hint: 'Leads, calls, texts & tours — put names and follow-ups in the note', fields: [
       { key: 'newLeads', label: 'New leads', kind: 'count' },
       { key: 'iksCalls', label: 'IKS calls made', kind: 'count' },
+      { key: 'textsSent', label: 'Text messages sent', kind: 'count' },
       { key: 'toursDone', label: 'Tours completed', kind: 'count' },
       { key: 'toursScheduled', label: 'Tours scheduled', kind: 'count' },
     ], note: true },
@@ -120,7 +121,13 @@ const CDR: OrgReportDef = {
       { key: 'complete', label: 'Closing checklist complete?', kind: 'toggle' },
       { key: 'reason', label: 'What got in the way?', kind: 'text', showWhen: { key: 'complete', equals: false } },
     ] },
-    { key: 'tasks', title: 'Tasks & Projects', hint: 'Director-binder tasks (matrix / day-of-week / 1–31), minutes in a classroom + why, and projects assigned or completed', fields: [], note: true },
+    { key: 'tasks', title: 'Tasks & Projects', hint: 'One row per task, project, or classroom coverage — pick the type, give it a title, and say what you did (if covering a room: which room & why)', fields: [
+      { key: 'items', label: '', kind: 'list', subFields: [
+        { key: 'type', label: 'Type', type: 'select', options: ['Task', 'Project', 'Classroom coverage'] },
+        { key: 'title', label: 'Title', type: 'text' },
+        { key: 'details', label: 'What you did', type: 'text' },
+      ] },
+    ] },
   ],
 }
 

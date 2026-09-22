@@ -34,6 +34,19 @@ describe('CDR (Co-Director Daily Report) config', () => {
     expect(posts.subFields?.map((sf) => sf.key)).toEqual(['what', 'page', 'campus'])
   })
 
+  it('enrollment tracks texts sent', () => {
+    const enroll = CDR.sections.find((s) => s.key === 'enrollment')!
+    expect(enroll.fields.find((f) => f.key === 'textsSent')?.kind).toBe('count')
+  })
+
+  it('tasks & projects is a typed line list (task / project / classroom coverage)', () => {
+    const tasks = CDR.sections.find((s) => s.key === 'tasks')!
+    const items = tasks.fields.find((f) => f.key === 'items')!
+    expect(items.kind).toBe('list')
+    expect(items.subFields?.map((sf) => sf.key)).toEqual(['type', 'title', 'details'])
+    expect(items.subFields?.find((sf) => sf.key === 'type')?.options).toContain('Classroom coverage')
+  })
+
   it('facility is a Yes/No toggle with a reason shown only on No', () => {
     const fac = CDR.sections.find((s) => s.key === 'facility')!
     expect(fac.fields.find((f) => f.key === 'complete')?.kind).toBe('toggle')
@@ -65,6 +78,8 @@ describe('CDR print model', () => {
     expect(model.meta.find((m) => m.label === 'Campus')?.value).toBe('Crozet')
 
     const hiring = model.sections.find((s) => s.title === 'Hiring')!
+    // Each list prints under its own subheading (the bug fix: was anonymous on the PDF).
+    expect(table(hiring.blocks)?.table.label).toBe('Phone screens')
     expect(table(hiring.blocks)?.table.rows[0]).toEqual(['Mia Heaton', 'Forest Lakes'])
 
     const fac = model.sections.find((s) => s.title === 'Facility & Closing')!

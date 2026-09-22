@@ -72,7 +72,9 @@ function Block({ block }: { block: PrintBlock }) {
     const count = Math.max(t.rows.length, t.minRows ?? 0)
     const rows = Array.from({ length: count }, (_, i) => t.rows[i] ?? t.columns.map(() => ''))
     return (
-      <table className="w-full border-collapse text-[11.5px]">
+      <div className="space-y-1">
+        {t.label && <div className="text-[12px] font-semibold">{t.label}</div>}
+        <table className="w-full border-collapse text-[11.5px]">
         <thead>
           <tr>
             {t.columns.map((c, i) => (
@@ -89,7 +91,8 @@ function Block({ block }: { block: PrintBlock }) {
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </div>
     )
   }
 
