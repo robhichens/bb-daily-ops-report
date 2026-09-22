@@ -1,10 +1,16 @@
 // src/lib/reportRegistry.ts
-// The report suite: metadata for all five reports (nav dropdown + routing) and
-// the field definitions for the three config-driven org reports (ADR/MDR/EDR).
-// DDR (/report) and FDR (/finance) keep their bespoke pages; ADR/MDR/EDR render
-// through the generic OrgReport engine at /r/:key.
+// The report suite: metadata for the active reports (nav dropdown + routing) and
+// the field definitions for the config-driven org reports (ADR/CDR). DDR (/report)
+// and FDR (/finance) keep their bespoke pages; ADR/CDR render through the generic
+// OrgReport engine at /r/:key.
+//
+// CDR (Co-Director Daily Report) is built on the RETIRED Executive report's slot:
+// it deliberately keeps the internal key 'edr' and the Firestore collections
+// 'executiveReports' / 'executiveNotes', so NO firestore.rules change is needed —
+// only its labels and sections changed. MDR (Marketing) was retired 2026-09-21
+// (its work is covered by the CDR); removed from the nav and the engine.
 
-import { ClipboardList, Wallet, Ticket, Megaphone, Compass } from 'lucide-react'
+import { ClipboardList, Wallet, Ticket, Users } from 'lucide-react'
 import { CLASSROOMS, SITES } from './schema'
 import type { OrgReportDef, ReportKey } from './schema'
 
@@ -19,15 +25,14 @@ export interface ReportMeta {
 
 export const REPORTS: ReportMeta[] = [
   { key: 'ddr', short: 'DDR', title: 'Director Daily Report', icon: ClipboardList, route: '/report', kind: 'ddr' },
+  { key: 'edr', short: 'CDR', title: 'Co-Director Daily Report', icon: Users, route: '/r/edr', kind: 'org' },
   { key: 'adr', short: 'ADR', title: 'Admissions Daily Report', icon: Ticket, route: '/r/adr', kind: 'org' },
-  { key: 'mdr', short: 'MDR', title: 'Marketing Daily Report', icon: Megaphone, route: '/r/mdr', kind: 'org' },
-  { key: 'edr', short: 'EDR', title: 'Executive Daily Report', icon: Compass, route: '/r/edr', kind: 'org' },
   { key: 'fdr', short: 'FDR', title: 'Finance Daily Report', icon: Wallet, route: '/finance', kind: 'fdr' },
 ]
 
 export const reportMeta = (key: ReportKey): ReportMeta | undefined => REPORTS.find((r) => r.key === key)
 
-// --- The three config-driven org reports -----------------------------------
+// --- The config-driven org reports -----------------------------------------
 
 const ADR: OrgReportDef = {
   key: 'adr',
@@ -68,64 +73,43 @@ const ADR: OrgReportDef = {
   ],
 }
 
-const MDR: OrgReportDef = {
-  key: 'mdr',
-  short: 'MDR',
-  title: 'Marketing Daily Report',
-  accent: 'coral',
-  collection: 'marketingReports',
-  notesCollection: 'marketingNotes',
-  sections: [
-    { key: 'leads', title: 'Leads Generated', hint: 'Total + channel split in the note', fields: [
-      { key: 'total', label: 'Leads', kind: 'count' },
-    ], note: true },
-    { key: 'spend', title: 'Ad Spend', fields: [
-      { key: 'amount', label: 'Spend today', kind: 'dollar' },
-    ], note: true },
-    { key: 'inbound', title: 'Inbound', fields: [
-      { key: 'formFills', label: 'Website form fills', kind: 'count' },
-      { key: 'calls', label: 'Marketing calls', kind: 'count' },
-    ], note: true },
-    { key: 'social', title: 'Social', fields: [
-      { key: 'posts', label: 'Posts published', kind: 'count' },
-    ], note: true },
-    { key: 'reputation', title: 'Reputation', hint: 'Reviews & referrals', fields: [
-      { key: 'reviewsRequested', label: 'Reviews requested', kind: 'count' },
-      { key: 'reviewsReceived', label: 'Reviews received', kind: 'count' },
-      { key: 'avgRating', label: 'Avg rating', kind: 'number' },
-      { key: 'referrals', label: 'Referrals in', kind: 'count' },
-    ], note: true },
-  ],
-}
-
-const EDR: OrgReportDef = {
+// CDR — Co-Director Daily Report (Front Desk / Office Manager / Assistant Director).
+// Repurposed from the retired Executive report, so its key stays 'edr' and it writes
+// to executiveReports / executiveNotes (no rules change). Kept deliberately lean per
+// Rob: a few counts per area plus one note. The Facility checklist collapses into a
+// single confirm-and-list-exceptions note — the engine has no checkbox field by design,
+// which keeps the daily report fast rather than a 30-field chore.
+const CDR: OrgReportDef = {
   key: 'edr',
-  short: 'EDR',
-  title: 'Executive Daily Report',
-  accent: 'gray',
+  short: 'CDR',
+  title: 'Co-Director Daily Report',
+  accent: 'sky',
   collection: 'executiveReports',
   notesCollection: 'executiveNotes',
   sections: [
-    { key: 'attendance', title: 'Attendance', fields: [
-      { key: 'total', label: 'Total across sites', kind: 'count' },
+    { key: 'communication', title: 'Communication', hint: 'Emails & voicemails handled today — list any urgent emails (who & what) in the note', fields: [
+      { key: 'emails', label: 'Emails answered', kind: 'count' },
+      { key: 'voicemails', label: 'Voicemails returned', kind: 'count' },
     ], note: true },
-    { key: 'enrollment', title: 'Enrollment', fields: [
-      { key: 'netChange', label: 'Net change today', kind: 'number' },
-      { key: 'capacityPct', label: 'Capacity %', kind: 'number' },
+    { key: 'enrollment', title: 'Enrollment / IKS', hint: 'Leads, calls & tours — put names and follow-ups in the note', fields: [
+      { key: 'newLeads', label: 'New leads', kind: 'count' },
+      { key: 'iksCalls', label: 'IKS calls made', kind: 'count' },
+      { key: 'toursDone', label: 'Tours completed', kind: 'count' },
+      { key: 'toursScheduled', label: 'Tours scheduled', kind: 'count' },
     ], note: true },
-    { key: 'cash', title: 'Cash', fields: [
-      { key: 'moneyIn', label: 'Money in today', kind: 'dollar' },
+    { key: 'hiring', title: 'Hiring', hint: 'Pipeline movement — names, interviews & offers out go in the note', fields: [
+      { key: 'applicants', label: 'New applicants', kind: 'count' },
+      { key: 'phoneScreens', label: 'Phone screens', kind: 'count' },
+      { key: 'interviews', label: 'Interviews', kind: 'count' },
+      { key: 'onboarded', label: 'Oriented / onboarded', kind: 'count' },
     ], note: true },
-    { key: 'staffing', title: 'Staffing', fields: [
-      { key: 'openRoles', label: 'Open roles', kind: 'count' },
-      { key: 'issues', label: 'Ratio / call-out issues', kind: 'text' },
-    ] },
-    { key: 'priorities', title: 'Priorities', fields: [
-      { key: 'redFlags', label: 'Top red flags', kind: 'text' },
-      { key: 'wins', label: 'Wins', kind: 'text' },
-      { key: 'decisions', label: 'Decisions needed', kind: 'text' },
-    ] },
+    { key: 'social', title: 'Social', hint: 'Facebook activity — note the headline and which page', fields: [
+      { key: 'posts', label: 'FB posts', kind: 'count' },
+      { key: 'events', label: 'FB events', kind: 'count' },
+    ], note: true },
+    { key: 'facility', title: 'Facility & Closing', hint: 'Whiteboards, lobby, trash, 4:30 playground & room check, tour-ready — confirm the walkthrough is done and list any exceptions in the note', fields: [], note: true },
+    { key: 'tasks', title: 'Tasks & Projects', hint: 'Director-binder tasks (matrix / day-of-week / 1–31), minutes in a classroom + why, and projects assigned or completed', fields: [], note: true },
   ],
 }
 
-export const ORG_DEFS: Record<'adr' | 'mdr' | 'edr', OrgReportDef> = { adr: ADR, mdr: MDR, edr: EDR }
+export const ORG_DEFS: Partial<Record<'adr' | 'mdr' | 'edr', OrgReportDef>> = { adr: ADR, edr: CDR }
