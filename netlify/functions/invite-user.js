@@ -18,7 +18,7 @@ import { getAuth } from 'firebase-admin/auth'
 import { getFirestore } from 'firebase-admin/firestore'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const VALID_ROLES = ['admin', 'director']
+const VALID_ROLES = ['admin', 'director', 'co_director']
 const VALID_SITES = ['crozet', 'forest-lakes', 'mill-creek']
 
 function corsHeaders() {
@@ -96,8 +96,8 @@ export const handler = async (event) => {
   const siteIds = Array.isArray(body.siteIds) ? body.siteIds.filter((s) => VALID_SITES.includes(s)) : []
 
   if (!EMAIL_RE.test(email)) return json(400, { error: 'Enter a valid email address' })
-  if (!VALID_ROLES.includes(role)) return json(400, { error: 'Role must be admin or director' })
-  if (role === 'director' && siteIds.length === 0) return json(400, { error: 'Pick at least one school for a director' })
+  if (!VALID_ROLES.includes(role)) return json(400, { error: 'Role must be admin, director, or co-director' })
+  if (role !== 'admin' && siteIds.length === 0) return json(400, { error: 'Pick at least one school' })
 
   let userRecord
   let isNew = false
@@ -116,7 +116,14 @@ export const handler = async (event) => {
   // Only seed the profile for a brand-new account — resending an invite to an
   // existing email must never silently overwrite that person's real role/sites.
   if (isNew) {
-    const profile = { email, role, ...(role === 'director' ? { siteIds, siteId: siteIds[0] } : {}) }
+    const profile = { email, role }
+    if (role === 'director' || role === 'co_director') {
+      profile.siteIds = siteIds
+      profile.siteId = siteIds[0]
+    }
+    // A co-director fills the CDR only — seed that grant so it works immediately
+    // and shows as "Fill" in Users & Access (they never get DDR/admin access).
+    if (role === 'co_director') profile.reportAccess = { edr: 'fill' }
     await db.doc(`users/${userRecord.uid}`).set(profile, { merge: true })
   }
 

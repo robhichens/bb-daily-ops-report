@@ -100,11 +100,17 @@ function ReportsMenu() {
 function useDayNotesUnread(): number {
   const { user, profile } = useAuth()
   const admin = isAdmin(profile?.role)
+  // Only DDR-area roles (admins + directors) read reports for the Day Notes nudge;
+  // a co-director has no DDR access, so skip the subscription (avoids a denied read).
+  const canSeeBoards = admin || profile?.role === 'director'
   const [reports, setReports] = useState<DailyOpsReport[]>([])
   const [remoteSeen, setRemoteSeen] = useState('')
   const [tick, setTick] = useState(0)
 
-  useEffect(() => subscribeRecentReports(300, setReports), [])
+  useEffect(() => {
+    if (!canSeeBoards) return
+    return subscribeRecentReports(300, setReports)
+  }, [canSeeBoards])
 
   // Admins sync "last seen" via their user doc → nudge clears across devices.
   useEffect(() => {
@@ -141,12 +147,13 @@ export function AppShell() {
   const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
   const admin = isAdmin(profile?.role)
+  const canSeeBoards = admin || profile?.role === 'director'
   const unread = useDayNotesUnread()
 
   const name = profile?.displayName || user?.email || 'Signed in'
   const roleLine =
-    profile?.role === 'director' && profile.siteId
-      ? `Director · ${siteName(profile.siteId)}`
+    (profile?.role === 'director' || profile?.role === 'co_director') && profile.siteId
+      ? `${profile.role === 'co_director' ? 'Co-Director' : 'Director'} · ${siteName(profile.siteId)}`
       : profile?.role
         ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1)
         : ''
@@ -179,7 +186,7 @@ export function AppShell() {
           <div className="flex items-center gap-2 sm:gap-4">
             <nav className="flex items-center gap-1">
               <ReportsMenu />
-              {navItems.filter((i) => !i.adminOnly || admin).map(({ to, label, icon: Icon }) => {
+              {navItems.filter((i) => (!i.adminOnly || admin) && canSeeBoards).map(({ to, label, icon: Icon }) => {
                 const badge = to === '/day-notes' && unread > 0
                 return (
                   <NavLink

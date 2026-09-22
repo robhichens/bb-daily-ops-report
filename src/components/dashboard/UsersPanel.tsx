@@ -16,7 +16,9 @@ import { Input, inputClass } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-const ROLE_ORDER: Record<string, number> = { admin: 0, director: 1 }
+const ROLE_ORDER: Record<string, number> = { admin: 0, director: 1, co_director: 2 }
+const ROLE_LABEL: Record<string, string> = { admin: 'Admin', director: 'Director', co_director: 'Co-Director' }
+const humanRole = (r: string) => ROLE_LABEL[r] ?? r
 
 // Assignable reports = everything except DDR (DDR access = the site checkboxes).
 const ASSIGNABLE = REPORTS.filter((r) => r.key !== 'ddr')
@@ -80,9 +82,13 @@ export function UsersPanel() {
                   </p>
                   <p className="text-xs text-[var(--color-dk-gray)]">{u.email}</p>
                 </div>
-                {isAdminUser && (
+                {isAdminUser ? (
                   <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--color-coral-soft)] px-2.5 py-1 text-xs font-bold text-[var(--color-coral-dark)]">
                     <ShieldCheck className="size-3.5" /> Admin · full access
+                  </span>
+                ) : (
+                  <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--color-secondary)] px-2.5 py-1 text-xs font-bold text-[var(--color-dk-gray)]">
+                    {humanRole(u.role)}
                   </span>
                 )}
               </div>
@@ -149,7 +155,7 @@ function InviteForm() {
   const { user } = useAuth()
   const [open, setOpen] = useState(false)
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState<'director' | 'admin'>('director')
+  const [role, setRole] = useState<'director' | 'admin' | 'co_director'>('director')
   const [siteIds, setSiteIds] = useState<SiteId[]>([])
   const [status, setStatus] = useState<InviteStatus>({ kind: 'idle' })
 
@@ -161,7 +167,7 @@ function InviteForm() {
     if (!user) return
     const trimmed = email.trim()
     if (!trimmed) { setStatus({ kind: 'error', message: 'Enter an email address' }); return }
-    if (role === 'director' && siteIds.length === 0) { setStatus({ kind: 'error', message: 'Pick at least one school' }); return }
+    if (role !== 'admin' && siteIds.length === 0) { setStatus({ kind: 'error', message: 'Pick at least one school' }); return }
 
     setStatus({ kind: 'sending' })
     try {
@@ -204,10 +210,11 @@ function InviteForm() {
           <select
             value={role}
             disabled={sending}
-            onChange={(e) => setRole(e.target.value as 'director' | 'admin')}
+            onChange={(e) => setRole(e.target.value as 'director' | 'admin' | 'co_director')}
             className={cn(inputClass, 'h-11 w-auto')}
           >
             <option value="director">Director</option>
+            <option value="co_director">Co-Director</option>
             <option value="admin">Admin</option>
           </select>
         </label>
@@ -218,9 +225,11 @@ function InviteForm() {
         <Button variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={sending}>Cancel</Button>
       </div>
 
-      {role === 'director' && (
+      {role !== 'admin' && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-mid-gray)]">Schools</span>
+          <span className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-mid-gray)]">
+            {role === 'co_director' ? 'Campus' : 'Schools'}
+          </span>
           {SITES.map((s) => (
             <label key={s.id} className="flex cursor-pointer items-center gap-1.5 text-sm text-[var(--color-charcoal)]">
               <input

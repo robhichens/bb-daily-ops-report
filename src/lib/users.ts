@@ -1,6 +1,7 @@
 // src/lib/users.ts
 // User profiles live in Firestore `users/{uid}` = { role, siteId?, siteIds?, displayName?, email? }.
-// Mirrors the bb-platform role set; only `director` (site-scoped) and `admin` reach the DOR.
+// Mirrors the bb-platform role set; `admin`, `director` (site-scoped) and
+// `co_director` (fills the CDR for a campus, no DDR/admin access) reach the DOR.
 // `siteIds` (list) is the source of truth for site access; legacy docs may only
 // have `siteId`, so always read access through `userSites()`.
 
@@ -21,6 +22,7 @@ import type { ReportAccessLevel, ReportKey, SiteId } from './schema'
 export type UserRole =
   | 'admin'
   | 'director'
+  | 'co_director'
   | 'teacher'
   | 'assistant'
   | 'floater'
@@ -41,7 +43,7 @@ export interface UserProfile {
 }
 
 /** Roles permitted to open the Daily Ops Report app at all. */
-export const DOR_ROLES: UserRole[] = ['admin', 'director']
+export const DOR_ROLES: UserRole[] = ['admin', 'director', 'co_director']
 
 export const canAccessDor = (role: UserRole | undefined): boolean =>
   !!role && DOR_ROLES.includes(role)
@@ -58,8 +60,11 @@ export function userSites(profile: UserProfile | null): SiteId[] {
 /**
  * A user's access level to one report, or null for none.
  *  - Admins (all leadership): 'fill' on everything.
- *  - DDR: directors get 'fill' if they have any site; else per-user grant.
- *  - FDR/ADR/MDR/EDR: the per-user grant in reportAccess.
+ *  - DDR: only DIRECTORS auto-get 'fill' (for their site). A co-director also has
+ *    a campus but must NOT touch the DDR, so DDR is gated on the role, not the
+ *    site — everyone else needs a per-user grant.
+ *  - FDR/ADR/CDR/etc.: the per-user grant in reportAccess (a co-director is
+ *    seeded reportAccess.edr='fill' at invite time, so they fill the CDR only).
  * Assigning a report to a user also makes that report's dashboard data visible.
  */
 export function reportAccessLevel(
@@ -68,7 +73,7 @@ export function reportAccessLevel(
 ): ReportAccessLevel | null {
   if (!profile) return null
   if (isAdmin(profile.role)) return 'fill'
-  if (key === 'ddr' && userSites(profile).length > 0) return 'fill'
+  if (key === 'ddr' && profile.role === 'director' && userSites(profile).length > 0) return 'fill'
   return profile.reportAccess?.[key] ?? null
 }
 
@@ -145,7 +150,7 @@ export interface InviteResult {
 export async function inviteUser(
   idToken: string,
   email: string,
-  role: 'admin' | 'director',
+  role: 'admin' | 'director' | 'co_director',
   siteIds: SiteId[]
 ): Promise<InviteResult> {
   const res = await fetch('/api/invite-user', {

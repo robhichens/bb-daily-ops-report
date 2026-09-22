@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import { ClipboardList } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
-import { isAdmin as isAdminRole, userSites } from '@/lib/users'
+import { accessibleReportKeys, isAdmin as isAdminRole, reportAccessLevel, userSites } from '@/lib/users'
 import { SITES, type SiteId } from '@/lib/schema'
+import { REPORTS } from '@/lib/reportRegistry'
 import { todayIso, formatLong } from '@/lib/dates'
 import { ReportForm } from '@/components/report/ReportForm'
 import { PrintButton } from '@/components/report/PrintableReport'
@@ -29,6 +30,14 @@ export function Report() {
 
   const [siteId, setSiteId] = useState<SiteId>(initialSite)
   const [date, setDate] = useState<string>(initialDate)
+
+  // The DDR is for admins + site directors. Anyone else with app access (e.g. a
+  // co-director) is sent to their first report, so they never land on a doc the
+  // security rules won't let them read.
+  if (!reportAccessLevel(profile, 'ddr')) {
+    const first = REPORTS.find((r) => accessibleReportKeys(profile).includes(r.key))
+    return <Navigate to={first?.route ?? '/dashboard'} replace />
+  }
 
   return (
     <div className="space-y-6">
