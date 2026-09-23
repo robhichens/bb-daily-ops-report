@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { NotebookPen, Check, Send, Eye, Flag, ArrowUpRight, Trash2, CornerDownRight, ShoppingCart, Wrench, Search, X } from 'lucide-react'
+import { NotebookPen, Check, Send, Eye, Flag, ArrowUpRight, Trash2, CornerDownRight, ShoppingCart, Wrench, Search, X, ChevronDown } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { isAdmin, userSites } from '@/lib/users'
 import {
@@ -48,6 +48,17 @@ const SITE_ACCENT: Record<SiteId, 'coral' | 'yellow' | 'sky' | 'gray'> = {
   'forest-lakes': 'sky',
   'mill-creek': 'yellow',
 }
+
+/** Report sources that still exist — hides notes from retired reports (e.g. MDR)
+ *  and drives the Reports filter, so the filter can never list a dead report. */
+const CURRENT_SOURCES = new Set<ReportKey>(REPORTS.map((r) => r.key))
+
+/** Site filter options: the three campuses + "HQ" for org-level report notes
+ *  (ADR/CDR/FDR) that aren't tied to a director's site. */
+const SITE_OPTIONS: { value: SiteId | 'hq'; label: string }[] = [
+  ...SITES.map((s) => ({ value: s.id, label: s.name })),
+  { value: 'hq', label: 'HQ' },
+]
 
 /** One Director-Report line, flattened out of its report + its Day-Notes state. */
 interface NoteEntry {
@@ -187,8 +198,8 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
   const { user, profile } = useAuth()
   const author = profile?.displayName || user?.email || 'Leadership'
 
-  const [site, setSite] = useState<SiteId | 'all'>('all')
-  const [source, setSource] = useState<ReportKey | 'all'>('all')
+  const [sources, setSources] = useState<Set<ReportKey>>(new Set())
+  const [siteSel, setSiteSel] = useState<Set<SiteId | 'hq'>>(new Set())
   const [hideAcked, setHideAcked] = useState(false)
   const [query, setQuery] = useState('')
   const [dateFilter, setDateFilter] = useState('')
@@ -198,7 +209,8 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
 
   const directorEntries = useMemo(() => toEntries(reports), [reports])
   const openCount =
-    directorEntries.filter((e) => !e.acked).length + orgNotes.filter((n) => !n.acked).length
+    directorEntries.filter((e) => !e.acked).length +
+    orgNotes.filter((n) => CURRENT_SOURCES.has(n.source) && !n.acked).length
 
   const items = useMemo<BoardItem[]>(() => {
     const q = query.trim().toLowerCase()
@@ -206,15 +218,18 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
       !q || [e.note, e.director, e.siteName, ...e.thread.map((c) => `${c.text} ${c.author}`)].join(' ').toLowerCase().includes(q)
     const hitOrg = (n: LedgerNote) =>
       !q || [n.text, n.author, reportMeta(n.source)?.short ?? n.source, n.siteId ? siteName(n.siteId) : '', ...n.comments.map((c) => `${c.text} ${c.author}`)].join(' ').toLowerCase().includes(q)
+    // Empty selection = all. Org notes with no site fall in the "HQ" bucket.
+    const srcOk = (k: ReportKey) => sources.size === 0 || sources.has(k)
+    const siteOk = (s: SiteId | 'hq') => siteSel.size === 0 || siteSel.has(s)
 
     const dir: BoardItem[] = directorEntries
-      .filter((e) => (source === 'all' || source === 'ddr') && (site === 'all' || e.siteId === site) && (!hideAcked || !e.acked) && (!dateFilter || e.date === dateFilter) && hitDir(e))
+      .filter((e) => srcOk('ddr') && siteOk(e.siteId) && (!hideAcked || !e.acked) && (!dateFilter || e.date === dateFilter) && hitDir(e))
       .map((e) => ({ kind: 'director', date: e.date, at: e.at || e.date, flagged: e.flagged, entry: e }))
     const org: BoardItem[] = orgNotes
-      .filter((n) => (source === 'all' || n.source === source) && (!hideAcked || !n.acked) && (!dateFilter || n.at.slice(0, 10) === dateFilter) && hitOrg(n))
+      .filter((n) => CURRENT_SOURCES.has(n.source) && srcOk(n.source) && siteOk(n.siteId ?? 'hq') && (!hideAcked || !n.acked) && (!dateFilter || n.at.slice(0, 10) === dateFilter) && hitOrg(n))
       .map((n) => ({ kind: 'org', date: n.at.slice(0, 10), at: n.at, flagged: n.flagged, note: n }))
     return [...dir, ...org]
-  }, [directorEntries, orgNotes, site, source, hideAcked, query, dateFilter])
+  }, [directorEntries, orgNotes, siteSel, sources, hideAcked, query, dateFilter])
 
   const groups = useMemo(() => groupItemsByDate(items), [items])
   const runBusy = useBusy(setBusy)
@@ -230,8 +245,13 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
           </>
         }
       >
-        <SourceFilter value={source} onChange={setSource} />
-        <SiteFilter sites={SITES} value={site} onChange={setSite} allLabel="All sites" />
+        <MultiSelect
+          label="Reports"
+          options={REPORTS.map((r) => ({ value: r.key, label: r.short }))}
+          selected={sources}
+          onChange={setSources}
+        />
+        <MultiSelect label="Sites" options={SITE_OPTIONS} selected={siteSel} onChange={setSiteSel} />
         <HideCheckedToggle checked={hideAcked} onChange={setHideAcked} />
       </FeedHeader>
 
@@ -445,13 +465,79 @@ function FlagButton({ flagged, busy, onClick }: { flagged: boolean; busy: boolea
   )
 }
 
-function SourceFilter({ value, onChange }: { value: ReportKey | 'all'; onChange: (v: ReportKey | 'all') => void }) {
+/** A checkbox dropdown for filtering by many values at once (empty = all). */
+function MultiSelect<T extends string>({
+  label,
+  options,
+  selected,
+  onChange,
+}: {
+  label: string
+  options: { value: T; label: string }[]
+  selected: Set<T>
+  onChange: (next: Set<T>) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  const count = selected.size
+  const summary = count === 0
+    ? `All ${label.toLowerCase()}`
+    : options.filter((o) => selected.has(o.value)).map((o) => o.label).join(', ')
+  const toggle = (v: T) => {
+    const next = new Set(selected)
+    if (next.has(v)) next.delete(v)
+    else next.add(v)
+    onChange(next)
+  }
+
   return (
-    <div className="flex flex-wrap rounded-lg bg-[var(--color-secondary)] p-0.5">
-      <Chip label="All" active={value === 'all'} onClick={() => onChange('all')} />
-      {REPORTS.map((r) => (
-        <Chip key={r.key} label={r.short} active={value === r.key} onClick={() => onChange(r.key)} />
-      ))}
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={cn(inputClass, 'flex h-10 w-auto items-center gap-2')}
+      >
+        <span className="max-w-[160px] truncate text-sm font-semibold text-[var(--color-charcoal)]">
+          {label}: <span className="font-normal text-[var(--color-dk-gray)]">{summary}</span>
+        </span>
+        <ChevronDown className={cn('size-3.5 shrink-0 text-[var(--color-mid-gray)] transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div className="absolute right-0 z-30 mt-1 w-56 overflow-hidden rounded-xl border border-[var(--color-border)] bg-white py-1 shadow-lg">
+          <button
+            type="button"
+            onClick={() => onChange(new Set())}
+            className={cn('flex w-full items-center px-3 py-2 text-sm hover:bg-[var(--color-secondary)]', count === 0 ? 'font-bold text-[var(--color-coral)]' : 'text-[var(--color-charcoal)]')}
+          >
+            All {label.toLowerCase()}
+          </button>
+          <div className="my-1 border-t border-[var(--color-border)]" />
+          {options.map((o) => {
+            const on = selected.has(o.value)
+            return (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => toggle(o.value)}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-sm hover:bg-[var(--color-secondary)]"
+              >
+                <span className={cn('grid size-4 shrink-0 place-items-center rounded border-2', on ? 'border-[var(--color-coral)] bg-[var(--color-coral)] text-white' : 'border-[var(--color-mid-gray)] text-transparent')}>
+                  <Check className="size-3" strokeWidth={3} />
+                </span>
+                <span className="text-[var(--color-charcoal)]">{o.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -816,42 +902,6 @@ function FeedHeader({
       </div>
       {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
     </div>
-  )
-}
-
-function SiteFilter({
-  sites,
-  value,
-  onChange,
-  allLabel,
-}: {
-  sites: { id: SiteId; name: string }[]
-  value: SiteId | 'all'
-  onChange: (v: SiteId | 'all') => void
-  allLabel: string
-}) {
-  return (
-    <div className="flex rounded-lg bg-[var(--color-secondary)] p-0.5">
-      <Chip label={allLabel} active={value === 'all'} onClick={() => onChange('all')} />
-      {sites.map((s) => (
-        <Chip key={s.id} label={s.name} active={value === s.id} onClick={() => onChange(s.id)} />
-      ))}
-    </div>
-  )
-}
-
-function Chip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
-        active ? 'bg-[var(--color-coral)] text-white shadow-sm' : 'text-[var(--color-dk-gray)] hover:text-[var(--color-charcoal)]'
-      )}
-    >
-      {label}
-    </button>
   )
 }
 
