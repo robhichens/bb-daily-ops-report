@@ -149,12 +149,21 @@ export interface EnrollmentCensus {
   bySite: SiteCensus[]
 }
 
-/** Most recent non-zero full-time enrollment a site reported within `rows`. */
-function latestFullTime(rows: DailyOpsReport[], siteId: SiteId): number {
-  const mine = rows
-    .filter((r) => r.siteId === siteId && (r.enrollmentMarketing.fullTimeEnrollment?.count ?? 0) > 0)
-    .sort((a, b) => (a.date < b.date ? 1 : -1))
-  return mine[0]?.enrollmentMarketing.fullTimeEnrollment.count ?? 0
+/** One site's full-time headcount on one day — from a DDR, or from the shared
+ *  headline record (lib/headlines.ts) for people who can't read DDRs. */
+export interface CensusPoint {
+  siteId: SiteId
+  date: string
+  fullTime: number
+}
+
+export const censusPoints = (rows: DailyOpsReport[]): CensusPoint[] =>
+  rows.map((r) => ({ siteId: r.siteId, date: r.date, fullTime: r.enrollmentMarketing.fullTimeEnrollment?.count ?? 0 }))
+
+/** Most recent non-zero full-time enrollment a site reported within `points`. */
+function latestFullTime(points: CensusPoint[], siteId: SiteId): number {
+  const mine = points.filter((p) => p.siteId === siteId && p.fullTime > 0).sort((a, b) => (a.date < b.date ? 1 : -1))
+  return mine[0]?.fullTime ?? 0
 }
 
 /** Current full-time enrollment vs licensed capacity, org-wide and per site,
@@ -164,9 +173,17 @@ export function enrollmentCensus(
   lastWeekRows: DailyOpsReport[],
   scope: SiteId[] = SITE_IDS
 ): EnrollmentCensus {
+  return censusFromPoints(censusPoints(rows), censusPoints(lastWeekRows), scope)
+}
+
+export function censusFromPoints(
+  points: CensusPoint[],
+  prevPoints: CensusPoint[],
+  scope: SiteId[] = SITE_IDS
+): EnrollmentCensus {
   const bySite: SiteCensus[] = SITES.filter((s) => scope.includes(s.id)).map((s) => {
-    const enrolled = latestFullTime(rows, s.id)
-    const prev = latestFullTime(lastWeekRows, s.id)
+    const enrolled = latestFullTime(points, s.id)
+    const prev = latestFullTime(prevPoints, s.id)
     const capacity = siteCapacity(s.id)
     return {
       siteId: s.id,
@@ -211,7 +228,11 @@ export interface OpeningsToStaff {
 /** Reads the latest ADR's Openings-to-Staff matrix (classrooms × sites) into a
  *  ranked list. Only cells someone has actually entered are included. */
 export function openingsToStaff(adr: OrgReport | null, scope: SiteId[] = SITE_IDS): OpeningsToStaff {
-  const cells = (adr?.data?.openingsToStaff ?? {}) as Record<string, unknown>
+  return openingsFromCells((adr?.data?.openingsToStaff ?? {}) as Record<string, unknown>, adr?.date ?? '', scope)
+}
+
+/** Same ranking, straight from the grid cells (the shared headline record). */
+export function openingsFromCells(cells: Record<string, unknown>, asOfDate: string, scope: SiteId[] = SITE_IDS): OpeningsToStaff {
   const rooms: RoomOpening[] = []
   for (const s of SITES.filter((x) => scope.includes(x.id))) {
     for (const c of CLASSROOMS) {
@@ -225,7 +246,7 @@ export function openingsToStaff(adr: OrgReport | null, scope: SiteId[] = SITE_ID
   rooms.sort((a, b) => b.open - a.open || a.site.localeCompare(b.site) || a.room.localeCompare(b.room))
   return {
     totalOpen: rooms.reduce((sum, r) => sum + Math.max(0, r.open), 0),
-    asOfDate: adr?.date ?? '',
+    asOfDate,
     rooms,
   }
 }
@@ -258,8 +279,11 @@ export function withdrawals(rows: DailyOpsReport[]): Withdrawal[] {
       })
     }
   }
-  return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+  return sortWithdrawals(out)
 }
+
+export const sortWithdrawals = (items: Withdrawal[]): Withdrawal[] =>
+  [...items].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
 
 // ---------------------------------------------------------------------------
 // Staff watch

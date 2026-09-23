@@ -73,6 +73,21 @@ service cloud.firestore {
       allow write: if isSignedIn() && canFillReport('edr');
     }
 
+    // Shared headline numbers behind the dashboard's pinned Enrollment & Openings
+    // block (src/lib/headlines.ts): each school's full-time headcount + withdrawals
+    // from submitted DDRs, and the latest ADR Openings grid. Every DOR role can read
+    // it — without being able to read the DDRs/ADRs themselves. Only the people who
+    // file the source report write their piece.
+    match /headlines/{id} {
+      allow read: if isSignedIn() && role() in ['admin', 'director', 'co_director', 'finance', 'admissions'];
+      allow create, update: if isSignedIn() && (
+        role() == 'admin' ||
+        (id == 'openings' && canFillReport('adr')) ||
+        (role() == 'director' && request.resource.data.kind == 'ddr' && request.resource.data.siteId in userSites())
+      );
+      allow delete: if isSignedIn() && role() == 'admin';
+    }
+
     // Central Flags & Notes ledger for every report (tagged by `source`).
     // Admins read all (the Day Notes board); others read only a report they can
     // view (report page queries filter by source). Writers need fill on the source.

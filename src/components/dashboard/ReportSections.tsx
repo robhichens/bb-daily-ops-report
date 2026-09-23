@@ -2,9 +2,7 @@ import type { ReactNode } from 'react'
 import { Briefcase, ChevronDown, CalendarCheck, DollarSign, Megaphone, Phone, Receipt, Ticket, UserPlus, Users, Wallet } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { formatShort } from '@/lib/dates'
-import type { OpeningsToStaff } from '@/lib/dashboard'
 import type { AdrSummary, CdrSummary, FdrSummary } from '@/lib/dashboardReports'
-import { OpeningsHero } from './CensusPanel'
 import { cn } from '@/lib/utils'
 import { usePersistentOpen } from '@/lib/usePersistentOpen'
 
@@ -216,14 +214,13 @@ export function CdrSection({ summary, title, collapsible }: { summary: CdrSummar
 
 // --- ADR ----------------------------------------------------------------------
 
-export function AdrSection({ summary, openings, collapsible }: { summary: AdrSummary; openings?: OpeningsToStaff; collapsible?: boolean }) {
+export function AdrSection({ summary, collapsible }: { summary: AdrSummary; collapsible?: boolean }) {
   const t = summary.total
   const p = summary.prevTotal
   const pipe = summary.pipeline
 
   return (
     <ReportSection title="Admissions Daily Report" sub={daysFiled(t.filed)} summary={`${t.inquiries} inquiries · ${t.newEnrollments} new enrollments`} storageKey="adr" collapsible={collapsible}>
-      {openings && <OpeningsHero openings={openings} />}
       {t.filed === 0 ? (
         <Empty>No Admissions reports submitted for this period yet.</Empty>
       ) : (

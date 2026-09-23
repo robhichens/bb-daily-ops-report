@@ -7,7 +7,6 @@ import { doc, onSnapshot, setDoc, type Unsubscribe } from 'firebase/firestore'
 import { db } from './firebase'
 
 export type DashboardSection =
-  | 'enrollment'
   | 'kpis'
   | 'leaderboard'
   | 'teamGoal'
@@ -23,7 +22,6 @@ export interface DirectorViewConfig {
 
 /** Labels + the order they appear in the config editor / director view. */
 export const SECTION_META: { key: DashboardSection; label: string; hint: string }[] = [
-  { key: 'enrollment', label: 'Enrollment & capacity', hint: 'Full-time enrollment, capacity, withdrawals' },
   { key: 'leaderboard', label: 'Leaderboard', hint: 'Friendly weekly ranking + streaks' },
   { key: 'teamGoal', label: 'Team goal', hint: 'Shared “everyone filed” progress bar' },
   { key: 'celebrations', label: 'Celebrations', hint: 'Wins: streaks, goals hit, growth' },
@@ -37,7 +35,6 @@ export const SECTION_META: { key: DashboardSection; label: string; hint: string 
 /** Default published view: the motivating stuff on, sensitive ops off. */
 export const DEFAULT_DIRECTOR_VIEW: DirectorViewConfig = {
   sections: {
-    enrollment: false,
     leaderboard: true,
     teamGoal: true,
     celebrations: true,
@@ -56,8 +53,12 @@ export function subscribeDirectorView(cb: (cfg: DirectorViewConfig) => void): Un
     ref(),
     (snap) => {
       if (!snap.exists()) return cb(DEFAULT_DIRECTOR_VIEW)
-      const data = snap.data() as Partial<DirectorViewConfig>
-      cb({ sections: { ...DEFAULT_DIRECTOR_VIEW.sections, ...(data.sections ?? {}) } })
+      const saved: Partial<Record<DashboardSection, unknown>> = (snap.data() as Partial<DirectorViewConfig>).sections ?? {}
+      // Only known cards — a retired toggle left in the saved doc (e.g. the old
+      // "enrollment", now pinned for everyone) must not count as a visible card.
+      const sections = { ...DEFAULT_DIRECTOR_VIEW.sections }
+      for (const { key } of SECTION_META) { const v = saved[key]; if (typeof v === 'boolean') sections[key] = v }
+      cb({ sections })
     },
     () => cb(DEFAULT_DIRECTOR_VIEW)
   )

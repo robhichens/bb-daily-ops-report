@@ -22,6 +22,7 @@ import {
 } from 'firebase/firestore';
 
 import { db } from './firebase';
+import { mirrorDdrHeadline } from './headlines';
 import { withDerived } from './derive';
 import {
   reportDocId,
@@ -96,6 +97,7 @@ export async function upsertDraft(report: DailyOpsReport): Promise<void> {
     updatedAt: new Date().toISOString(),
   };
   await setDoc(reportRef(payload.id), payload, { merge: true });
+  void mirrorDdrHeadline(payload);
 }
 
 // ---------------------------------------------------------------------------
@@ -165,6 +167,7 @@ export async function submitReport(
   };
 
   await setDoc(reportRef(payload.id), payload, { merge: true });
+  void mirrorDdrHeadline(payload);
   return { ok: true, errors: [] };
 }
 

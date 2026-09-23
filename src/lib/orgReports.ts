@@ -23,12 +23,16 @@ import {
 
 import { where } from 'firebase/firestore'
 import { db } from './firebase'
+import { mirrorOpeningsHeadline } from './headlines'
 import { weekOf as weekOfFn, weekdayName } from './derive'
 import { orgDocId, siteName } from './schema'
 import type { FieldKind, LedgerNote, LedgerNoteComment, OrgFieldValue, OrgReport, OrgReportDef, ReportKey, RequestList, RequestTag, SiteId } from './schema'
 import type { RequestItem } from './reports'
 
 // --- Daily report doc -------------------------------------------------------
+
+// The ADR's Openings grid is mirrored to the shared headline record on save.
+const ADR_COLLECTION = 'admissionsReports'
 
 const reportRef = (col: string, id: string) => doc(db, col, id)
 
@@ -104,6 +108,7 @@ export async function upsertOrgDraft(col: string, report: OrgReport): Promise<vo
     updatedAt: new Date().toISOString(),
   }
   await setDoc(reportRef(col, payload.id), payload, { merge: true })
+  if (col === ADR_COLLECTION) void mirrorOpeningsHeadline(payload)
 }
 
 export async function submitOrgReport(col: string, report: OrgReport, uid: string): Promise<void> {
@@ -114,6 +119,7 @@ export async function submitOrgReport(col: string, report: OrgReport, uid: strin
     createdByUid: report.createdByUid || uid,
   }
   await setDoc(reportRef(col, payload.id), payload, { merge: true })
+  if (col === ADR_COLLECTION) void mirrorOpeningsHeadline(payload)
 }
 
 // --- Flags & Notes — ONE central ledger for every report --------------------

@@ -7,7 +7,8 @@ import { SITES, siteName, type SiteId, type DailyOpsReport, type FinanceReport, 
 import { weekOf as weekOfFn } from '@/lib/derive'
 import { todayIso, addIsoDays, daysBetween, formatRange } from '@/lib/dates'
 import { subscribeRecentReports, subscribeReportsByRange } from '@/lib/reports'
-import { buildDashboardView, openingsToStaff, type DashboardView } from '@/lib/dashboard'
+import { buildDashboardView, censusFromPoints, openingsFromCells, openingsToStaff, sortWithdrawals, type DashboardView } from '@/lib/dashboard'
+import { headlinePoints, subscribeDdrHeadlines, subscribeOpeningsHeadline, type DdrHeadline, type OpeningsHeadline } from '@/lib/headlines'
 import { adrSummary, cdrSummary, fdrSummary } from '@/lib/dashboardReports'
 import {
   subscribeDirectorView,
@@ -25,6 +26,7 @@ import { inputClass } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { DashboardSections } from '@/components/dashboard/DashboardSections'
+import { CensusPanel } from '@/components/dashboard/CensusPanel'
 import { AdrSection, CdrSection, FdrSection, ReportSection } from '@/components/dashboard/ReportSections'
 import { PeriodPicker } from '@/components/dashboard/PeriodPicker'
 import { thisWeekPeriod, type Period } from '@/lib/period'
@@ -72,6 +74,7 @@ const subCdr: RangeSub<OrgReport> = (s, e, cb) => subscribeOrgReportsByRange(CDR
 const subAdr: RangeSub<OrgReport> = (s, e, cb) => subscribeOrgReportsByRange(ADR_COL, s, e, cb)
 const subFdr: RangeSub<FinanceReport> = subscribeFinanceReportsByRange
 const subDdr: RangeSub<DailyOpsReport> = subscribeReportsByRange
+const subHeadlines: RangeSub<DdrHeadline> = subscribeDdrHeadlines
 
 export function Dashboard() {
   const { profile } = useAuth()
@@ -94,6 +97,8 @@ export function Dashboard() {
   const cdr = usePeriodRows(has.cdr, subCdr, range)
   const adr = usePeriodRows(has.adr, subAdr, range)
   const fdr = usePeriodRows(has.fdr, subFdr, range)
+  // People who can't read DDRs get the pinned enrollment numbers from the shared headline record.
+  const hl = usePeriodRows(!has.ddr, subHeadlines, range)
 
   const [config, setConfig] = useState<Config>(DEFAULT_DIRECTOR_VIEW)
   const [recentRows, setRecentRows] = useState<DailyOpsReport[]>([])
@@ -103,6 +108,8 @@ export function Dashboard() {
   useEffect(() => (admin ? subscribeRecentReports(200, setRecentRows) : undefined), [admin])
   useEffect(() => (admin ? subscribeAllOrgNotes(setOrgNotes) : undefined), [admin])
   useEffect(() => (has.adr ? subscribeLatestOrgReport(ADR_COL, setLatestAdr) : undefined), [has.adr])
+  const [openingsHl, setOpeningsHl] = useState<OpeningsHeadline | null>(null)
+  useEffect(() => (has.adr ? undefined : subscribeOpeningsHeadline(setOpeningsHl)), [has.adr])
 
   const ddrSections = admin ? ALL_ON : config.sections
   const anyDdrCard = has.ddr && Object.values(ddrSections).some(Boolean)
@@ -126,10 +133,19 @@ export function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [has.fdr, fdr.cur, fdr.prev, scope.join()])
 
-  // The Openings hero sits in the DDR enrollment section when that's showing;
-  // otherwise it leads the ADR section.
-  const openingsInDdr = has.adr && anyDdrCard && ddrSections.enrollment
-  const adrOpenings = has.adr && !openingsInDdr ? openingsToStaff(latestAdr, scope) : undefined
+  // PINNED for everyone: Openings to Staff + enrollment vs capacity + withdrawals,
+  // for the schools in view. DDR/ADR readers compute it from the reports; everyone
+  // else reads the shared headline record (lib/headlines.ts).
+  const pinned = useMemo(() => {
+    const inScope = <T extends { siteId: SiteId }>(rows: T[]) => rows.filter((r) => scope.includes(r.siteId))
+    const census = view ? view.census : censusFromPoints(headlinePoints(inScope(hl.cur)), headlinePoints(inScope(hl.prev)), scope)
+    const withdrawn = view ? view.withdrawals : sortWithdrawals(inScope(hl.cur).flatMap((h) => h.withdrawals))
+    const openings = has.adr
+      ? openingsToStaff(latestAdr, scope)
+      : openingsFromCells(openingsHl?.cells ?? {}, openingsHl?.date ?? '', scope)
+    return { census, withdrawn, openings }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, hl.cur, hl.prev, scope.join(), has.adr, latestAdr, openingsHl])
 
   const reportCount = [anyDdrCard, has.cdr, has.adr, has.fdr].filter(Boolean).length
   // Sections fold away behind their headings once there's more than one to scroll past.
@@ -138,11 +154,7 @@ export function Dashboard() {
 
   const ddrBody = view && (
     <>
-      <DashboardSections
-        view={view}
-        sections={ddrSections}
-        showOpenings={has.adr}
-      />
+      <DashboardSections view={view} sections={ddrSections} />
       <ReportsTable rows={view.tableRows} />
     </>
   )
@@ -180,6 +192,8 @@ export function Dashboard() {
         </div>
       </div>
 
+      <CensusPanel census={pinned.census} withdrawals={pinned.withdrawn} openings={pinned.openings} />
+
       {reportCount === 0 && (
         <Card accent="sky" className="p-8 text-center">
           <p className="text-sm text-[var(--color-dk-gray)]">
@@ -204,7 +218,7 @@ export function Dashboard() {
       {admin && <RequestLists reports={recentRows} orgNotes={orgNotes} />}
 
       {cdrData && <CdrSection summary={cdrData} title="Co-Director Daily Report" collapsible={multi} />}
-      {adrData && <AdrSection summary={adrData} openings={adrOpenings} collapsible={multi} />}
+      {adrData && <AdrSection summary={adrData} collapsible={multi} />}
       {fdrData && <FdrSection summary={fdrData} collapsible={multi} />}
 
       {admin && <DirectorViewConfig config={config} />}

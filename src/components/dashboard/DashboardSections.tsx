@@ -1,6 +1,5 @@
 import type { DashboardView } from '@/lib/dashboard'
 import type { DashboardSection } from '@/lib/settings'
-import { CensusPanel } from './CensusPanel'
 import { KpiCards } from './KpiCards'
 import { Leaderboard } from './Leaderboard'
 import { TeamGoalBar } from './TeamGoalBar'
@@ -15,20 +14,15 @@ type Sections = Record<DashboardSection, boolean>
 export function DashboardSections({
   view,
   sections,
-  showOpenings = true,
 }: {
   view: DashboardView
   sections: Sections
-  /** False for viewers without ADR access — the Openings grid comes from the ADR. */
-  showOpenings?: boolean
 }) {
   const gameRow = sections.leaderboard || sections.teamGoal || sections.celebrations
   const opsRow = sections.staffWatch || sections.packet
 
   return (
     <div className="space-y-6">
-      {sections.enrollment && <CensusPanel census={view.census} withdrawals={view.withdrawals} openings={showOpenings ? view.openings : undefined} />}
-
       {sections.kpis && (
         <KpiCards kpis={view.kpis} overtimeStaff={view.overtimeStaff} singleSite={view.singleSite} />
       )}
