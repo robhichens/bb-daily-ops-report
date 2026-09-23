@@ -178,7 +178,12 @@ export function Dashboard() {
       {view && anyDdrCard && (
         <section className="space-y-4">
           {reportCount > 1 && <ReportHeading title="Director Daily Report" sub={site === 'all' ? undefined : siteName(site)} />}
-          <DashboardSections view={view} sections={ddrSections} showOpenings={has.adr} />
+          <DashboardSections
+            view={view}
+            sections={ddrSections}
+            showOpenings={has.adr}
+            afterFunnel={admin && <RequestLists reports={recentRows} orgNotes={orgNotes} />}
+          />
           <ReportsTable rows={view.tableRows} />
         </section>
       )}
@@ -187,7 +192,6 @@ export function Dashboard() {
       {adrData && <AdrSection summary={adrData} openings={adrOpenings} />}
       {fdrData && <FdrSection summary={fdrData} />}
 
-      {admin && <RequestLists reports={recentRows} orgNotes={orgNotes} />}
       {admin && <DirectorViewConfig config={config} />}
       {admin && <UsersPanel />}
     </div>
