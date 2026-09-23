@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Eye, Check } from 'lucide-react'
-import { Card } from '@/components/ui/card'
+import { CollapsibleCard } from './CollapsibleCard'
 import {
   SECTION_META,
   updateDirectorView,
@@ -18,8 +18,11 @@ export function DirectorViewConfig({ config }: { config: Config }) {
   }
 
   return (
-    <Card accent="sky">
-      <div className="flex items-center gap-2 border-b border-[var(--color-border)] p-5">
+    <CollapsibleCard
+      accent="sky"
+      storageKey="directorView"
+      header={
+        <>
         <Eye className="size-4 text-[var(--color-sky-deep)]" />
         <div className="flex-1">
           <h2 className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--color-sky-deep)]">
@@ -34,7 +37,9 @@ export function DirectorViewConfig({ config }: { config: Config }) {
             <Check className="size-3.5" /> Saved
           </span>
         )}
-      </div>
+        </>
+      }
+    >
       <div className="grid grid-cols-1 gap-2 p-5 sm:grid-cols-2">
         {SECTION_META.map(({ key, label, hint }) => {
           const on = config.sections[key]
@@ -64,6 +69,6 @@ export function DirectorViewConfig({ config }: { config: Config }) {
           )
         })}
       </div>
-    </Card>
+    </CollapsibleCard>
   )
 }

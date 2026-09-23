@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Ban, Check, Loader2, Mail, Pencil, RotateCcw, Trash2, UserPlus, UsersRound, X } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
-import { Card } from '@/components/ui/card'
+import { CollapsibleCard } from './CollapsibleCard'
 import { SITES, type ReportAccessLevel, type ReportKey, type SiteId } from '@/lib/schema'
 import { REPORTS } from '@/lib/reportRegistry'
 import {
@@ -113,17 +113,21 @@ export function UsersPanel() {
   }
 
   return (
-    <Card accent="gray" className="overflow-hidden">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-[var(--color-border)] p-5">
-        <UsersRound className="size-4 text-[var(--color-dk-gray)]" />
-        <h2 className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--color-dk-gray)]">
-          Users &amp; Access
-        </h2>
-        <span className="w-full text-xs text-[var(--color-mid-gray)] sm:ml-auto sm:w-auto">
-          Grant schools (DDR) &amp; reports · assigning a report shows its dashboard data
-        </span>
-      </div>
-
+    <CollapsibleCard
+      accent="gray"
+      storageKey="usersAccess"
+      header={
+        <div className="flex flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+          <UsersRound className="size-4 text-[var(--color-dk-gray)]" />
+          <h2 className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--color-dk-gray)]">
+            Users &amp; Access
+          </h2>
+          <span className="w-full text-xs text-[var(--color-mid-gray)] sm:ml-auto sm:w-auto">
+            Grant schools (DDR) &amp; reports · assigning a report shows its dashboard data
+          </span>
+        </div>
+      }
+    >
       <InviteForm />
 
       <div className="divide-y divide-[var(--color-border)]">
@@ -250,7 +254,7 @@ export function UsersPanel() {
           <p className="p-5 text-sm text-[var(--color-dk-gray)]">Loading users…</p>
         )}
       </div>
-    </Card>
+    </CollapsibleCard>
   )
 }
 
