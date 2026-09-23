@@ -65,7 +65,11 @@ export function UsersPanel() {
   }
 
   async function rename(u: UserProfile, name: string) {
-    await withSave(u.uid, () => updateUserName(u.uid, name))
+    try {
+      await withSave(u.uid, () => updateUserName(u.uid, name))
+    } catch (err) {
+      window.alert(err instanceof Error ? `Couldn’t save the name: ${err.message}` : 'Couldn’t save the name')
+    }
   }
 
   async function changeRole(u: UserProfile, next: UserRole) {
@@ -110,12 +114,12 @@ export function UsersPanel() {
 
   return (
     <Card accent="gray" className="overflow-hidden">
-      <div className="flex items-center gap-2 border-b border-[var(--color-border)] p-5">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-[var(--color-border)] p-5">
         <UsersRound className="size-4 text-[var(--color-dk-gray)]" />
         <h2 className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--color-dk-gray)]">
           Users &amp; Access
         </h2>
-        <span className="ml-auto text-xs text-[var(--color-mid-gray)]">
+        <span className="w-full text-xs text-[var(--color-mid-gray)] sm:ml-auto sm:w-auto">
           Grant schools (DDR) &amp; reports · assigning a report shows its dashboard data
         </span>
       </div>
@@ -130,10 +134,11 @@ export function UsersPanel() {
           const isSelf = user?.uid === u.uid
           return (
             <div key={u.uid} className={cn('px-5 py-4', u.disabled && 'opacity-60')}>
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
+              {/* Phones: name + email on their own line, controls underneath. */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                <div className="min-w-0 flex-1">
                   <NameField u={u} disabled={saving} onSave={(name) => rename(u, name)} />
-                  <p className="text-xs text-[var(--color-dk-gray)]">{u.email}</p>
+                  <p className="truncate text-xs text-[var(--color-dk-gray)]">{u.email}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {u.disabled && (
@@ -201,7 +206,7 @@ export function UsersPanel() {
                 <div className="mt-3 space-y-3">
                   {/* DDR = school access */}
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                    <span className="w-16 text-[11px] font-bold uppercase tracking-wide text-[var(--color-mid-gray)]">Schools</span>
+                    <span className="w-full text-[11px] font-bold uppercase tracking-wide text-[var(--color-mid-gray)] sm:w-16">Schools</span>
                     {SITES.map((s) => (
                       <label key={s.id} className="flex cursor-pointer items-center gap-1.5 text-sm text-[var(--color-charcoal)]">
                         <input
@@ -218,7 +223,7 @@ export function UsersPanel() {
 
                   {/* Per-report Fill / View grants */}
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                    <span className="w-16 text-[11px] font-bold uppercase tracking-wide text-[var(--color-mid-gray)]">Reports</span>
+                    <span className="w-full text-[11px] font-bold uppercase tracking-wide text-[var(--color-mid-gray)] sm:w-16">Reports</span>
                     {ASSIGNABLE.map((r) => (
                       <label key={r.key} className="flex items-center gap-1.5 text-sm">
                         <span className="font-semibold text-[var(--color-charcoal)]">{r.short}</span>
@@ -265,26 +270,33 @@ function NameField({ u, disabled, onSave }: { u: UserProfile; disabled: boolean;
   }
 
   if (editing) {
+    // A real form so the phone keyboard's Go/Return key submits too.
     return (
-      <div className="flex items-center gap-1">
+      <form
+        className="flex items-center gap-1"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void save()
+        }}
+      >
         <Input
           value={draft}
           autoFocus
+          enterKeyHint="done"
           placeholder="First Last"
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') void save()
             if (e.key === 'Escape') setEditing(false)
           }}
-          className="h-8 w-56 text-sm"
+          className="h-9 w-full min-w-0 text-base sm:w-56 sm:text-sm"
         />
-        <button type="button" onClick={() => void save()} aria-label="Save name" className="grid size-8 place-items-center rounded-lg text-[var(--color-good)] hover:bg-[var(--color-secondary)]">
-          <Check className="size-4" />
+        <button type="submit" aria-label="Save name" className="grid size-9 shrink-0 place-items-center rounded-lg text-[var(--color-good)] hover:bg-[var(--color-secondary)]">
+          <Check className="size-5" />
         </button>
-        <button type="button" onClick={() => setEditing(false)} aria-label="Cancel" className="grid size-8 place-items-center rounded-lg text-[var(--color-mid-gray)] hover:bg-[var(--color-secondary)]">
-          <X className="size-4" />
+        <button type="button" onClick={() => setEditing(false)} aria-label="Cancel" className="grid size-9 shrink-0 place-items-center rounded-lg text-[var(--color-mid-gray)] hover:bg-[var(--color-secondary)]">
+          <X className="size-5" />
         </button>
-      </div>
+      </form>
     )
   }
 

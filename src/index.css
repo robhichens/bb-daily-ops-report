@@ -99,6 +99,17 @@
     border-color: var(--color-border);
   }
 
+  /* iOS Safari gives date inputs an intrinsic min-width, so they poke out of
+     their cards on phones. Let them shrink to their box like other inputs. */
+  input[type='date'] {
+    min-width: 0;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  input[type='date']::-webkit-date-and-time-value {
+    text-align: left;
+  }
+
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

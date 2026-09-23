@@ -175,7 +175,8 @@ export function AppShell() {
               alt="Bright Beginnings"
               className="size-9 object-contain"
             />
-            <div className="leading-tight">
+            {/* Wordmark hides on phones so the nav icons have room (the tree stays). */}
+            <div className="hidden leading-tight sm:block">
               <p className="font-brand text-base font-medium text-[var(--color-charcoal)]">
                 Daily Ops Report
               </p>
