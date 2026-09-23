@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
-import { Briefcase, CalendarCheck, DollarSign, Megaphone, Phone, Receipt, Ticket, UserPlus, Users, Wallet } from 'lucide-react'
+import { Briefcase, ChevronDown, CalendarCheck, DollarSign, Megaphone, Phone, Receipt, Ticket, UserPlus, Users, Wallet } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { formatShort } from '@/lib/dates'
 import type { OpeningsToStaff } from '@/lib/dashboard'
 import type { AdrSummary, CdrSummary, FdrSummary } from '@/lib/dashboardReports'
 import { OpeningsHero } from './CensusPanel'
 import { cn } from '@/lib/utils'
+import { usePersistentOpen } from '@/lib/usePersistentOpen'
 
 // Dashboard sections for the CDR, ADR and FDR. Each renders only for people
 // with access to that report (the page decides); numbers cover the chosen
@@ -15,14 +16,60 @@ type Accent = 'coral' | 'yellow' | 'sky' | 'gray'
 
 const money = (n: number) => `$${Math.round(n).toLocaleString()}`
 
-export function ReportHeading({ title, sub }: { title: string; sub?: string }) {
-  return (
-    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-[var(--color-border)] pb-2">
+/**
+ * A titled dashboard section. When the page shows more than one section it
+ * folds away behind its heading (chevron); collapsed, the heading carries a
+ * one-line summary. Open/closed is remembered per device.
+ */
+export function ReportSection({
+  title,
+  sub,
+  summary,
+  storageKey,
+  collapsible = true,
+  children,
+}: {
+  title: string
+  sub?: string
+  /** Shown next to the title only while collapsed, e.g. "$21,904 net deposits". */
+  summary?: string
+  storageKey: string
+  collapsible?: boolean
+  children: ReactNode
+}) {
+  const [open, setOpen] = usePersistentOpen(`section:${storageKey}`, true)
+  const isOpen = !collapsible || open
+  const detail = [sub, !isOpen && summary].filter(Boolean).join(' · ')
+  const heading = (
+    <>
       <h2 className="text-lg font-extrabold text-[var(--color-charcoal)]">{title}</h2>
-      {sub && <span className="text-sm text-[var(--color-dk-gray)]">{sub}</span>}
-    </div>
+      {detail && <span className="text-sm text-[var(--color-dk-gray)]">{detail}</span>}
+    </>
+  )
+
+  return (
+    <section className="space-y-4">
+      {collapsible ? (
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={isOpen}
+          className="flex w-full flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-[var(--color-border)] pb-2 text-left"
+        >
+          {heading}
+          <ChevronDown
+            className={cn('ml-auto size-5 shrink-0 self-center text-[var(--color-mid-gray)] transition-transform', !isOpen && '-rotate-90')}
+          />
+        </button>
+      ) : (
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-[var(--color-border)] pb-2">{heading}</div>
+      )}
+      {isOpen && children}
+    </section>
   )
 }
+
+const daysFiled = (n: number) => `${n} day${n === 1 ? '' : 's'} filed`
 
 /** "+3 vs prior period" (green up / red down); nothing when unchanged. */
 function Change({ now, before, format = (n: number) => String(n), invert = false }: { now: number; before: number; format?: (n: number) => string; invert?: boolean }) {
@@ -69,14 +116,13 @@ function Figure({ label, value, strong }: { label: string; value: ReactNode; str
 
 // --- CDR ----------------------------------------------------------------------
 
-export function CdrSection({ summary, title }: { summary: CdrSummary; title: string }) {
+export function CdrSection({ summary, title, collapsible }: { summary: CdrSummary; title: string; collapsible?: boolean }) {
   const t = summary.total
   const p = summary.prevTotal
   const multi = summary.bySite.length > 1
 
   return (
-    <section className="space-y-4">
-      <ReportHeading title={title} sub={`${t.filed} day${t.filed === 1 ? '' : 's'} filed`} />
+    <ReportSection title={title} sub={daysFiled(t.filed)} summary={`${t.newLeads} new leads · ${t.toursDone} tours`} storageKey="cdr" collapsible={collapsible}>
       {t.filed === 0 ? (
         <Empty>No Co-Director reports submitted for this period yet.</Empty>
       ) : (
@@ -164,20 +210,19 @@ export function CdrSection({ summary, title }: { summary: CdrSummary; title: str
           )}
         </>
       )}
-    </section>
+    </ReportSection>
   )
 }
 
 // --- ADR ----------------------------------------------------------------------
 
-export function AdrSection({ summary, openings }: { summary: AdrSummary; openings?: OpeningsToStaff }) {
+export function AdrSection({ summary, openings, collapsible }: { summary: AdrSummary; openings?: OpeningsToStaff; collapsible?: boolean }) {
   const t = summary.total
   const p = summary.prevTotal
   const pipe = summary.pipeline
 
   return (
-    <section className="space-y-4">
-      <ReportHeading title="Admissions Daily Report" sub={`${t.filed} day${t.filed === 1 ? '' : 's'} filed`} />
+    <ReportSection title="Admissions Daily Report" sub={daysFiled(t.filed)} summary={`${t.inquiries} inquiries · ${t.newEnrollments} new enrollments`} storageKey="adr" collapsible={collapsible}>
       {openings && <OpeningsHero openings={openings} />}
       {t.filed === 0 ? (
         <Empty>No Admissions reports submitted for this period yet.</Empty>
@@ -217,20 +262,19 @@ export function AdrSection({ summary, openings }: { summary: AdrSummary; opening
           </div>
         </>
       )}
-    </section>
+    </ReportSection>
   )
 }
 
 // --- FDR ----------------------------------------------------------------------
 
-export function FdrSection({ summary }: { summary: FdrSummary }) {
+export function FdrSection({ summary, collapsible }: { summary: FdrSummary; collapsible?: boolean }) {
   const t = summary.total
   const multi = summary.bySite.length > 1
   const outstanding = t.outstandingCurrent + t.outstandingFormer
 
   return (
-    <section className="space-y-4">
-      <ReportHeading title="Finance Daily Report" sub={`${summary.filed} day${summary.filed === 1 ? '' : 's'} filed`} />
+    <ReportSection title="Finance Daily Report" sub={daysFiled(summary.filed)} summary={`${money(t.deposits)} net deposits`} storageKey="fdr" collapsible={collapsible}>
       {summary.filed === 0 ? (
         <Empty>No Finance reports submitted for this period yet.</Empty>
       ) : (
@@ -329,6 +373,6 @@ export function FdrSection({ summary }: { summary: FdrSummary }) {
             </Card>
         </>
       )}
-    </section>
+    </ReportSection>
   )
 }

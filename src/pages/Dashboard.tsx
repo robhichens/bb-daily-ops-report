@@ -25,7 +25,7 @@ import { inputClass } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { DashboardSections } from '@/components/dashboard/DashboardSections'
-import { AdrSection, CdrSection, FdrSection, ReportHeading } from '@/components/dashboard/ReportSections'
+import { AdrSection, CdrSection, FdrSection, ReportSection } from '@/components/dashboard/ReportSections'
 import { PeriodPicker } from '@/components/dashboard/PeriodPicker'
 import { thisWeekPeriod, type Period } from '@/lib/period'
 import { DirectorViewConfig } from '@/components/dashboard/DirectorViewConfig'
@@ -132,7 +132,21 @@ export function Dashboard() {
   const adrOpenings = has.adr && !openingsInDdr ? openingsToStaff(latestAdr, scope) : undefined
 
   const reportCount = [anyDdrCard, has.cdr, has.adr, has.fdr].filter(Boolean).length
+  // Sections fold away behind their headings once there's more than one to scroll past.
+  const multi = reportCount > 1
   const showSitePicker = sites.length > 1 && (has.ddr || has.cdr || has.fdr)
+
+  const ddrBody = view && (
+    <>
+      <DashboardSections
+        view={view}
+        sections={ddrSections}
+        showOpenings={has.adr}
+        afterFunnel={admin && <RequestLists reports={recentRows} orgNotes={orgNotes} />}
+      />
+      <ReportsTable rows={view.tableRows} />
+    </>
+  )
 
   const fileTag = `${range.start}_${range.end}`
   const exportLabel = `${fileTag}${site === 'all' ? '' : '-' + site}`
@@ -175,22 +189,22 @@ export function Dashboard() {
         </Card>
       )}
 
-      {view && anyDdrCard && (
-        <section className="space-y-4">
-          {reportCount > 1 && <ReportHeading title="Director Daily Report" sub={site === 'all' ? undefined : siteName(site)} />}
-          <DashboardSections
-            view={view}
-            sections={ddrSections}
-            showOpenings={has.adr}
-            afterFunnel={admin && <RequestLists reports={recentRows} orgNotes={orgNotes} />}
-          />
-          <ReportsTable rows={view.tableRows} />
-        </section>
-      )}
+      {view && anyDdrCard && (multi ? (
+        <ReportSection
+          title="Director Daily Report"
+          sub={site === 'all' ? undefined : siteName(site)}
+          summary={`${view.tableRows.length} report${view.tableRows.length === 1 ? '' : 's'} filed`}
+          storageKey="ddr"
+        >
+          {ddrBody}
+        </ReportSection>
+      ) : (
+        <div className="space-y-4">{ddrBody}</div>
+      ))}
 
-      {cdrData && <CdrSection summary={cdrData} title="Co-Director Daily Report" />}
-      {adrData && <AdrSection summary={adrData} openings={adrOpenings} />}
-      {fdrData && <FdrSection summary={fdrData} />}
+      {cdrData && <CdrSection summary={cdrData} title="Co-Director Daily Report" collapsible={multi} />}
+      {adrData && <AdrSection summary={adrData} openings={adrOpenings} collapsible={multi} />}
+      {fdrData && <FdrSection summary={fdrData} collapsible={multi} />}
 
       {admin && <DirectorViewConfig config={config} />}
       {admin && <UsersPanel />}

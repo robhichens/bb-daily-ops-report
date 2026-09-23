@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ShoppingCart, Wrench, Check, CheckCircle2, Trash2 } from 'lucide-react'
 import { CollapsibleCard } from './CollapsibleCard'
-import { ReportHeading } from './ReportSections'
+import { ReportSection } from './ReportSections'
 import {
   REQUEST_LISTS,
   type DailyOpsReport,
@@ -69,15 +69,14 @@ const removeItem = (i: RequestItem) =>
  *  Buy/Fix tags across every report's Day Notes. */
 export function RequestLists({ reports, orgNotes }: { reports: DailyOpsReport[]; orgNotes: LedgerNote[] }) {
   return (
-    <div className="space-y-4">
-      <ReportHeading title="Day Note Requests" />
+    <ReportSection title="Day Note Requests" sub="Purchase & maintenance" storageKey="requests">
       <div className="grid items-start gap-4 md:grid-cols-2">
         {REQUEST_LISTS.map((l) => (
           <ActiveListCard key={l.id} list={l.id} label={l.label} reports={reports} orgNotes={orgNotes} />
         ))}
       </div>
       <CompletedCard reports={reports} orgNotes={orgNotes} />
-    </div>
+    </ReportSection>
   )
 }
 
