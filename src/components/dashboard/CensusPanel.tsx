@@ -18,13 +18,14 @@ function Delta({ n }: { n: number }) {
   const up = n > 0
   return (
     <span
+      title="vs. the prior period"
       className={cn(
         'inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-bold',
         up ? 'bg-[var(--color-good-soft)] text-[var(--color-good)]' : 'bg-[var(--color-critical-soft)] text-[var(--color-critical)]'
       )}
     >
       {up ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
-      {up ? '+' : ''}{n} this week
+      {up ? '+' : ''}{n}
     </span>
   )
 }

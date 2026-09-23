@@ -4,12 +4,12 @@ import { useAuth } from '@/auth/AuthProvider'
 import { isAdmin as isAdminRole, userSites } from '@/lib/users'
 import { SITES, siteName, type SiteId, type DailyOpsReport, type SiteConfig, type LedgerNote, type OrgReport } from '@/lib/schema'
 import { weekOf as weekOfFn } from '@/lib/derive'
-import { todayIso, addIsoDays, formatShort } from '@/lib/dates'
+import { todayIso, addIsoDays, formatShort, daysBetween, formatRange } from '@/lib/dates'
 import {
   subscribeReportsByWeek,
   subscribeRecentReports,
   getReportsByWeek,
-  distinctWeeks,
+  subscribeReportsByRange,
 } from '@/lib/reports'
 import { buildDashboardView } from '@/lib/dashboard'
 import {
@@ -25,6 +25,8 @@ import { inputClass } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { DashboardSections } from '@/components/dashboard/DashboardSections'
+import { PeriodPicker } from '@/components/dashboard/PeriodPicker'
+import { thisWeekPeriod, type Period } from '@/lib/period'
 import { DirectorViewConfig } from '@/components/dashboard/DirectorViewConfig'
 import { ReportsTable } from '@/components/dashboard/ReportsTable'
 import { RequestLists } from '@/components/dashboard/RequestLists'
@@ -60,35 +62,39 @@ export function Dashboard() {
 // --- their schools' data.
 function FullDashboard({ sites, admin }: { sites: SiteConfig[]; admin: boolean }) {
   const today = todayIso()
-  const currentWeek = weekOfFn(today)
   const scope = sites.map((s) => s.id)
-  const [weeks, setWeeks] = useState<string[]>([currentWeek])
-  const [weekOf, setWeekOf] = useState(currentWeek)
+  const [range, setRange] = useState<Period>(() => thisWeekPeriod())
   const [site, setSite] = useState<SiteId | 'all'>('all')
   const [config, setConfig] = useState<Config>(DEFAULT_DIRECTOR_VIEW)
   const [recentRows, setRecentRows] = useState<DailyOpsReport[]>([])
   const [orgNotes, setOrgNotes] = useState<LedgerNote[]>([])
   const [latestAdr, setLatestAdr] = useState<OrgReport | null>(null)
-  const { rows, lastWeekRows } = useWeekData(weekOf)
+  const [rangeRows, setRangeRows] = useState<DailyOpsReport[]>([])
+  const [prevRows, setPrevRows] = useState<DailyOpsReport[]>([])
 
-  useEffect(
-    () =>
-      subscribeRecentReports(200, (recent) => {
-        setRecentRows(recent)
-        setWeeks(Array.from(new Set([currentWeek, ...distinctWeeks(recent)])).sort().reverse())
-      }),
-    [currentWeek]
-  )
+  // Reports for the selected period + the prior equal-length period (for deltas).
+  useEffect(() => {
+    const len = daysBetween(range.start, range.end) + 1
+    const prevStart = addIsoDays(range.start, -len)
+    return subscribeReportsByRange(prevStart, range.end, (all) => {
+      setRangeRows(all.filter((r) => r.date >= range.start && r.date <= range.end))
+      setPrevRows(all.filter((r) => r.date >= prevStart && r.date < range.start))
+    })
+  }, [range.start, range.end])
+
+  useEffect(() => subscribeRecentReports(200, setRecentRows), [])
   useEffect(() => (admin ? subscribeDirectorView(setConfig) : undefined), [admin])
   useEffect(() => (admin ? subscribeAllOrgNotes(setOrgNotes) : undefined), [admin])
   useEffect(() => (admin ? subscribeLatestOrgReport('admissionsReports', setLatestAdr) : undefined), [admin])
 
   const view = useMemo(
-    () => buildDashboardView(rows, lastWeekRows, weekOf, site, today, scope, latestAdr),
+    () => buildDashboardView(rangeRows, prevRows, weekOfFn(range.end), site, today, scope, latestAdr),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rows, lastWeekRows, weekOf, site, today, scope.join(), latestAdr]
+    [rangeRows, prevRows, range.end, site, today, scope.join(), latestAdr]
   )
-  const exportLabel = `${weekOf}${site === 'all' ? '' : '-' + site}`
+  const fileTag = `${range.start}_${range.end}`
+  const exportLabel = `${fileTag}${site === 'all' ? '' : '-' + site}`
+  const periodLabel = formatRange(range.start, range.end)
   const siteLabel = site === 'all' ? (admin ? 'All sites' : 'My schools') : siteName(site)
 
   return (
@@ -100,15 +106,13 @@ function FullDashboard({ sites, admin }: { sites: SiteConfig[]; admin: boolean }
           subtitle={admin ? 'Live insights, red flags & celebrations' : `Your schools: ${sites.map((s) => s.name).join(' · ')}`}
         />
         <div className="flex flex-wrap items-center gap-2">
-          <select value={weekOf} onChange={(e) => setWeekOf(e.target.value)} className={`${inputClass} h-9 w-auto`}>
-            {weeks.map((w) => <option key={w} value={w}>Week of {formatShort(w)}</option>)}
-          </select>
+          <PeriodPicker value={range} onChange={setRange} />
           <select value={site} onChange={(e) => setSite(e.target.value as SiteId | 'all')} className={`${inputClass} h-9 w-auto`}>
             <option value="all">{admin ? 'All sites' : 'All my schools'}</option>
             {sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <Button size="sm" variant="outline" onClick={() => exportCsv(view.tableRows, exportLabel)}><Download className="size-3.5" /> CSV</Button>
-          <Button size="sm" onClick={() => void exportReportsPdf({ reports: view.tableRows, weekOf, siteLabel })}><FileText className="size-3.5" /> PDF</Button>
+          <Button size="sm" onClick={() => void exportReportsPdf({ reports: view.tableRows, periodLabel, fileTag, siteLabel })}><FileText className="size-3.5" /> PDF</Button>
         </div>
       </div>
 

@@ -57,10 +57,11 @@ function fmtSubmitted(r: DailyOpsReport): string {
 
 export async function exportReportsPdf(opts: {
   reports: DailyOpsReport[]
-  weekOf: string
+  periodLabel: string
+  fileTag: string
   siteLabel: string
 }): Promise<void> {
-  const { reports, weekOf, siteLabel } = opts
+  const { reports, periodLabel, siteLabel, fileTag } = opts
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.getWidth()
   const pageH = doc.internal.pageSize.getHeight()
@@ -107,12 +108,12 @@ export async function exportReportsPdf(opts: {
   )
 
   if (sorted.length === 0) {
-    band('Daily Ops Report', siteLabel, `Week of ${formatLong(weekOf)}`)
+    band('Daily Ops Report', siteLabel, periodLabel)
     doc.setTextColor(...C.dkGray)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(11)
     doc.text('No submitted reports for this selection.', M, 44)
-    doc.save(`bb-dor-reports-${weekOf}.pdf`)
+    doc.save(`bb-dor-reports-${fileTag}.pdf`)
     return
   }
 
@@ -229,6 +230,6 @@ export async function exportReportsPdf(opts: {
     doc.text(`Page ${p} of ${pages}`, pageW - M, pageH - 8, { align: 'right' })
   }
 
-  const label = `${weekOf}${siteLabel === 'All sites' ? '' : '-' + siteLabel.toLowerCase().replace(/\s+/g, '-')}`
+  const label = `${fileTag}${siteLabel === 'All sites' ? '' : '-' + siteLabel.toLowerCase().replace(/\s+/g, '-')}`
   doc.save(`bb-dor-reports-${label}.pdf`)
 }

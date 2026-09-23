@@ -185,6 +185,19 @@ export function subscribeReportsByWeek(
   });
 }
 
+/** Live reports whose date falls in [start, end] (inclusive). Two range filters
+ *  on one field need no composite index; the caller filters by site / splits. */
+export function subscribeReportsByRange(
+  start: string,
+  end: string,
+  cb: (rows: DailyOpsReport[]) => void
+): Unsubscribe {
+  return onSnapshot(
+    query(reportsCol(), where('date', '>=', start), where('date', '<=', end)),
+    (snap) => cb(snap.docs.map((d) => d.data() as DailyOpsReport))
+  );
+}
+
 /** One-shot read of all reports in a week (optionally one site). */
 export async function getReportsByWeek(
   weekOf: string,
