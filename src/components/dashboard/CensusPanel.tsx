@@ -39,11 +39,12 @@ export function CensusPanel({
 }: {
   census: EnrollmentCensus
   withdrawals: Withdrawal[]
-  openings: OpeningsToStaff
+  /** Omitted for viewers without ADR access (the grid lives on the ADR). */
+  openings?: OpeningsToStaff
 }) {
   return (
     <div className="space-y-4">
-      <OpeningsHero openings={openings} />
+      {openings && <OpeningsHero openings={openings} />}
 
       <div className="grid items-start gap-4 lg:grid-cols-[1.5fr_1fr]">
         <div className="grid gap-4 sm:grid-cols-3">
@@ -55,7 +56,7 @@ export function CensusPanel({
   )
 }
 
-function OpeningsHero({ openings }: { openings: OpeningsToStaff }) {
+export function OpeningsHero({ openings }: { openings: OpeningsToStaff }) {
   const [showAll, setShowAll] = useState(false)
   const positive = openings.rooms.filter((r) => r.open > 0)
   const shown = showAll ? openings.rooms : positive.slice(0, 5)

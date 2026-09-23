@@ -82,6 +82,21 @@ export function subscribeLatestOrgReport(col: string, cb: (report: OrgReport | n
   )
 }
 
+/** Org reports whose date falls in [start, end] (inclusive), for the dashboard.
+ *  Two range filters on one field need no composite index. */
+export function subscribeOrgReportsByRange(
+  col: string,
+  start: string,
+  end: string,
+  cb: (rows: OrgReport[]) => void
+): Unsubscribe {
+  return onSnapshot(
+    query(collection(db, col), where('date', '>=', start), where('date', '<=', end)),
+    (snap) => cb(snap.docs.map((d) => d.data() as OrgReport)),
+    () => cb([])
+  )
+}
+
 export async function upsertOrgDraft(col: string, report: OrgReport): Promise<void> {
   const payload: OrgReport = {
     ...withDerived(report),

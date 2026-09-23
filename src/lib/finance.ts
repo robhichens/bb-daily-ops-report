@@ -4,7 +4,7 @@
 // Notes live in the central `orgDayNotes` ledger (see orgReports.ts, source 'fdr').
 
 import {
-  doc, getDoc, limit, onSnapshot, orderBy, query, collection, setDoc,
+  doc, getDoc, limit, onSnapshot, orderBy, query, collection, setDoc, where,
   type Unsubscribe,
 } from 'firebase/firestore'
 
@@ -51,5 +51,14 @@ export async function submitFinanceReport(report: FinanceReport, uid: string): P
 export function subscribeRecentFinanceReports(max: number, cb: (rows: FinanceReport[]) => void): Unsubscribe {
   return onSnapshot(query(reportsCol(), orderBy('date', 'desc'), limit(max)), (snap) =>
     cb(snap.docs.map((d) => d.data() as FinanceReport))
+  )
+}
+
+/** Finance reports whose date falls in [start, end] (inclusive), for the dashboard. */
+export function subscribeFinanceReportsByRange(start: string, end: string, cb: (rows: FinanceReport[]) => void): Unsubscribe {
+  return onSnapshot(
+    query(reportsCol(), where('date', '>=', start), where('date', '<=', end)),
+    (snap) => cb(snap.docs.map((d) => d.data() as FinanceReport)),
+    () => cb([])
   )
 }

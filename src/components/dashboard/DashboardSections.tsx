@@ -12,13 +12,22 @@ type Sections = Record<DashboardSection, boolean>
 /** Renders the dashboard cards selected in `sections`. Shared by the admin
  *  dashboard (all on) and the curated director view. Gamification (leaderboard,
  *  team goal, celebrations) sits at the bottom; operational cards up top. */
-export function DashboardSections({ view, sections }: { view: DashboardView; sections: Sections }) {
+export function DashboardSections({
+  view,
+  sections,
+  showOpenings = true,
+}: {
+  view: DashboardView
+  sections: Sections
+  /** False for viewers without ADR access — the Openings grid comes from the ADR. */
+  showOpenings?: boolean
+}) {
   const gameRow = sections.leaderboard || sections.teamGoal || sections.celebrations
   const opsRow = sections.staffWatch || sections.packet
 
   return (
     <div className="space-y-6">
-      {sections.enrollment && <CensusPanel census={view.census} withdrawals={view.withdrawals} openings={view.openings} />}
+      {sections.enrollment && <CensusPanel census={view.census} withdrawals={view.withdrawals} openings={showOpenings ? view.openings : undefined} />}
 
       {sections.kpis && (
         <KpiCards kpis={view.kpis} overtimeStaff={view.overtimeStaff} singleSite={view.singleSite} />
