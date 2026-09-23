@@ -254,8 +254,8 @@ export function FdrSection({ summary }: { summary: FdrSummary }) {
             />
           </div>
 
-          <div className="grid items-start gap-4 lg:grid-cols-[1.5fr_1fr]">
-            <Card className="overflow-x-auto p-0">
+          {/* Full-width table from tablet up; stacked cards per location on phones. */}
+          <Card className="hidden overflow-hidden p-0 sm:block">
               <table className="w-full text-sm">
                 <thead className="bg-[var(--color-secondary)] text-left text-[11px] font-bold uppercase tracking-wide text-[var(--color-dk-gray)]">
                   <tr>
@@ -267,7 +267,7 @@ export function FdrSection({ summary }: { summary: FdrSummary }) {
                 <tbody>
                   {summary.bySite.map((s) => (
                     <tr key={s.siteId} className="border-t border-[var(--color-border)]">
-                      <td className="px-4 py-2 font-semibold text-[var(--color-charcoal)]">{s.name}</td>
+                      <td className="px-4 py-2 font-semibold whitespace-nowrap text-[var(--color-charcoal)]">{s.name}</td>
                       <td className="px-4 py-2">{money(s.checks)}</td>
                       <td className="px-4 py-2">{money(s.agency)}</td>
                       <td className="px-4 py-2">{money(s.tuitionExpress)}</td>
@@ -289,7 +289,25 @@ export function FdrSection({ summary }: { summary: FdrSummary }) {
                   )}
                 </tbody>
               </table>
-            </Card>
+          </Card>
+
+          <div className="grid gap-3 sm:hidden">
+            {summary.bySite.map((s) => (
+              <Card key={s.siteId} className="p-4">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="font-bold text-[var(--color-charcoal)]">{s.name}</span>
+                  <span className="text-lg font-extrabold text-[var(--color-charcoal)]">{money(s.deposits)}</span>
+                </div>
+                <div className="mt-1 border-t border-[var(--color-border)] pt-1">
+                  <Figure label="Checks" value={money(s.checks)} />
+                  <Figure label="Agency" value={money(s.agency)} />
+                  <Figure label="Tuition Express" value={money(s.tuitionExpress)} />
+                  {s.declinesRefunds > 0 && <Figure label="Declines & refunds" value={`−${money(s.declinesRefunds)}`} />}
+                  <Figure label="Outstanding" value={money(s.outstandingCurrent + s.outstandingFormer)} />
+                </div>
+              </Card>
+            ))}
+          </div>
 
             <Card className="p-5">
               <p className="text-[11px] font-bold uppercase tracking-[0.13em] text-[var(--color-critical)]">Declines & refunds</p>
@@ -309,7 +327,6 @@ export function FdrSection({ summary }: { summary: FdrSummary }) {
                 </ul>
               )}
             </Card>
-          </div>
         </>
       )}
     </section>
