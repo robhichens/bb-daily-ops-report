@@ -18,8 +18,8 @@ import { Input, inputClass } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-const ROLE_ORDER: Record<string, number> = { admin: 0, director: 1, co_director: 2 }
-const ROLE_LABEL: Record<string, string> = { admin: 'Admin', director: 'Director', co_director: 'Co-Director' }
+const ROLE_ORDER: Record<string, number> = { admin: 0, director: 1, co_director: 2, finance: 3, admissions: 4 }
+const ROLE_LABEL: Record<string, string> = { admin: 'Admin', director: 'Director', co_director: 'Co-Director', finance: 'Finance', admissions: 'Admissions' }
 const humanRole = (r: string) => ROLE_LABEL[r] ?? r
 
 // Assignable reports = everything except DDR (DDR access = the site checkboxes).

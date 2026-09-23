@@ -1,7 +1,9 @@
 // src/lib/users.ts
 // User profiles live in Firestore `users/{uid}` = { role, siteId?, siteIds?, displayName?, email? }.
-// Mirrors the bb-platform role set; `admin`, `director` (site-scoped) and
-// `co_director` (fills the CDR for a campus, no DDR/admin access) reach the DOR.
+// Mirrors the bb-platform role set. Roles that reach the DOR: `admin` (Kathe/
+// Molly/Rob — see everything), `director` (site-scoped DDR), `co_director` (fills
+// the CDR for a campus), and `finance` / `admissions` (scoped to one org report —
+// FDR / ADR — via reportAccess, no DDR or all-org access).
 // `siteIds` (list) is the source of truth for site access; legacy docs may only
 // have `siteId`, so always read access through `userSites()`.
 
@@ -23,6 +25,8 @@ export type UserRole =
   | 'admin'
   | 'director'
   | 'co_director'
+  | 'finance'
+  | 'admissions'
   | 'teacher'
   | 'assistant'
   | 'floater'
@@ -44,7 +48,7 @@ export interface UserProfile {
 }
 
 /** Roles permitted to open the Daily Ops Report app at all. */
-export const DOR_ROLES: UserRole[] = ['admin', 'director', 'co_director']
+export const DOR_ROLES: UserRole[] = ['admin', 'director', 'co_director', 'finance', 'admissions']
 
 export const canAccessDor = (role: UserRole | undefined): boolean =>
   !!role && DOR_ROLES.includes(role)

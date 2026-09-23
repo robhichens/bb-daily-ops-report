@@ -28,3 +28,24 @@ describe('co-director access', () => {
     expect(reportAccessLevel(director, 'edr')).toBeNull()
   })
 })
+
+describe('finance / admissions scoped roles', () => {
+  const finance: UserProfile = { uid: 'f', role: 'finance', reportAccess: { fdr: 'fill' } }
+  const admissions: UserProfile = { uid: 'a', role: 'admissions', reportAccess: { adr: 'fill' } }
+
+  it('can open the DOR app', () => {
+    expect(canAccessDor('finance')).toBe(true)
+    expect(canAccessDor('admissions')).toBe(true)
+  })
+
+  it('each sees only its own report — never the DDR or everything', () => {
+    expect(reportAccessLevel(finance, 'fdr')).toBe('fill')
+    expect(reportAccessLevel(finance, 'ddr')).toBeNull()
+    expect(reportAccessLevel(finance, 'adr')).toBeNull()
+    expect(accessibleReportKeys(finance)).toEqual(['fdr'])
+
+    expect(reportAccessLevel(admissions, 'adr')).toBe('fill')
+    expect(reportAccessLevel(admissions, 'fdr')).toBeNull()
+    expect(accessibleReportKeys(admissions)).toEqual(['adr'])
+  })
+})
