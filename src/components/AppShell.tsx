@@ -10,9 +10,11 @@ import { subscribeRecentReports } from '@/lib/reports'
 import { countUnreadReplies, getDayNotesSeen, laterIso } from '@/lib/dayNotesRead'
 
 // The report picker lives where "Daily Report" used to; other views stay flat.
-const navItems: { to: string; label: string; icon: typeof ClipboardList; adminOnly?: boolean }[] = [
+// Everyone gets a Dashboard (built from their report access). Day Notes is the
+// DDR notes board, so it stays with admins + directors (the DDR readers).
+const navItems: { to: string; label: string; icon: typeof ClipboardList; adminOnly?: boolean; ddrReaders?: boolean }[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/day-notes', label: 'Day Notes', icon: NotebookPen },
+  { to: '/day-notes', label: 'Day Notes', icon: NotebookPen, ddrReaders: true },
 ]
 
 /** Reports the user can reach, in registry order. */
@@ -186,7 +188,7 @@ export function AppShell() {
           <div className="flex items-center gap-2 sm:gap-4">
             <nav className="flex items-center gap-1">
               <ReportsMenu />
-              {navItems.filter((i) => (!i.adminOnly || admin) && canSeeBoards).map(({ to, label, icon: Icon }) => {
+              {navItems.filter((i) => (!i.adminOnly || admin) && (!i.ddrReaders || canSeeBoards)).map(({ to, label, icon: Icon }) => {
                 const badge = to === '/day-notes' && unread > 0
                 return (
                   <NavLink
