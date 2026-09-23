@@ -8,6 +8,7 @@ import {
   ENROLLMENT_COMMS_DAILY_GOAL,
   REGISTRATION_FEE,
   SITES,
+  siteCapacity,
   siteName,
   type DailyOpsReport,
   type SiteId,
@@ -120,6 +121,101 @@ export function enrollmentFunnelBySite(allRows: DailyOpsReport[], scope: SiteId[
     name: s.name,
     stages: enrollmentFunnel(allRows.filter((r) => r.siteId === s.id)),
   }))
+}
+
+// ---------------------------------------------------------------------------
+// Enrollment census & capacity (the dashboard's headline metric)
+// ---------------------------------------------------------------------------
+
+export interface SiteCensus {
+  siteId: SiteId
+  name: string
+  enrolled: number
+  capacity: number
+  pct: number // 0–100
+  open: number
+  delta: number // vs the same point last week
+}
+
+export interface EnrollmentCensus {
+  total: number
+  capacity: number
+  pct: number
+  open: number
+  delta: number
+  bySite: SiteCensus[]
+}
+
+/** Most recent non-zero full-time enrollment a site reported within `rows`. */
+function latestFullTime(rows: DailyOpsReport[], siteId: SiteId): number {
+  const mine = rows
+    .filter((r) => r.siteId === siteId && (r.enrollmentMarketing.fullTimeEnrollment?.count ?? 0) > 0)
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+  return mine[0]?.enrollmentMarketing.fullTimeEnrollment.count ?? 0
+}
+
+/** Current full-time enrollment vs licensed capacity, org-wide and per site,
+ *  with the week-over-week change (this week's latest vs last week's latest). */
+export function enrollmentCensus(
+  rows: DailyOpsReport[],
+  lastWeekRows: DailyOpsReport[],
+  scope: SiteId[] = SITE_IDS
+): EnrollmentCensus {
+  const bySite: SiteCensus[] = SITES.filter((s) => scope.includes(s.id)).map((s) => {
+    const enrolled = latestFullTime(rows, s.id)
+    const prev = latestFullTime(lastWeekRows, s.id)
+    const capacity = siteCapacity(s.id)
+    return {
+      siteId: s.id,
+      name: s.name,
+      enrolled,
+      capacity,
+      pct: capacity > 0 ? Math.round((enrolled / capacity) * 100) : 0,
+      open: Math.max(0, capacity - enrolled),
+      delta: enrolled - prev,
+    }
+  })
+  const total = sum(bySite.map((c) => c.enrolled))
+  const capacity = sum(bySite.map((c) => c.capacity))
+  return {
+    total,
+    capacity,
+    pct: capacity > 0 ? Math.round((total / capacity) * 100) : 0,
+    open: Math.max(0, capacity - total),
+    delta: sum(bySite.map((c) => c.delta)),
+    bySite,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Withdrawals — who left & why (from the DDR "Terminations (Today)" items)
+// ---------------------------------------------------------------------------
+
+export interface Withdrawal {
+  name: string
+  room: string
+  date: string
+  reason: string
+  site: string
+}
+
+export function withdrawals(rows: DailyOpsReport[]): Withdrawal[] {
+  const out: Withdrawal[] = []
+  for (const r of rows) {
+    for (const it of r.enrollmentMarketing.terminationsToday.items ?? []) {
+      const name = (it.name ?? '').trim()
+      const reason = (it.reason ?? '').trim()
+      if (!name && !reason) continue
+      out.push({
+        name: name || '—',
+        room: (it.room ?? '').trim(),
+        date: (it.terminationDate ?? '').trim() || r.date,
+        reason,
+        site: r.siteName,
+      })
+    }
+  }
+  return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
 }
 
 // ---------------------------------------------------------------------------
@@ -264,6 +360,8 @@ export function celebrations(weekRows: DailyOpsReport[], weekOf: string, asOf: s
 export interface DashboardView {
   asOf: string
   singleSite: boolean
+  census: EnrollmentCensus
+  withdrawals: Withdrawal[]
   kpis: Kpis
   overtimeStaff: OvertimeStaffRow[]
   board: LeaderboardRow[]
@@ -299,6 +397,7 @@ export function buildDashboardView(
   const allSites = rows.filter((r) => r.status === 'submitted' && scope.includes(r.siteId))
   const lastWeekScoped = lastWeekRows.filter((r) => scope.includes(r.siteId))
   const filtered = site === 'all' ? allSites : allSites.filter((r) => r.siteId === site)
+  const censusScope = site === 'all' ? scope : [site]
 
   const badgesBySite: Record<string, Badge[]> = {}
   for (const id of scope) badgesBySite[id] = badgesForSite(allSites, id, weekOf, asOf)
@@ -306,6 +405,8 @@ export function buildDashboardView(
   return {
     asOf,
     singleSite: site !== 'all',
+    census: enrollmentCensus(allSites, lastWeekScoped, censusScope),
+    withdrawals: withdrawals(filtered),
     kpis: computeKpis(filtered, today),
     overtimeStaff: overtimeByStaff(filtered),
     board: leaderboard(allSites, scope, weekOf, asOf),

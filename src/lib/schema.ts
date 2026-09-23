@@ -10,16 +10,22 @@ export type SiteId = 'crozet' | 'forest-lakes' | 'mill-creek';
 export interface SiteConfig {
   id: SiteId;
   name: string;
+  /** Licensed full-time capacity, for the dashboard capacity meter.
+   *  PLACEHOLDER numbers — confirm the real licensed capacity per campus. */
+  capacity: number;
 }
 
 export const SITES: SiteConfig[] = [
-  { id: 'crozet', name: 'Crozet' },
-  { id: 'forest-lakes', name: 'Forest Lakes' },
-  { id: 'mill-creek', name: 'Mill Creek' },
+  { id: 'crozet', name: 'Crozet', capacity: 110 },
+  { id: 'forest-lakes', name: 'Forest Lakes', capacity: 100 },
+  { id: 'mill-creek', name: 'Mill Creek', capacity: 90 },
 ];
 
 export const siteName = (id: SiteId): string =>
   SITES.find((s) => s.id === id)?.name ?? id;
+
+export const siteCapacity = (id: SiteId): number =>
+  SITES.find((s) => s.id === id)?.capacity ?? 0;
 
 /** Standard 7-room scheme, identical across all 3 campuses (as of 2026-08-17). */
 export interface ClassroomConfig {
@@ -92,6 +98,7 @@ export interface Labor {
 }
 
 export interface EnrollmentMarketing {
+  fullTimeEnrollment: CountNote; // current FT census (a headcount, not a daily event)
   toursGiven: CountNote;
   toursScheduled: CountNote;
   callsInEmailsWeb: CountNote;
@@ -223,6 +230,7 @@ const F_ROOM: ItemFieldDef = { key: 'room', label: 'Room', type: 'text' };
 const F_REASON: ItemFieldDef = { key: 'reason', label: 'Reason', type: 'text' };
 
 export const ENROLLMENT_FIELDS: CountNoteField<keyof EnrollmentMarketing>[] = [
+  { key: 'fullTimeEnrollment', label: 'Full-Time Enrollment', notesPrompt: 'Current full-time headcount at your campus today' },
   { key: 'toursGiven', label: 'Number of Tours Given', notesPrompt: 'Add names', itemFields: [F_NAME] },
   { key: 'toursScheduled', label: 'Number of Tours Scheduled', notesPrompt: 'Check IKS', itemFields: [F_NAME, { key: 'tourDate', label: 'Tour date', type: 'date' }] },
   { key: 'callsInEmailsWeb', label: 'Number of Calls In/Emails & Web Inq', notesPrompt: 'Provide all details', itemFields: [{ key: 'type', label: 'Type', type: 'select', options: ['Call', 'Email', 'Web', 'Walk-in'], allowOther: true }, F_NAME] },

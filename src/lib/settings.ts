@@ -7,6 +7,7 @@ import { doc, onSnapshot, setDoc, type Unsubscribe } from 'firebase/firestore'
 import { db } from './firebase'
 
 export type DashboardSection =
+  | 'enrollment'
   | 'kpis'
   | 'leaderboard'
   | 'teamGoal'
@@ -22,6 +23,7 @@ export interface DirectorViewConfig {
 
 /** Labels + the order they appear in the config editor / director view. */
 export const SECTION_META: { key: DashboardSection; label: string; hint: string }[] = [
+  { key: 'enrollment', label: 'Enrollment & capacity', hint: 'Full-time enrollment, capacity, withdrawals' },
   { key: 'leaderboard', label: 'Leaderboard', hint: 'Friendly weekly ranking + streaks' },
   { key: 'teamGoal', label: 'Team goal', hint: 'Shared “everyone filed” progress bar' },
   { key: 'celebrations', label: 'Celebrations', hint: 'Wins: streaks, goals hit, growth' },
@@ -35,6 +37,7 @@ export const SECTION_META: { key: DashboardSection; label: string; hint: string 
 /** Default published view: the motivating stuff on, sensitive ops off. */
 export const DEFAULT_DIRECTOR_VIEW: DirectorViewConfig = {
   sections: {
+    enrollment: false,
     leaderboard: true,
     teamGoal: true,
     celebrations: true,

@@ -2,8 +2,19 @@
 // Pure helpers for derived fields. Call withDerived() before every save so the
 // dashboard can query/group without recomputation.
 
-import type { DailyOpsReport } from './schema';
+import { ENROLLMENT_FIELDS, STAFF_FIELDS, emptyCountNote, type CountNote, type DailyOpsReport } from './schema';
 import { computeQualityScore } from './gamification';
+
+/** Seed any CountNote field missing from a loaded doc (e.g. a field added after
+ *  the doc was written, like fullTimeEnrollment) so the form never reads undefined. */
+function withCountNoteDefaults<K extends string>(
+  map: Record<K, CountNote>,
+  fields: { key: K }[]
+): Record<K, CountNote> {
+  const out = { ...map };
+  for (const f of fields) if (!out[f.key]) out[f.key] = emptyCountNote();
+  return out;
+}
 
 export const totalAttendance = (preschool: number, subsidy: number): number =>
   (preschool || 0) + (subsidy || 0);
@@ -38,6 +49,8 @@ export function withDerived(r: DailyOpsReport): DailyOpsReport {
     ...r,
     day: weekdayName(r.date),
     weekOf: weekOf(r.date),
+    enrollmentMarketing: withCountNoteDefaults(r.enrollmentMarketing, ENROLLMENT_FIELDS),
+    staff: withCountNoteDefaults(r.staff, STAFF_FIELDS),
     attendance: {
       ...r.attendance,
       total: totalAttendance(r.attendance.preschool, r.attendance.subsidy),

@@ -1,5 +1,6 @@
 import type { DashboardView } from '@/lib/dashboard'
 import type { DashboardSection } from '@/lib/settings'
+import { CensusPanel } from './CensusPanel'
 import { KpiCards } from './KpiCards'
 import { Leaderboard } from './Leaderboard'
 import { TeamGoalBar } from './TeamGoalBar'
@@ -17,6 +18,8 @@ export function DashboardSections({ view, sections }: { view: DashboardView; sec
 
   return (
     <div className="space-y-6">
+      {sections.enrollment && <CensusPanel census={view.census} withdrawals={view.withdrawals} />}
+
       {sections.kpis && (
         <KpiCards kpis={view.kpis} overtimeStaff={view.overtimeStaff} singleSite={view.singleSite} />
       )}
