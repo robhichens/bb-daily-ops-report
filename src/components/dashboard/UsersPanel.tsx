@@ -12,6 +12,7 @@ import {
   inviteUser,
   setUserDisabled,
   deleteUser,
+  type InviteRole,
   type UserProfile,
 } from '@/lib/users'
 import { Input, inputClass } from '@/components/ui/input'
@@ -203,17 +204,26 @@ export function UsersPanel() {
   )
 }
 
-type InviteStatus = { kind: 'idle' } | { kind: 'sending' } | { kind: 'error'; message: string } | { kind: 'sent'; email: string; reused: boolean }
+type InviteStatus =
+  | { kind: 'idle' }
+  | { kind: 'sending' }
+  | { kind: 'error'; message: string }
+  | { kind: 'sent'; email: string; reused: boolean; emailSent: boolean }
 
-/** Admin enters an email + role (+ schools, for a director) and sends an
- *  invite: the invite-user function creates the account, then the browser
- *  sends the person the same "set your password" email as Forgot password.
+// Roles tied to a campus (they pick schools); the rest are org-wide.
+const SITE_ROLES: InviteRole[] = ['director', 'co_director']
+
+/** Admin enters a name + email + role (+ schools, for campus roles) and an
+ *  optional personal note, and sends an invite: the invite-user function
+ *  creates the account and emails a branded "set your password" invite.
  *  They pick their own password on first login — this never touches one. */
 function InviteForm() {
   const { user } = useAuth()
   const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState<'director' | 'admin' | 'co_director'>('director')
+  const [note, setNote] = useState('')
+  const [role, setRole] = useState<InviteRole>('director')
   const [siteIds, setSiteIds] = useState<SiteId[]>([])
   const [status, setStatus] = useState<InviteStatus>({ kind: 'idle' })
 
@@ -225,14 +235,21 @@ function InviteForm() {
     if (!user) return
     const trimmed = email.trim()
     if (!trimmed) { setStatus({ kind: 'error', message: 'Enter an email address' }); return }
-    if (role !== 'admin' && siteIds.length === 0) { setStatus({ kind: 'error', message: 'Pick at least one school' }); return }
+    const isSiteRole = SITE_ROLES.includes(role)
+    if (isSiteRole && siteIds.length === 0) { setStatus({ kind: 'error', message: 'Pick at least one school' }); return }
 
     setStatus({ kind: 'sending' })
     try {
       const idToken = await user.getIdToken()
-      const result = await inviteUser(idToken, trimmed, role, siteIds)
-      setStatus({ kind: 'sent', email: trimmed, reused: result.reused })
-      setEmail(''); setRole('director'); setSiteIds([])
+      const result = await inviteUser(idToken, {
+        email: trimmed,
+        name: name.trim(),
+        role,
+        siteIds: isSiteRole ? siteIds : [],
+        note: note.trim(),
+      })
+      setStatus({ kind: 'sent', email: trimmed, reused: result.reused, emailSent: result.emailSent })
+      setName(''); setEmail(''); setNote(''); setRole('director'); setSiteIds([])
     } catch (err) {
       setStatus({ kind: 'error', message: err instanceof Error ? err.message : 'Invite failed' })
     }
@@ -253,6 +270,15 @@ function InviteForm() {
   return (
     <div className="space-y-3 border-b border-[var(--color-border)] bg-[var(--color-secondary)]/40 p-5">
       <div className="flex flex-wrap items-end gap-3">
+        <label className="flex min-w-40 flex-1 flex-col gap-1">
+          <span className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-mid-gray)]">Name</span>
+          <Input
+            value={name}
+            placeholder="First Last"
+            disabled={sending}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
         <label className="flex min-w-48 flex-1 flex-col gap-1">
           <span className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-mid-gray)]">Email</span>
           <Input
@@ -268,11 +294,13 @@ function InviteForm() {
           <select
             value={role}
             disabled={sending}
-            onChange={(e) => setRole(e.target.value as 'director' | 'admin' | 'co_director')}
+            onChange={(e) => setRole(e.target.value as InviteRole)}
             className={cn(inputClass, 'h-11 w-auto')}
           >
             <option value="director">Director</option>
             <option value="co_director">Co-Director</option>
+            <option value="finance">Finance</option>
+            <option value="admissions">Admissions</option>
             <option value="admin">Admin</option>
           </select>
         </label>
@@ -283,7 +311,7 @@ function InviteForm() {
         <Button variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={sending}>Cancel</Button>
       </div>
 
-      {role !== 'admin' && (
+      {SITE_ROLES.includes(role) && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
           <span className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-mid-gray)]">
             {role === 'co_director' ? 'Campus' : 'Schools'}
@@ -303,6 +331,21 @@ function InviteForm() {
         </div>
       )}
 
+      <label className="flex flex-col gap-1">
+        <span className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-mid-gray)]">
+          Personal note <span className="font-normal normal-case tracking-normal">(optional, shows in the email)</span>
+        </span>
+        <textarea
+          value={note}
+          rows={2}
+          maxLength={1000}
+          placeholder="So glad you're joining us! Reach out any time if you get stuck."
+          disabled={sending}
+          onChange={(e) => setNote(e.target.value)}
+          className={cn(inputClass, 'h-auto min-h-16 py-2')}
+        />
+      </label>
+
       {status.kind === 'error' && (
         <p className="text-xs font-semibold text-[var(--color-coral-dark)]">{status.message}</p>
       )}
@@ -311,6 +354,7 @@ function InviteForm() {
           {status.reused
             ? `${status.email} already had an account — resent the set-password email.`
             : `Invite sent to ${status.email} — they'll get an email to set their password.`}
+          {!status.emailSent && " (Sent as the plain Firebase email — the branded invite isn't switched on yet.)"}
         </p>
       )}
     </div>

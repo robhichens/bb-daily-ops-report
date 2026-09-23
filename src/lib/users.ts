@@ -145,28 +145,35 @@ export async function setDayNotesSeenAt(uid: string, iso: string): Promise<void>
 export interface InviteResult {
   uid: string
   reused: boolean // true = the email already had an account; we just resent the set-password email
+  emailSent: boolean // true = the branded invite went out; false = fell back to Firebase's plain reset email
+}
+
+export type InviteRole = 'admin' | 'director' | 'co_director' | 'finance' | 'admissions'
+
+export interface InviteInput {
+  email: string
+  name: string // invitee's name — greets them + becomes their displayName
+  role: InviteRole
+  siteIds: SiteId[]
+  note: string // optional personal note shown in the email
 }
 
 /** Admin-only: invite someone by email from Users & Access. Creates their
  *  Firebase Auth account + Firestore profile via the invite-user Netlify
- *  Function (privileged — needs firebase-admin, can't run client-side), then
- *  sends the same password-reset email "Forgot password?" uses, so they land
- *  on the set-password screen themselves. This code never sees a password. */
-export async function inviteUser(
-  idToken: string,
-  email: string,
-  role: 'admin' | 'director' | 'co_director',
-  siteIds: SiteId[]
-): Promise<InviteResult> {
+ *  Function (privileged — needs firebase-admin, can't run client-side), which
+ *  also emails them the branded invite with a set-password link. If that email
+ *  couldn't go out, fall back to the plain "Forgot password?" email so they
+ *  still get a way in. This code never sees a password. */
+export async function inviteUser(idToken: string, input: InviteInput): Promise<InviteResult> {
   const res = await fetch('/api/invite-user', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-    body: JSON.stringify({ email, role, siteIds }),
+    body: JSON.stringify(input),
   })
   const body = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(body.error || `Invite failed (${res.status})`)
-  await sendPasswordResetEmail(auth, email)
-  return body as InviteResult
+  if (!body.emailSent) await sendPasswordResetEmail(auth, input.email)
+  return { uid: body.uid, reused: !!body.reused, emailSent: !!body.emailSent }
 }
 
 /** Admin-only: deactivate (block sign-in), reactivate, or delete an account.
