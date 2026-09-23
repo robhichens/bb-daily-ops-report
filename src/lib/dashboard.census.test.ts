@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { enrollmentCensus, withdrawals } from './dashboard'
-import { emptyReport, type DailyOpsReport, type SiteId } from './schema'
+import { enrollmentCensus, withdrawals, openingsToStaff } from './dashboard'
+import { emptyReport, type DailyOpsReport, type OrgReport, type SiteId } from './schema'
 
 function ft(site: SiteId, date: string, count: number): DailyOpsReport {
   const r = emptyReport(site, date)
@@ -37,5 +37,34 @@ describe('withdrawals', () => {
     const out = withdrawals([r1, r2])
     expect(out.map((w) => w.name)).toEqual(['Rowan D.', 'Ava R.']) // last day 10-06 sorts above 09-18
     expect(out[0]).toMatchObject({ room: 'Lions', reason: 'Relocating', site: 'Mill Creek', date: '2026-10-06' })
+  })
+})
+
+describe('openingsToStaff', () => {
+  const adr: OrgReport = {
+    id: '2026-09-22', date: '2026-09-22', day: '', weekOf: '', completedBy: '',
+    data: {
+      openingsToStaff: {
+        crozet_lions: 3,
+        crozet_tigers: -1,
+        'mill-creek_cheetahs': 5,
+        'forest-lakes_hippos': 0,
+      },
+    },
+    status: 'submitted', submittedAt: null, createdAt: '', updatedAt: '', createdByUid: '',
+  }
+
+  it('ranks entered rooms most-open first and totals only positive openings', () => {
+    const o = openingsToStaff(adr)
+    expect(o.rooms.map((r) => r.room)).toEqual(['Cheetahs', 'Lions', 'Hippos', 'Tigers']) // 5, 3, 0, -1
+    expect(o.rooms[0]).toMatchObject({ site: 'Mill Creek', open: 5 })
+    expect(o.totalOpen).toBe(8) // 5 + 3; the 0 and -1 don't add
+    expect(o.asOfDate).toBe('2026-09-22')
+  })
+
+  it('is empty when there is no ADR yet', () => {
+    const o = openingsToStaff(null)
+    expect(o.rooms).toEqual([])
+    expect(o.totalOpen).toBe(0)
   })
 })

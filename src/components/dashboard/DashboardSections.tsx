@@ -18,7 +18,7 @@ export function DashboardSections({ view, sections }: { view: DashboardView; sec
 
   return (
     <div className="space-y-6">
-      {sections.enrollment && <CensusPanel census={view.census} withdrawals={view.withdrawals} />}
+      {sections.enrollment && <CensusPanel census={view.census} withdrawals={view.withdrawals} openings={view.openings} />}
 
       {sections.kpis && (
         <KpiCards kpis={view.kpis} overtimeStaff={view.overtimeStaff} singleSite={view.singleSite} />

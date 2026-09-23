@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { LayoutDashboard, Download, FileText, Sparkles } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { isAdmin as isAdminRole, userSites } from '@/lib/users'
-import { SITES, siteName, type SiteId, type DailyOpsReport, type SiteConfig, type LedgerNote } from '@/lib/schema'
+import { SITES, siteName, type SiteId, type DailyOpsReport, type SiteConfig, type LedgerNote, type OrgReport } from '@/lib/schema'
 import { weekOf as weekOfFn } from '@/lib/derive'
 import { todayIso, addIsoDays, formatShort } from '@/lib/dates'
 import {
@@ -28,7 +28,7 @@ import { DashboardSections } from '@/components/dashboard/DashboardSections'
 import { DirectorViewConfig } from '@/components/dashboard/DirectorViewConfig'
 import { ReportsTable } from '@/components/dashboard/ReportsTable'
 import { RequestLists } from '@/components/dashboard/RequestLists'
-import { subscribeAllOrgNotes } from '@/lib/orgReports'
+import { subscribeAllOrgNotes, subscribeLatestOrgReport } from '@/lib/orgReports'
 import { UsersPanel } from '@/components/dashboard/UsersPanel'
 
 const ALL_ON = Object.fromEntries(SECTION_META.map((s) => [s.key, true])) as Record<DashboardSection, boolean>
@@ -68,6 +68,7 @@ function FullDashboard({ sites, admin }: { sites: SiteConfig[]; admin: boolean }
   const [config, setConfig] = useState<Config>(DEFAULT_DIRECTOR_VIEW)
   const [recentRows, setRecentRows] = useState<DailyOpsReport[]>([])
   const [orgNotes, setOrgNotes] = useState<LedgerNote[]>([])
+  const [latestAdr, setLatestAdr] = useState<OrgReport | null>(null)
   const { rows, lastWeekRows } = useWeekData(weekOf)
 
   useEffect(
@@ -80,11 +81,12 @@ function FullDashboard({ sites, admin }: { sites: SiteConfig[]; admin: boolean }
   )
   useEffect(() => (admin ? subscribeDirectorView(setConfig) : undefined), [admin])
   useEffect(() => (admin ? subscribeAllOrgNotes(setOrgNotes) : undefined), [admin])
+  useEffect(() => (admin ? subscribeLatestOrgReport('admissionsReports', setLatestAdr) : undefined), [admin])
 
   const view = useMemo(
-    () => buildDashboardView(rows, lastWeekRows, weekOf, site, today, scope),
+    () => buildDashboardView(rows, lastWeekRows, weekOf, site, today, scope, latestAdr),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rows, lastWeekRows, weekOf, site, today, scope.join()]
+    [rows, lastWeekRows, weekOf, site, today, scope.join(), latestAdr]
   )
   const exportLabel = `${weekOf}${site === 'all' ? '' : '-' + site}`
   const siteLabel = site === 'all' ? (admin ? 'All sites' : 'My schools') : siteName(site)

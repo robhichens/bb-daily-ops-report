@@ -72,6 +72,16 @@ export async function getOrgReport(col: string, docId: string): Promise<OrgRepor
   return snap.exists() ? (snap.data() as OrgReport) : null
 }
 
+/** The most recent org report in a collection (by date), for dashboard reads
+ *  like the ADR's Openings-to-Staff grid. Single-field orderBy, no index. */
+export function subscribeLatestOrgReport(col: string, cb: (report: OrgReport | null) => void): Unsubscribe {
+  return onSnapshot(
+    query(collection(db, col), orderBy('date', 'desc'), limit(1)),
+    (snap) => cb(snap.empty ? null : (snap.docs[0].data() as OrgReport)),
+    () => cb(null)
+  )
+}
+
 export async function upsertOrgDraft(col: string, report: OrgReport): Promise<void> {
   const payload: OrgReport = {
     ...withDerived(report),

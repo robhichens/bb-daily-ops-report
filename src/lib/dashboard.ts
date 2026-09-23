@@ -5,12 +5,15 @@
 // staff watch, packet compliance, and the red-flag / celebration feeds.
 
 import {
+  CLASSROOMS,
   ENROLLMENT_COMMS_DAILY_GOAL,
   REGISTRATION_FEE,
   SITES,
+  matrixCellKey,
   siteCapacity,
   siteName,
   type DailyOpsReport,
+  type OrgReport,
   type SiteId,
 } from './schema'
 import {
@@ -188,6 +191,46 @@ export function enrollmentCensus(
 }
 
 // ---------------------------------------------------------------------------
+// Openings to Staff — ratio-adjusted placeable spots (from the latest ADR grid)
+// ---------------------------------------------------------------------------
+
+export interface RoomOpening {
+  siteId: SiteId
+  site: string
+  room: string
+  ageGroup: string
+  open: number // spots open for today's staffing; negative = over ratio
+}
+
+export interface OpeningsToStaff {
+  totalOpen: number // sum of positive openings
+  asOfDate: string
+  rooms: RoomOpening[] // entered cells only, ranked most-open first
+}
+
+/** Reads the latest ADR's Openings-to-Staff matrix (classrooms × sites) into a
+ *  ranked list. Only cells someone has actually entered are included. */
+export function openingsToStaff(adr: OrgReport | null, scope: SiteId[] = SITE_IDS): OpeningsToStaff {
+  const cells = (adr?.data?.openingsToStaff ?? {}) as Record<string, unknown>
+  const rooms: RoomOpening[] = []
+  for (const s of SITES.filter((x) => scope.includes(x.id))) {
+    for (const c of CLASSROOMS) {
+      const raw = cells[matrixCellKey(s.id, c.key)]
+      if (raw === undefined || raw === null || raw === '') continue
+      const open = typeof raw === 'number' ? raw : Number(raw)
+      if (Number.isNaN(open)) continue
+      rooms.push({ siteId: s.id, site: s.name, room: c.name, ageGroup: c.ageGroup, open })
+    }
+  }
+  rooms.sort((a, b) => b.open - a.open || a.site.localeCompare(b.site) || a.room.localeCompare(b.room))
+  return {
+    totalOpen: rooms.reduce((sum, r) => sum + Math.max(0, r.open), 0),
+    asOfDate: adr?.date ?? '',
+    rooms,
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Withdrawals — who left & why (from the DDR "Terminations (Today)" items)
 // ---------------------------------------------------------------------------
 
@@ -360,6 +403,7 @@ export function celebrations(weekRows: DailyOpsReport[], weekOf: string, asOf: s
 export interface DashboardView {
   asOf: string
   singleSite: boolean
+  openings: OpeningsToStaff
   census: EnrollmentCensus
   withdrawals: Withdrawal[]
   kpis: Kpis
@@ -387,7 +431,8 @@ export function buildDashboardView(
   weekOf: string,
   site: SiteId | 'all',
   today: string,
-  scope: SiteId[] = SITE_IDS
+  scope: SiteId[] = SITE_IDS,
+  latestAdr: OrgReport | null = null
 ): DashboardView {
   const weekFri = addIsoDays(weekOf, 4)
   const asOf = today < weekFri ? today : weekFri
@@ -405,6 +450,7 @@ export function buildDashboardView(
   return {
     asOf,
     singleSite: site !== 'all',
+    openings: openingsToStaff(latestAdr, censusScope),
     census: enrollmentCensus(allSites, lastWeekScoped, censusScope),
     withdrawals: withdrawals(filtered),
     kpis: computeKpis(filtered, today),
