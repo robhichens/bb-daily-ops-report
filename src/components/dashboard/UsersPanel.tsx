@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Ban, Loader2, Mail, RotateCcw, ShieldCheck, Trash2, UserPlus, UsersRound } from 'lucide-react'
+import { Ban, Check, Loader2, Mail, Pencil, RotateCcw, Trash2, UserPlus, UsersRound, X } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { Card } from '@/components/ui/card'
 import { SITES, type ReportAccessLevel, type ReportKey, type SiteId } from '@/lib/schema'
@@ -12,8 +12,14 @@ import {
   inviteUser,
   setUserDisabled,
   deleteUser,
+  roleChange,
+  updateUserName,
+  updateUserRole,
+  ASSIGNABLE_ROLES,
+  SITE_ROLES,
   type InviteRole,
   type UserProfile,
+  type UserRole,
 } from '@/lib/users'
 import { Input, inputClass } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -56,6 +62,29 @@ export function UsersPanel() {
   async function setReport(u: UserProfile, key: ReportKey, value: string) {
     const level = value === '' ? null : (value as ReportAccessLevel)
     await withSave(u.uid, () => updateUserReportAccess(u.uid, key, level))
+  }
+
+  async function rename(u: UserProfile, name: string) {
+    await withSave(u.uid, () => updateUserName(u.uid, name))
+  }
+
+  async function changeRole(u: UserProfile, next: UserRole) {
+    if (next === u.role) return
+    const who = u.displayName || u.email || 'this person'
+    const c = roleChange(u, next)
+    const effects = [
+      next === 'admin' && 'full access to every report, every school, and Users & Access',
+      next === 'director' && userSites(u).length === 0 && 'pick their school(s) next so they can file the DDR',
+      next === 'co_director' && 'the CDR (Fill) for their campus — pick it below if it isn’t set',
+      c.clearSites && 'their school list is cleared (this role covers every school)',
+      (next === 'finance' || next === 'admissions') && `the ${next === 'finance' ? 'FDR' : 'ADR'} (Fill)`,
+    ].filter(Boolean)
+    const lines = [`Change ${who} from ${humanRole(u.role)} to ${humanRole(next)}?`]
+    if (effects.length) lines.push(`They’ll get: ${effects.join('; ')}.`)
+    lines.push('Other report access you set by hand stays.')
+    const msg = lines.join('\n\n')
+    if (!window.confirm(msg)) return
+    await withSave(u.uid, () => updateUserRole(u.uid, c))
   }
 
   async function toggleActive(u: UserProfile) {
@@ -103,9 +132,7 @@ export function UsersPanel() {
             <div key={u.uid} className={cn('px-5 py-4', u.disabled && 'opacity-60')}>
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[var(--color-charcoal)]">
-                    {u.displayName || u.email || u.uid}
-                  </p>
+                  <NameField u={u} disabled={saving} onSave={(name) => rename(u, name)} />
                   <p className="text-xs text-[var(--color-dk-gray)]">{u.email}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
@@ -114,14 +141,26 @@ export function UsersPanel() {
                       Deactivated
                     </span>
                   )}
-                  {isAdminUser ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-coral-soft)] px-2.5 py-1 text-xs font-bold text-[var(--color-coral-dark)]">
-                      <ShieldCheck className="size-3.5" /> Admin
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center rounded-full bg-[var(--color-secondary)] px-2.5 py-1 text-xs font-bold text-[var(--color-dk-gray)]">
+                  {isSelf ? (
+                    // You can't change your own role — no accidental self-lockout.
+                    <span className="inline-flex items-center rounded-full bg-[var(--color-coral-soft)] px-2.5 py-1 text-xs font-bold text-[var(--color-coral-dark)]">
                       {humanRole(u.role)}
                     </span>
+                  ) : (
+                    <select
+                      value={u.role}
+                      disabled={saving}
+                      onChange={(e) => void changeRole(u, e.target.value as UserRole)}
+                      aria-label="Role"
+                      className={cn(
+                        inputClass,
+                        'h-8 w-auto py-0 text-xs font-bold',
+                        isAdminUser && 'border-[var(--color-coral)] text-[var(--color-coral-dark)]'
+                      )}
+                    >
+                      {!ASSIGNABLE_ROLES.includes(u.role) && <option value={u.role}>{humanRole(u.role)}</option>}
+                      {ASSIGNABLE_ROLES.map((r) => <option key={r} value={r}>{humanRole(r)}</option>)}
+                    </select>
                   )}
                   {isSelf ? (
                     <span className="text-xs text-[var(--color-mid-gray)]">You</span>
@@ -151,6 +190,12 @@ export function UsersPanel() {
                   )}
                 </div>
               </div>
+
+              {SITE_ROLES.includes(u.role) && access.length === 0 && (
+                <p className="mt-2 text-xs font-semibold text-[var(--color-critical)]">
+                  No school picked yet — tick one below so they can file.
+                </p>
+              )}
 
               {!isAdminUser && (
                 <div className="mt-3 space-y-3">
@@ -204,14 +249,69 @@ export function UsersPanel() {
   )
 }
 
+/** Name with a pencil to edit it in place (Enter saves, Esc cancels). */
+function NameField({ u, disabled, onSave }: { u: UserProfile; disabled: boolean; onSave: (name: string) => Promise<void> }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  function start() {
+    setDraft(u.displayName ?? '')
+    setEditing(true)
+  }
+  async function save() {
+    const next = draft.trim()
+    setEditing(false)
+    if (next !== (u.displayName ?? '')) await onSave(next)
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <Input
+          value={draft}
+          autoFocus
+          placeholder="First Last"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void save()
+            if (e.key === 'Escape') setEditing(false)
+          }}
+          className="h-8 w-56 text-sm"
+        />
+        <button type="button" onClick={() => void save()} aria-label="Save name" className="grid size-8 place-items-center rounded-lg text-[var(--color-good)] hover:bg-[var(--color-secondary)]">
+          <Check className="size-4" />
+        </button>
+        <button type="button" onClick={() => setEditing(false)} aria-label="Cancel" className="grid size-8 place-items-center rounded-lg text-[var(--color-mid-gray)] hover:bg-[var(--color-secondary)]">
+          <X className="size-4" />
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="group flex items-center gap-1.5">
+      <p className="text-sm font-semibold text-[var(--color-charcoal)]">
+        {u.displayName || <span className="font-normal italic text-[var(--color-mid-gray)]">No name set</span>}
+      </p>
+      <button
+        type="button"
+        onClick={start}
+        disabled={disabled}
+        title="Edit name"
+        aria-label="Edit name"
+        className="grid size-6 place-items-center rounded-md text-[var(--color-mid-gray)] transition-colors hover:bg-[var(--color-secondary)] hover:text-[var(--color-charcoal)] disabled:opacity-50"
+      >
+        <Pencil className="size-3.5" />
+      </button>
+    </div>
+  )
+}
+
 type InviteStatus =
   | { kind: 'idle' }
   | { kind: 'sending' }
   | { kind: 'error'; message: string }
   | { kind: 'sent'; email: string; reused: boolean; emailSent: boolean }
-
-// Roles tied to a campus (they pick schools); the rest are org-wide.
-const SITE_ROLES: InviteRole[] = ['director', 'co_director']
 
 /** Admin enters a name + email + role (+ schools, for campus roles) and an
  *  optional personal note, and sends an invite: the invite-user function

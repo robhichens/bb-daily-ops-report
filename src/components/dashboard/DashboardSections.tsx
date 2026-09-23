@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import type { DashboardView } from '@/lib/dashboard'
 import type { DashboardSection } from '@/lib/settings'
 import { CensusPanel } from './CensusPanel'
@@ -17,14 +16,11 @@ export function DashboardSections({
   view,
   sections,
   showOpenings = true,
-  afterFunnel,
 }: {
   view: DashboardView
   sections: Sections
   /** False for viewers without ADR access — the Openings grid comes from the ADR. */
   showOpenings?: boolean
-  /** Slot rendered right under the Enrollment pipeline (admin request lists). */
-  afterFunnel?: ReactNode
 }) {
   const gameRow = sections.leaderboard || sections.teamGoal || sections.celebrations
   const opsRow = sections.staffWatch || sections.packet
@@ -38,8 +34,6 @@ export function DashboardSections({
       )}
 
       {sections.funnel && <EnrollmentFunnelBySite groups={view.funnelBySite} />}
-
-      {afterFunnel}
 
       {opsRow && (
         <div className="grid items-start gap-4 lg:grid-cols-2">

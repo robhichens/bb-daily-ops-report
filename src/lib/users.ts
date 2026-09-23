@@ -127,6 +127,52 @@ export async function updateUserReportAccess(
   })
 }
 
+// --- Role changes (Users & Access) ------------------------------------------
+
+/** Roles an admin can assign in Users & Access (the ones that reach the DOR). */
+export const ASSIGNABLE_ROLES: UserRole[] = ['admin', 'director', 'co_director', 'finance', 'admissions']
+
+/** The report each scoped role exists to fill (seeded at invite time too). */
+const ROLE_DEFAULT_REPORT: Partial<Record<UserRole, ReportKey>> = { co_director: 'edr', finance: 'fdr', admissions: 'adr' }
+
+/** Roles tied to a campus; the rest are org-wide. */
+export const SITE_ROLES: UserRole[] = ['director', 'co_director']
+
+export interface RoleChange {
+  role: UserRole
+  reportAccess: Partial<Record<ReportKey, ReportAccessLevel>>
+  /** Finance/admissions span every school, so their old school list is cleared. */
+  clearSites: boolean
+}
+
+/**
+ * What changing someone's role does to their access: the old role's own
+ * report grant goes (only if it's still the default 'fill'), the new role's
+ * own report is granted, and any other grants you gave them by hand stay.
+ */
+export function roleChange(profile: Pick<UserProfile, 'role' | 'reportAccess'>, next: UserRole): RoleChange {
+  const access = { ...(profile.reportAccess ?? {}) }
+  const oldKey = ROLE_DEFAULT_REPORT[profile.role]
+  if (oldKey && access[oldKey] === 'fill') delete access[oldKey]
+  const newKey = ROLE_DEFAULT_REPORT[next]
+  if (newKey) access[newKey] = 'fill'
+  return { role: next, reportAccess: access, clearSites: next === 'finance' || next === 'admissions' }
+}
+
+export async function updateUserRole(uid: string, change: RoleChange): Promise<void> {
+  await updateDoc(usersRef(uid), {
+    role: change.role,
+    reportAccess: change.reportAccess,
+    ...(change.clearSites ? { siteIds: deleteField(), siteId: deleteField() } : {}),
+  })
+}
+
+/** Rename someone (what the app shows in the header, reports and notes). */
+export async function updateUserName(uid: string, name: string): Promise<void> {
+  const trimmed = name.trim()
+  await updateDoc(usersRef(uid), { displayName: trimmed || deleteField() })
+}
+
 /** Live subscription to just this user's Day-Notes "last seen" timestamp, so the
  *  reply nudge clears across a user's devices. Only writable by admins per
  *  firestore.rules (users/{uid} write = admin only), so directors fall back to

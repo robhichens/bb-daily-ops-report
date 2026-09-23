@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 // users.ts pulls in the Firebase client at import; stub it so this stays a pure
 // unit test of the access logic (vi.mock is hoisted above the import below).
 vi.mock('./firebase', () => ({ auth: {}, db: {} }))
-import { reportAccessLevel, accessibleReportKeys, canAccessDor, type UserProfile } from './users'
+import { reportAccessLevel, accessibleReportKeys, canAccessDor, roleChange, type UserProfile } from './users'
 
 const coDirector: UserProfile = {
   uid: 'c', role: 'co_director', siteIds: ['mill-creek'], siteId: 'mill-creek', reportAccess: { edr: 'fill' },
@@ -47,5 +47,24 @@ describe('finance / admissions scoped roles', () => {
     expect(reportAccessLevel(admissions, 'adr')).toBe('fill')
     expect(reportAccessLevel(admissions, 'fdr')).toBeNull()
     expect(accessibleReportKeys(admissions)).toEqual(['adr'])
+  })
+})
+
+describe('roleChange', () => {
+  it('swaps the old role’s own report for the new one and keeps extra grants', () => {
+    const c = roleChange({ role: 'finance', reportAccess: { fdr: 'fill', edr: 'view' } }, 'admissions')
+    expect(c.role).toBe('admissions')
+    expect(c.reportAccess).toEqual({ edr: 'view', adr: 'fill' })
+    expect(c.clearSites).toBe(true)
+  })
+
+  it('keeps a hand-set View on the old report (only the default Fill is removed)', () => {
+    expect(roleChange({ role: 'co_director', reportAccess: { edr: 'view' } }, 'director').reportAccess).toEqual({ edr: 'view' })
+  })
+
+  it('keeps schools for campus roles and adds nothing for admin/director', () => {
+    const toDirector = roleChange({ role: 'co_director', reportAccess: { edr: 'fill' } }, 'director')
+    expect(toDirector).toEqual({ role: 'director', reportAccess: {}, clearSites: false })
+    expect(roleChange({ role: 'director' }, 'co_director').reportAccess).toEqual({ edr: 'fill' })
   })
 })

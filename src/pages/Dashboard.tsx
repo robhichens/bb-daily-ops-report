@@ -142,7 +142,6 @@ export function Dashboard() {
         view={view}
         sections={ddrSections}
         showOpenings={has.adr}
-        afterFunnel={admin && <RequestLists reports={recentRows} orgNotes={orgNotes} />}
       />
       <ReportsTable rows={view.tableRows} />
     </>
@@ -201,6 +200,8 @@ export function Dashboard() {
       ) : (
         <div className="space-y-4">{ddrBody}</div>
       ))}
+
+      {admin && <RequestLists reports={recentRows} orgNotes={orgNotes} />}
 
       {cdrData && <CdrSection summary={cdrData} title="Co-Director Daily Report" collapsible={multi} />}
       {adrData && <AdrSection summary={adrData} openings={adrOpenings} collapsible={multi} />}
