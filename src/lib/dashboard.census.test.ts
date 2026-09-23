@@ -15,9 +15,9 @@ describe('enrollmentCensus', () => {
     const last = [ft('crozet', '2026-09-15', 93)]
     const c = enrollmentCensus(rows, last, ['crozet'])
     expect(c.total).toBe(95) // the latest, not the earlier 90
-    expect(c.capacity).toBe(110)
-    expect(c.pct).toBe(86)
-    expect(c.open).toBe(15)
+    expect(c.capacity).toBe(135)
+    expect(c.pct).toBe(70) // 95 / 135
+    expect(c.open).toBe(40)
     expect(c.delta).toBe(2) // 95 now vs 93 last week
     expect(c.bySite[0]).toMatchObject({ siteId: 'crozet', enrolled: 95 })
   })

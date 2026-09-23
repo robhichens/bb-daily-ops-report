@@ -10,15 +10,14 @@ export type SiteId = 'crozet' | 'forest-lakes' | 'mill-creek';
 export interface SiteConfig {
   id: SiteId;
   name: string;
-  /** Licensed full-time capacity, for the dashboard capacity meter.
-   *  PLACEHOLDER numbers — confirm the real licensed capacity per campus. */
+  /** Licensed full-time capacity, for the dashboard capacity meter. */
   capacity: number;
 }
 
 export const SITES: SiteConfig[] = [
-  { id: 'crozet', name: 'Crozet', capacity: 110 },
-  { id: 'forest-lakes', name: 'Forest Lakes', capacity: 100 },
-  { id: 'mill-creek', name: 'Mill Creek', capacity: 90 },
+  { id: 'crozet', name: 'Crozet', capacity: 135 },
+  { id: 'forest-lakes', name: 'Forest Lakes', capacity: 120 },
+  { id: 'mill-creek', name: 'Mill Creek', capacity: 139 },
 ];
 
 export const siteName = (id: SiteId): string =>
