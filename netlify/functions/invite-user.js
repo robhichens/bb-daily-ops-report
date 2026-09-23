@@ -177,13 +177,14 @@ async function sendInvite({ to, replyTo, name, role, siteIds, inviterName, note,
   const key = process.env.RESEND_API_KEY
   if (!key) return false
   try {
-    let link
-    try {
-      // Send them back to the app's sign-in page after they set a password.
-      link = await auth.generatePasswordResetLink(to, { url: `${APP_URL}/login` })
-    } catch {
-      link = await auth.generatePasswordResetLink(to) // domain not authorized for continue URLs
-    }
+    // Firebase's link points at its generic handler page; lift the one-time code
+    // out and send them to our own /set-password page instead, which signs them
+    // straight in afterwards.
+    const firebaseLink = await auth.generatePasswordResetLink(to)
+    const oobCode = new URL(firebaseLink).searchParams.get('oobCode')
+    const link = oobCode
+      ? `${APP_URL}/set-password?mode=resetPassword&oobCode=${encodeURIComponent(oobCode)}`
+      : firebaseLink
     const { subject, html, text } = buildInviteEmail({ name, role, siteIds, inviterName, note, link, appUrl: APP_URL })
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',

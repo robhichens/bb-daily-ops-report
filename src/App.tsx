@@ -6,6 +6,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { AppShell } from '@/components/AppShell'
 import { InstallPrompt } from '@/components/InstallPrompt'
 import { Login } from '@/pages/Login'
+import { SetPassword } from '@/pages/SetPassword'
 
 // Code-split the heavy authed pages (form + dashboard + Firestore/Framer usage).
 const Report = lazy(() => import('@/pages/Report').then((m) => ({ default: m.Report })))
@@ -29,6 +30,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/set-password" element={<SetPassword />} />
             <Route
               element={
                 <RequireAuth>
