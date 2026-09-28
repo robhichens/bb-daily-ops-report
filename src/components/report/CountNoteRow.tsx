@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import type { CountNote, ItemDetail, ItemFieldDef } from '@/lib/schema'
 import { Input, inputClass } from '@/components/ui/input'
@@ -23,6 +23,8 @@ interface CountNoteRowProps {
   countOnly?: boolean
   /** Shows a required marker (the check itself is in validateForSubmit). */
   required?: boolean
+  /** Extra control under the header (e.g. "Copy from last report"). */
+  action?: ReactNode
 }
 
 const MAX_ROWS = 40
@@ -48,6 +50,7 @@ export function CountNoteRow({
   itemFields,
   countOnly = false,
   required = false,
+  action,
 }: CountNoteRowProps) {
   const hasItems = !!itemFields && itemFields.length > 0
   // Tracks which (row, field) selects are in free-type "Other" mode, keyed `${i}:${key}`.
@@ -120,6 +123,8 @@ export function CountNoteRow({
           {unit && <span className="text-xs text-[var(--color-dk-gray)]">{unit}</span>}
         </div>
       </div>
+
+      {action && <div className="mt-1.5">{action}</div>}
 
       {/* Body: structured item rows, or the legacy notes box */}
       {hasItems ? (

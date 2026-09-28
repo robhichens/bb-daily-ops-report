@@ -4,20 +4,21 @@ import { Check, Lock, Pencil, Loader2, CloudOff, Eye } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { reportAccessLevel, userSites } from '@/lib/users'
 import { ORG_DEFS, reportMeta } from '@/lib/reportRegistry'
-import { effectiveRatio, matrixCellKey, openingsFor, orgDocId, RATIO_WAIVERS, SITES, siteName, staffingKey, STAFFING_CALC_FLAG } from '@/lib/schema'
+import { carrySiteStaffing, CLASSROOMS, effectiveRatio, matrixCellKey, openingsFor, orgDocId, RATIO_WAIVERS, SITES, siteName, staffingKey, STAFFING_CALC_FLAG } from '@/lib/schema'
 import type {
   FieldKind, MatrixDef, OrgFieldDef, OrgFieldValue, OrgListItem,
   OrgReport as TOrgReport, OrgReportDef, OrgSectionDef, OrgSubField, SiteId,
 } from '@/lib/schema'
 import {
-  getOrgReport, upsertOrgDraft, submitOrgReport, emptyOrgReport,
+  getOrgReport, getPreviousOrgReports, upsertOrgDraft, submitOrgReport, emptyOrgReport,
 } from '@/lib/orgReports'
-import { todayIso, formatLong } from '@/lib/dates'
+import { todayIso, formatLong, formatShort } from '@/lib/dates'
 import { weekdayName } from '@/lib/derive'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input, inputClass } from '@/components/ui/input'
 import { NotesLedger } from '@/components/report/NotesLedger'
+import { CopyPrevious } from '@/components/report/CopyPrevious'
 import { PrintableReport, PrintButton } from '@/components/report/PrintableReport'
 import { buildOrgPrintModel } from '@/lib/printModel'
 import { cn } from '@/lib/utils'
@@ -240,6 +241,22 @@ function SectionCard({
   const vals = draft.data[section.key] ?? {}
   // Conditional fields (e.g. a "reason" shown only when a toggle is No).
   const visible = section.fields.filter((f) => !f.showWhen || vals[f.showWhen.key] === f.showWhen.equals)
+
+  // "Copy from last report" for one school's staffing: the newest earlier ADR
+  // that has numbers for it, recalculated with the current ratios.
+  async function copySite(site: SiteId): Promise<string> {
+    for (const r of await getPreviousOrgReports(def.collection, draft.date)) {
+      const patch = carrySiteStaffing((r.data?.[section.key] ?? {}) as Record<string, unknown>, site)
+      if (!patch) continue
+      const hasNumbers = CLASSROOMS.some((c) => vals[staffingKey(site, c.key, 'kids')] || vals[staffingKey(site, c.key, 'teachers')])
+      if (hasNumbers && !window.confirm(`Replace ${siteName(site)}’s numbers with the ones from ${formatShort(r.date)}?`)) {
+        return 'Kept today’s numbers.'
+      }
+      patchSection(section.key, patch)
+      return `Copied from ${formatShort(r.date)}. Update any room that changed.`
+    }
+    return `No earlier numbers for ${siteName(site)} yet.`
+  }
   return (
     <Card accent={def.accent} className="p-5">
       <div className="mb-4">
@@ -252,6 +269,7 @@ function SectionCard({
           vals={vals}
           disabled={locked}
           onPatch={(patch) => patchSection(section.key, patch)}
+          onCopySite={copySite}
         />
       ) : section.matrix ? (
         <MatrixGrid
@@ -486,12 +504,13 @@ function MatrixGrid({
  *  shows the calculated openings (teachers × ratio − children). The result is
  *  stored in the plain cell key, the inputs beside it (see staffingKey). */
 function StaffingGrid({
-  matrix, vals, disabled, onPatch,
+  matrix, vals, disabled, onPatch, onCopySite,
 }: {
   matrix: MatrixDef
   vals: Record<string, OrgFieldValue>
   disabled: boolean
   onPatch: (patch: Record<string, OrgFieldValue>) => void
+  onCopySite?: (site: SiteId) => Promise<string>
 }) {
   const num = (v: OrgFieldValue | undefined) => (typeof v === 'number' ? v : 0)
 
@@ -519,6 +538,9 @@ function StaffingGrid({
             <div className="mb-2 flex flex-wrap items-baseline gap-x-2 border-b border-[var(--color-border)] pb-1.5">
               <span className="text-sm font-extrabold text-[var(--color-charcoal)]">{c.label}</span>
               {waiver > 0 && <span className="text-xs font-semibold text-[var(--color-coral-dark)]">ratio waiver +{waiver} per teacher</span>}
+              {onCopySite && !disabled && (
+                <CopyPrevious className="ml-auto" onCopy={() => onCopySite(site)} />
+              )}
             </div>
             <div className="grid items-center gap-x-2 gap-y-2" style={{ gridTemplateColumns: 'minmax(96px,1.4fr) minmax(58px,72px) minmax(58px,72px) minmax(78px,1fr)' }}>
               <div />

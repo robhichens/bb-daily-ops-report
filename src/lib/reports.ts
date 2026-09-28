@@ -24,6 +24,7 @@ import {
 import { db } from './firebase';
 import { mirrorDdrHeadline } from './headlines';
 import { withDerived } from './derive';
+import { addIsoDays } from './dates';
 import {
   reportDocId,
   siteName,
@@ -201,6 +202,25 @@ export function subscribeReportsByRange(
   return onSnapshot(
     query(reportsCol(), where('date', '>=', start), where('date', '<=', end)),
     (snap) => cb(snap.docs.map((d) => d.data() as DailyOpsReport))
+  );
+}
+
+/** The most recent report for a site BEFORE `date` (looking back up to 3 weeks)
+ *  that passes `keep` — for "Copy from last report". Single-field date range,
+ *  so no composite index; the site is filtered here. */
+export async function getPreviousReport(
+  siteId: SiteId,
+  date: string,
+  keep: (r: DailyOpsReport) => boolean = () => true
+): Promise<DailyOpsReport | null> {
+  const snap = await getDocs(
+    query(reportsCol(), where('date', '>=', addIsoDays(date, -21)), where('date', '<', date))
+  );
+  return (
+    snap.docs
+      .map((d) => d.data() as DailyOpsReport)
+      .filter((r) => r.siteId === siteId && keep(r))
+      .sort((a, b) => (a.date < b.date ? 1 : -1))[0] ?? null
   );
 }
 

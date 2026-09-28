@@ -6,14 +6,17 @@ import {
 } from '@/lib/schema'
 import { SectionCard } from './SectionCard'
 import { CountNoteRow } from './CountNoteRow'
+import { CopyPrevious } from './CopyPrevious'
 
 interface Props {
   value: EnrollmentMarketing
   onChange: (e: EnrollmentMarketing) => void
   disabled: boolean
+  /** Pull Full-Time Enrollment forward from this school's last report. */
+  onCopyFullTime?: () => Promise<string>
 }
 
-export function EnrollmentMarketingSection({ value, onChange, disabled }: Props) {
+export function EnrollmentMarketingSection({ value, onChange, disabled, onCopyFullTime }: Props) {
   const setField = (key: keyof EnrollmentMarketing, next: CountNote) =>
     onChange({ ...value, [key]: next })
 
@@ -32,6 +35,11 @@ export function EnrollmentMarketingSection({ value, onChange, disabled }: Props)
             value={value[f.key]}
             onChange={(next) => setField(f.key, next)}
             disabled={disabled}
+            action={
+              f.key === 'fullTimeEnrollment' && onCopyFullTime && !disabled
+                ? <CopyPrevious onCopy={onCopyFullTime} />
+                : undefined
+            }
           />
         ))}
       </div>

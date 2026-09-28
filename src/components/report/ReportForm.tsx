@@ -9,9 +9,9 @@ import {
   type SiteId,
 } from '@/lib/schema'
 import { withDerived } from '@/lib/derive'
-import { getReport, upsertDraft, submitReport, validateForSubmit } from '@/lib/reports'
+import { getPreviousReport, getReport, upsertDraft, submitReport, validateForSubmit } from '@/lib/reports'
 import { readLocalDraft, writeLocalDraft, clearLocalDraft, reconcile } from '@/lib/localMirror'
-import { formatLong } from '@/lib/dates'
+import { formatLong, formatShort } from '@/lib/dates'
 import { Button } from '@/components/ui/button'
 import { HeaderSection } from './HeaderSection'
 import { AttendanceSection } from './AttendanceSection'
@@ -83,10 +83,12 @@ export function ReportForm({ siteId, date, isAdmin, sites, uid, onSite, onDate }
   }, [draft, isAdmin, adminEditing])
 
   const update = useCallback(
-    (patch: Partial<DailyOpsReport>) => {
+    // A patch, or a function of the latest draft (for async edits like "Copy
+    // from last report", so they merge into whatever was typed meanwhile).
+    (patch: Partial<DailyOpsReport> | ((prev: DailyOpsReport) => Partial<DailyOpsReport>)) => {
       setDraft((prev) => {
         if (!prev) return prev
-        const next = withDerived({ ...prev, ...patch })
+        const next = withDerived({ ...prev, ...(typeof patch === 'function' ? patch(prev) : patch) })
         writeLocalDraft(next)
         if (saveTimer.current) clearTimeout(saveTimer.current)
         setSaveState('saving')
@@ -215,6 +217,18 @@ export function ReportForm({ siteId, date, isAdmin, sites, uid, onSite, onDate }
         value={draft.enrollmentMarketing}
         onChange={(enrollmentMarketing) => update({ enrollmentMarketing })}
         disabled={locked}
+        onCopyFullTime={async () => {
+          const prev = await getPreviousReport(draft.siteId, draft.date, (r) => (r.enrollmentMarketing.fullTimeEnrollment?.count ?? 0) > 0)
+          if (!prev) return 'No earlier full-time number to copy yet.'
+          const count = prev.enrollmentMarketing.fullTimeEnrollment.count
+          update((cur) => ({
+            enrollmentMarketing: {
+              ...cur.enrollmentMarketing,
+              fullTimeEnrollment: { ...cur.enrollmentMarketing.fullTimeEnrollment, count },
+            },
+          }))
+          return `Copied ${count} from ${formatShort(prev.date)}. Change it if today is different.`
+        }}
       />
       <StaffSection value={draft.staff} onChange={(staff) => update({ staff })} disabled={locked} />
       <DirectorPacketSection

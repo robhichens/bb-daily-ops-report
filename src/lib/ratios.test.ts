@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { effectiveRatio, openingsFor } from './schema'
+import { carrySiteStaffing, effectiveRatio, openingsFor } from './schema'
 
 describe('classroom ratios', () => {
   it('uses the base ratio at Mill Creek and +1 per teacher at Crozet / Forest Lakes', () => {
@@ -26,5 +26,28 @@ describe('openingsFor (teachers × ratio − children)', () => {
 
   it('is not calculable until a teacher count is entered', () => {
     expect(openingsFor('crozet', 'tigers', 12, 0)).toBeNull()
+  })
+})
+
+describe("carrySiteStaffing (Copy from last report)", () => {
+  const prev = {
+    __calc: 1,
+    crozet_cheetahs__kids: 13, crozet_cheetahs__teachers: 2, crozet_cheetahs: 9,
+    "mill-creek_lions__kids": 7, "mill-creek_lions__teachers": 2, "mill-creek_lions": 1,
+  }
+
+  it("brings one school's children + teachers forward and recalculates openings", () => {
+    const p = carrySiteStaffing(prev, "crozet")!
+    expect(p.crozet_cheetahs__kids).toBe(13)
+    expect(p.crozet_cheetahs__teachers).toBe(2)
+    expect(p.crozet_cheetahs).toBe(9) // 2 × 11 − 13
+    expect(p.crozet_lions).toBe("") // no teachers → not calculable
+    expect(p.__calc).toBe(1)
+    expect(Object.keys(p).some((k) => k.startsWith("mill-creek"))).toBe(false) // other schools untouched
+  })
+
+  it("returns null when the earlier grid had nothing for that school", () => {
+    expect(carrySiteStaffing(prev, "forest-lakes")).toBeNull()
+    expect(carrySiteStaffing({ crozet_cheetahs: 14 }, "crozet")).toBeNull() // old hand-typed grid
   })
 })

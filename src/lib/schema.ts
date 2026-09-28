@@ -455,6 +455,26 @@ export function openingsFor(site: SiteId, room: string, kids: number, teachers: 
   return teachers * effectiveRatio(site, room) - (kids || 0);
 }
 
+/** "Copy from last report": one school's children + teachers from an earlier
+ *  grid, with openings recalculated. Null when that grid had nothing for the school. */
+export function carrySiteStaffing(prev: Record<string, unknown>, site: SiteId): Record<string, number | string> | null {
+  const patch: Record<string, number | string> = {};
+  let any = false;
+  for (const c of CLASSROOMS) {
+    const k = prev[staffingKey(site, c.key, 'kids')];
+    const t = prev[staffingKey(site, c.key, 'teachers')];
+    const kids = typeof k === 'number' ? k : 0;
+    const teachers = typeof t === 'number' ? t : 0;
+    if (kids || teachers) any = true;
+    patch[staffingKey(site, c.key, 'kids')] = kids;
+    patch[staffingKey(site, c.key, 'teachers')] = teachers;
+    patch[matrixCellKey(site, c.key)] = openingsFor(site, c.key, kids, teachers) ?? '';
+  }
+  if (!any) return null;
+  patch[STAFFING_CALC_FLAG] = 1;
+  return patch;
+}
+
 export interface OrgSectionDef {
   key: string;
   title: string;

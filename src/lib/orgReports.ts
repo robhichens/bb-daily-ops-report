@@ -12,6 +12,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   limit,
   onSnapshot,
   orderBy,
@@ -74,6 +75,13 @@ export function subscribeOrgReport(
 export async function getOrgReport(col: string, docId: string): Promise<OrgReport | null> {
   const snap = await getDoc(reportRef(col, docId))
   return snap.exists() ? (snap.data() as OrgReport) : null
+}
+
+/** The most recent org reports BEFORE `date`, newest first (for "Copy from last
+ *  report"). Range + orderBy on the same field: no composite index. */
+export async function getPreviousOrgReports(col: string, date: string, max = 14): Promise<OrgReport[]> {
+  const snap = await getDocs(query(collection(db, col), where('date', '<', date), orderBy('date', 'desc'), limit(max)))
+  return snap.docs.map((d) => d.data() as OrgReport)
 }
 
 /** Org reports whose date falls in [start, end] (inclusive), for the dashboard.
