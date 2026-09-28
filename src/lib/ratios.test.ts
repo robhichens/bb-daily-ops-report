@@ -8,6 +8,12 @@ describe('classroom ratios', () => {
     expect(effectiveRatio('forest-lakes', 'lions')).toBe(5)
     expect(effectiveRatio('mill-creek', 'monkeys')).toBe(8)
   })
+
+  it('uses a school override where one exists: Mill Creek Hippos is 1:4', () => {
+    expect(effectiveRatio('mill-creek', 'hippos')).toBe(4)
+    expect(effectiveRatio('crozet', 'hippos')).toBe(6) // base 5 + waiver
+    expect(openingsFor('mill-creek', 'hippos', 8, 2)).toBe(0) // 2 × 4 − 8
+  })
 })
 
 describe('openingsFor (teachers × ratio − children)', () => {

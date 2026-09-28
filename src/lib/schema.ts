@@ -432,15 +432,22 @@ export const matrixCellKey = (colKey: string, rowKey: string): string => `${colK
 
 // --- Classroom ratios (confirmed by Rob 2026-09-28) ---------------------------
 
-/** Base ratio, 1 teacher : N children — the same at every school. */
+/** Base ratio, 1 teacher : N children, used at every school unless overridden below. */
 export const ROOM_RATIOS: Record<string, number> = {
   lions: 4, hippos: 5, elephants: 6, monkeys: 8, tigers: 10, zebras: 10, cheetahs: 10,
+};
+/** A school whose room runs a different base ratio (Rob, 2026-09-28). */
+export const SITE_RATIO_OVERRIDES: Partial<Record<SiteId, Record<string, number>>> = {
+  'mill-creek': { hippos: 4 },
 };
 /** Extended ratio waivers: extra children allowed per teacher at a school. */
 export const RATIO_WAIVERS: Record<SiteId, number> = { crozet: 1, 'forest-lakes': 1, 'mill-creek': 0 };
 
+export const baseRatio = (site: SiteId, room: string): number =>
+  SITE_RATIO_OVERRIDES[site]?.[room] ?? ROOM_RATIOS[room] ?? 0;
+
 export const effectiveRatio = (site: SiteId, room: string): number =>
-  (ROOM_RATIOS[room] ?? 0) + (RATIO_WAIVERS[site] ?? 0);
+  baseRatio(site, room) + (RATIO_WAIVERS[site] ?? 0);
 
 /** Where a staffing cell keeps its inputs, beside the calculated openings. */
 export const staffingKey = (site: string, room: string, part: 'kids' | 'teachers'): string =>
