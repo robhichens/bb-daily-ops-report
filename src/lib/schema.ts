@@ -403,6 +403,8 @@ export interface OrgSubField {
   type: 'text' | 'select';
   optionSet?: 'sites';
   options?: string[];
+  /** Give this column most of the row's width (long free text like "What you did"). */
+  wide?: boolean;
 }
 
 export interface OrgFieldDef {

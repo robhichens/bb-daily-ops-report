@@ -112,7 +112,7 @@ const CDR: OrgReportDef = {
     ], note: true },
     { key: 'social', title: 'Social', hint: 'One row per Facebook post or event — the headline, which page, and the campus it was for', fields: [
       { key: 'posts', label: 'Facebook posts & events', kind: 'list', subFields: [
-        { key: 'what', label: 'Headline / what', type: 'text' },
+        { key: 'what', label: 'Headline / what', type: 'text', wide: true },
         { key: 'page', label: 'FB page', type: 'text' },
         CAMPUS_SF,
       ] },
@@ -125,7 +125,7 @@ const CDR: OrgReportDef = {
       { key: 'items', label: '', kind: 'list', subFields: [
         { key: 'type', label: 'Type', type: 'select', options: ['Task', 'Project', 'Classroom coverage'] },
         { key: 'title', label: 'Title', type: 'text' },
-        { key: 'details', label: 'What you did', type: 'text' },
+        { key: 'details', label: 'What you did', type: 'text', wide: true },
       ] },
     ] },
   ],

@@ -389,7 +389,11 @@ function ListField({
     // Keep only rows with at least one non-empty value; the trailing blank re-appears on render.
     onChange(next.filter((it) => Object.values(it).some((val) => (val ?? '').trim() !== '')))
   }
-  const cols = subFields.length >= 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
+  // Column weights from tablet up: dropdowns narrow, short text medium, a "wide"
+  // field (e.g. What you did) gets the most room. Phones stack full-width.
+  const colTemplate = subFields
+    .map((sf) => (sf.wide ? 'minmax(0,3fr)' : sf.type === 'select' ? 'minmax(0,1fr)' : 'minmax(0,1.4fr)'))
+    .join(' ')
   return (
     <div className="col-span-2 sm:col-span-3 lg:col-span-4">
       {label && <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">{label}</span>}
@@ -401,7 +405,10 @@ function ListField({
                 <span className="mt-1 grid size-5 shrink-0 place-items-center rounded-full bg-[var(--color-coral-soft)] text-[10px] font-bold text-[var(--color-coral-dark)]">
                   {i + 1}
                 </span>
-                <div className={cn('grid flex-1 gap-2', cols)}>
+                <div
+                  className="grid flex-1 gap-2 sm:[grid-template-columns:var(--cols)]"
+                  style={{ '--cols': colTemplate } as React.CSSProperties}
+                >
                   {subFields.map((sf) => {
                     const val = item[sf.key] ?? ''
                     const options =
