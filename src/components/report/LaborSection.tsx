@@ -5,6 +5,7 @@ import { totalOvertime } from '@/lib/derive'
 import { SectionCard } from './SectionCard'
 import { NumberField } from './NumberField'
 import { Input } from '@/components/ui/input'
+import { TextField } from '@/components/ui/textarea'
 
 interface Props {
   value: Labor
@@ -78,12 +79,12 @@ export function LaborSection({ value, onChange, disabled }: Props) {
                 className="flex items-start gap-2"
               >
                 <div className="flex flex-1 flex-col">
-                  <Input
+                  <TextField
                     value={e.name}
                     onChange={(ev) => setEntry(i, { name: ev.target.value })}
                     placeholder="Staff name"
                     disabled={disabled}
-                    className="h-9"
+                    className="min-h-9 py-1.5"
                   />
                   <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--color-mid-gray)]">
                     Staff name

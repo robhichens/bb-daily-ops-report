@@ -18,6 +18,7 @@ import { weekdayName } from '@/lib/derive'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { TextField } from '@/components/ui/textarea'
 import { NotesLedger } from '@/components/report/NotesLedger'
 import { PrintableReport, PrintButton } from '@/components/report/PrintableReport'
 import { buildFdrPrintModel } from '@/lib/printModel'
@@ -258,7 +259,7 @@ function DepositFields({ loc, disabled, onLoc }: { loc: FinanceLocation; disable
         </div>
         <label className="mt-2 flex flex-col gap-1">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-mid-gray)]">Note</span>
-          <Input value={te.note} disabled={disabled} placeholder="Optional note" onChange={(e) => onLoc({ tuitionExpress: { ...te, note: e.target.value } })} />
+          <TextField value={te.note} disabled={disabled} placeholder="Optional note" onChange={(e) => onLoc({ tuitionExpress: { ...te, note: e.target.value } })} />
         </label>
       </div>
 
@@ -289,10 +290,10 @@ function LineList({
       {hint && <p className="mb-1.5 text-xs text-[var(--color-dk-gray)]">{hint}</p>}
       <div className="space-y-2">
         {rows.map((r, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <Input value={r.who} placeholder={whoPlaceholder} disabled={disabled}
+          <div key={i} className="flex items-start gap-2">
+            <TextField value={r.who} placeholder={whoPlaceholder} disabled={disabled}
               onChange={(e) => setRow(i, { who: e.target.value })} className="min-w-0 flex-1" />
-            <Input value={r.what} placeholder={whatPlaceholder} disabled={disabled}
+            <TextField value={r.what} placeholder={whatPlaceholder} disabled={disabled}
               onChange={(e) => setRow(i, { what: e.target.value })} className="min-w-0 flex-1" />
             <MoneyInput value={r.amount} disabled={disabled} onChange={(n) => setRow(i, { amount: n })} className="w-28 shrink-0" />
             {!disabled && i < value.length && (
@@ -324,12 +325,12 @@ function AgencyLineList({
       <datalist id="fdr-agencies">{FINANCE_AGENCIES.map((a) => <option key={a} value={a} />)}</datalist>
       <div className="space-y-2">
         {rows.map((r, i) => (
-          <div key={i} className="flex items-center gap-2">
+          <div key={i} className="flex items-start gap-2">
             <Input list="fdr-agencies" value={r.agency} placeholder="Agency" disabled={disabled}
               onChange={(e) => setRow(i, { agency: e.target.value })} className="w-28 shrink-0" />
-            <Input value={r.parent} placeholder="Parent name" disabled={disabled}
+            <TextField value={r.parent} placeholder="Parent name" disabled={disabled}
               onChange={(e) => setRow(i, { parent: e.target.value })} className="min-w-0 flex-1" />
-            <Input value={r.child} placeholder="Child name" disabled={disabled}
+            <TextField value={r.child} placeholder="Child name" disabled={disabled}
               onChange={(e) => setRow(i, { child: e.target.value })} className="min-w-0 flex-1" />
             <MoneyInput value={r.amount} disabled={disabled} onChange={(n) => setRow(i, { amount: n })} className="w-28 shrink-0" />
             {!disabled && i < value.length && (
@@ -362,7 +363,7 @@ function DeclineRefundList({
       </p>
       <div className="space-y-2">
         {rows.map((r, i) => (
-          <div key={i} className="flex items-center gap-2">
+          <div key={i} className="flex items-start gap-2">
             <div className="flex shrink-0 rounded-lg bg-[var(--color-secondary)] p-0.5">
               {(['Decline', 'Refund'] as const).map((t) => (
                 <button key={t} type="button" disabled={disabled} onClick={() => setRow(i, { type: t })}
@@ -374,7 +375,7 @@ function DeclineRefundList({
                 </button>
               ))}
             </div>
-            <Input value={r.parent} placeholder="Parent name" disabled={disabled}
+            <TextField value={r.parent} placeholder="Parent name" disabled={disabled}
               onChange={(e) => setRow(i, { parent: e.target.value })} className="min-w-0 flex-1" />
             <MoneyInput value={r.amount} disabled={disabled} onChange={(n) => setRow(i, { amount: n })} className="w-28 shrink-0" />
             {!disabled && i < value.length && (
@@ -395,9 +396,9 @@ function OutstandingRow({
   label, value, disabled, onChange,
 }: { label: string; value: { names: string; amount: number }; disabled: boolean; onChange: (v: { names: string; amount: number }) => void }) {
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <span className="w-32 shrink-0 text-sm font-semibold text-[var(--color-charcoal)]">{label}</span>
-      <Input value={value.names} placeholder="Family names" disabled={disabled}
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+      <span className="w-32 shrink-0 sm:pt-2.5 text-sm font-semibold text-[var(--color-charcoal)]">{label}</span>
+      <TextField value={value.names} placeholder="Family names" disabled={disabled}
         onChange={(e) => onChange({ ...value, names: e.target.value })} className="flex-1" />
       <MoneyInput value={value.amount} disabled={disabled} onChange={(n) => onChange({ ...value, amount: n })} className="w-32" />
     </div>

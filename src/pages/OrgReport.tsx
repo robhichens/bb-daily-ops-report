@@ -17,6 +17,7 @@ import { weekdayName } from '@/lib/derive'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input, inputClass } from '@/components/ui/input'
+import { TextField } from '@/components/ui/textarea'
 import { NotesLedger } from '@/components/report/NotesLedger'
 import { CopyPrevious } from '@/components/report/CopyPrevious'
 import { PrintableReport, PrintButton } from '@/components/report/PrintableReport'
@@ -294,7 +295,7 @@ function SectionCard({
       {section.note && (
         <label className="mt-3 flex flex-col gap-1">
           <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">Note</span>
-          <Input
+          <TextField
             value={String(vals.note ?? '')}
             disabled={locked}
             placeholder="Any detail worth flagging…"
@@ -422,11 +423,11 @@ function ListField({
                             ))}
                           </select>
                         ) : (
-                          <Input
+                          <TextField
                             value={val}
                             disabled={disabled}
                             onChange={(e) => setCell(i, sf.key, e.target.value)}
-                            className="h-9"
+                            className="min-h-9 py-1.5"
                           />
                         )}
                         <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--color-mid-gray)]">
@@ -607,7 +608,7 @@ function ValueField({
     return (
       <label className="col-span-2 flex flex-col gap-1 sm:col-span-3 lg:col-span-4">
         <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">{label}</span>
-        <Input value={String(value ?? '')} disabled={disabled} onChange={(e) => onChange(e.target.value)} />
+        <TextField value={String(value ?? '')} disabled={disabled} onChange={(e) => onChange(e.target.value)} />
       </label>
     )
   }

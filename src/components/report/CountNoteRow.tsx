@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import type { CountNote, ItemDetail, ItemFieldDef } from '@/lib/schema'
 import { Input, inputClass } from '@/components/ui/input'
+import { TextField } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 
 const OTHER = '__other__'
@@ -178,22 +179,29 @@ export function CountNoteRow({
                                     {f.allowOther && <option value={OTHER}>Other…</option>}
                                   </select>
                                   {isOther && (
-                                    <Input
+                                    <TextField
                                       value={val}
                                       disabled={disabled}
                                       onChange={(e) => setItem(i, f.key, e.target.value)}
                                       placeholder="Type it in…"
-                                      className="mt-1 h-9"
+                                      className="mt-1 min-h-9 py-1.5"
                                     />
                                   )}
                                 </>
-                              ) : (
+                              ) : f.type === 'date' || f.type === 'time' ? (
                                 <Input
-                                  type={f.type === 'date' ? 'date' : f.type === 'time' ? 'time' : 'text'}
+                                  type={f.type}
                                   value={val}
                                   disabled={disabled}
                                   onChange={(e) => setItem(i, f.key, e.target.value)}
                                   className="h-9"
+                                />
+                              ) : (
+                                <TextField
+                                  value={val}
+                                  disabled={disabled}
+                                  onChange={(e) => setItem(i, f.key, e.target.value)}
+                                  className="min-h-9 py-1.5"
                                 />
                               )}
                               <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--color-mid-gray)]">
@@ -216,7 +224,7 @@ export function CountNoteRow({
           </div>
         )
       ) : countOnly ? null : (
-        <Input
+        <TextField
           value={value.notes}
           onChange={(e) => onChange({ ...value, notes: e.target.value })}
           placeholder={notesPrompt}
