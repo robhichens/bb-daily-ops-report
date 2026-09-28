@@ -5,6 +5,7 @@
 // staff watch, packet compliance, and the red-flag / celebration feeds.
 
 import {
+  STAFFING_CALC_FLAG,
   CLASSROOMS,
   ENROLLMENT_COMMS_DAILY_GOAL,
   REGISTRATION_FEE,
@@ -233,6 +234,9 @@ export function openingsToStaff(adr: OrgReport | null, scope: SiteId[] = SITE_ID
 
 /** Same ranking, straight from the grid cells (the shared headline record). */
 export function openingsFromCells(cells: Record<string, unknown>, asOfDate: string, scope: SiteId[] = SITE_IDS): OpeningsToStaff {
+  // Only grids the ADR calculated from children + teachers. The old hand-typed
+  // numbers (before 2026-09-28) used mixed definitions and aren't shown.
+  if (!cells[STAFFING_CALC_FLAG]) return { totalOpen: 0, asOfDate: '', rooms: [] }
   const rooms: RoomOpening[] = []
   for (const s of SITES.filter((x) => scope.includes(x.id))) {
     for (const c of CLASSROOMS) {

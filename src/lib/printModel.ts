@@ -4,7 +4,7 @@
 // blank fields (rendered as fillable lines) so a printout can be filled by hand.
 
 import {
-  ENROLLMENT_FIELDS, STAFF_FIELDS, SITES, countNoteSummary, matrixCellKey, siteName,
+  ENROLLMENT_FIELDS, STAFF_FIELDS, SITES, countNoteSummary, matrixCellKey, siteName, staffingKey,
   type DailyOpsReport, type EnrollmentMarketing, type Staff,
   type FinanceReport, type OrgListItem, type OrgReport, type OrgReportDef, type SiteId,
   totalBilling, totalOutstanding, subtotalDeposits, totalDeposits,
@@ -142,7 +142,16 @@ export function buildOrgPrintModel(def: OrgReportDef, r: OrgReport): PrintModel 
         columns: ['', ...m.columns.map((c) => c.label)],
         rows: m.rows.map((row) => [
           row.sub ? `${row.label} (${row.sub})` : row.label,
-          ...m.columns.map((c) => { const v = vals[matrixCellKey(c.key, row.key)]; return typeof v === 'number' && v ? String(v) : (v ? String(v) : '') }),
+          ...m.columns.map((c) => {
+            const v = vals[matrixCellKey(c.key, row.key)]
+            const shown = typeof v === 'number' && v ? String(v) : (v ? String(v) : '')
+            if (!m.staffing) return shown
+            // Staffing grid: openings (children / teachers), e.g. "7 (13 kids / 2 tchr)".
+            const kids = vals[staffingKey(c.key, row.key, 'kids')]
+            const teachers = vals[staffingKey(c.key, row.key, 'teachers')]
+            if (typeof teachers !== 'number' || !teachers) return ''
+            return `${typeof v === 'number' ? v : 0} (${typeof kids === 'number' ? kids : 0} kids / ${teachers} tchr)`
+          }),
         ]),
       } })
     } else {

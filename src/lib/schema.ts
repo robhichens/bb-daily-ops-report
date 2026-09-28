@@ -423,8 +423,37 @@ export interface MatrixDef {
   rows: { key: string; label: string; sub?: string }[];
   columns: { key: string; label: string }[];
   kind: FieldKind; // typically 'number' so short-staffed (negative) rooms aren't clamped to 0
+  /** Staffing mode (ADR Openings to Staff): each cell takes children + teachers
+   *  and the openings are CALCULATED from the room ratios below, stored in the
+   *  plain cell key so every reader (dashboard, headlines, print) is unchanged. */
+  staffing?: boolean;
 }
 export const matrixCellKey = (colKey: string, rowKey: string): string => `${colKey}_${rowKey}`;
+
+// --- Classroom ratios (confirmed by Rob 2026-09-28) ---------------------------
+
+/** Base ratio, 1 teacher : N children — the same at every school. */
+export const ROOM_RATIOS: Record<string, number> = {
+  lions: 4, hippos: 5, elephants: 6, monkeys: 8, tigers: 10, zebras: 10, cheetahs: 10,
+};
+/** Extended ratio waivers: extra children allowed per teacher at a school. */
+export const RATIO_WAIVERS: Record<SiteId, number> = { crozet: 1, 'forest-lakes': 1, 'mill-creek': 0 };
+
+export const effectiveRatio = (site: SiteId, room: string): number =>
+  (ROOM_RATIOS[room] ?? 0) + (RATIO_WAIVERS[site] ?? 0);
+
+/** Where a staffing cell keeps its inputs, beside the calculated openings. */
+export const staffingKey = (site: string, room: string, part: 'kids' | 'teachers'): string =>
+  `${matrixCellKey(site, room)}__${part}`;
+/** Marks a grid whose openings were calculated (not the old hand-typed numbers). */
+export const STAFFING_CALC_FLAG = '__calc';
+
+/** Openings to Staff = teachers × effective ratio − children (spaces available with
+ *  CURRENT staffing). Null until a teacher count is entered. Negative = over ratio. */
+export function openingsFor(site: SiteId, room: string, kids: number, teachers: number): number | null {
+  if (!teachers || teachers <= 0) return null;
+  return teachers * effectiveRatio(site, room) - (kids || 0);
+}
 
 export interface OrgSectionDef {
   key: string;

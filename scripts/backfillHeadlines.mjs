@@ -51,7 +51,10 @@ for (const d of ddrs) {
   })
 }
 
-const latestAdr = (await db.collection('admissionsReports').orderBy('date', 'desc').limit(1).get()).docs[0]?.data()
+// Latest ADR whose Openings grid was CALCULATED (children + teachers) — skips
+// empty grids and the old hand-typed ones, like the app does.
+const latestAdr = (await db.collection('admissionsReports').orderBy('date', 'desc').limit(14).get()).docs
+  .map((d) => d.data()).find((r) => r.data?.openingsToStaff?.__calc)
 if (latestAdr) {
   batch.set(db.collection('headlines').doc('openings'), {
     kind: 'openings',
@@ -62,7 +65,7 @@ if (latestAdr) {
 }
 
 console.log(`${ddrs.length} submitted DDRs → headlines/ddr_*`)
-console.log(latestAdr ? `Openings grid from the ADR of ${latestAdr.date} → headlines/openings` : 'No ADR yet — no openings headline')
+console.log(latestAdr ? `Openings grid from the ADR of ${latestAdr.date} → headlines/openings` : 'No ADR with a calculated Openings grid yet — openings headline left as is')
 if (write) {
   await batch.commit()
   console.log('Written.')

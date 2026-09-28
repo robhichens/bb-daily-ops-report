@@ -4,7 +4,7 @@ import { Check, Lock, Pencil, Loader2, CloudOff, Eye } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { reportAccessLevel, userSites } from '@/lib/users'
 import { ORG_DEFS, reportMeta } from '@/lib/reportRegistry'
-import { matrixCellKey, orgDocId, SITES, siteName } from '@/lib/schema'
+import { effectiveRatio, matrixCellKey, openingsFor, orgDocId, RATIO_WAIVERS, SITES, siteName, staffingKey, STAFFING_CALC_FLAG } from '@/lib/schema'
 import type {
   FieldKind, MatrixDef, OrgFieldDef, OrgFieldValue, OrgListItem,
   OrgReport as TOrgReport, OrgReportDef, OrgSectionDef, OrgSubField, SiteId,
@@ -122,6 +122,21 @@ function OrgForm({
     })
   }, [author, queueSave])
 
+  // Several keys in one section at once (a staffing cell writes children,
+  // teachers and the calculated openings together).
+  const patchSection = useCallback((section: string, patch: Record<string, OrgFieldValue>) => {
+    setDraft((prev) => {
+      if (!prev) return prev
+      const next: TOrgReport = {
+        ...prev,
+        completedBy: prev.completedBy || author,
+        data: { ...prev.data, [section]: { ...prev.data[section], ...patch } },
+      }
+      queueSave(next)
+      return next
+    })
+  }, [author, queueSave])
+
   const setCompletedBy = useCallback((name: string) => {
     setDraft((prev) => {
       if (!prev) return prev
@@ -197,7 +212,7 @@ function OrgForm({
       </Card>
 
       {def.sections.map((s) => (
-        <SectionCard key={s.key} def={def} section={s} draft={draft} locked={locked} setField={setField} />
+        <SectionCard key={s.key} def={def} section={s} draft={draft} locked={locked} setField={setField} patchSection={patchSection} />
       ))}
 
       {!locked && (
@@ -213,13 +228,14 @@ function OrgForm({
 }
 
 function SectionCard({
-  def, section, draft, locked, setField,
+  def, section, draft, locked, setField, patchSection,
 }: {
   def: OrgReportDef
   section: OrgSectionDef
   draft: TOrgReport
   locked: boolean
   setField: (section: string, field: string, value: OrgFieldValue) => void
+  patchSection: (section: string, patch: Record<string, OrgFieldValue>) => void
 }) {
   const vals = draft.data[section.key] ?? {}
   // Conditional fields (e.g. a "reason" shown only when a toggle is No).
@@ -230,7 +246,14 @@ function SectionCard({
         <h2 className="text-sm font-extrabold uppercase tracking-[0.14em] text-[var(--color-charcoal)]">{section.title}</h2>
         {section.hint && <p className="mt-0.5 text-xs text-[var(--color-dk-gray)]">{section.hint}</p>}
       </div>
-      {section.matrix ? (
+      {section.matrix?.staffing ? (
+        <StaffingGrid
+          matrix={section.matrix}
+          vals={vals}
+          disabled={locked}
+          onPatch={(patch) => patchSection(section.key, patch)}
+        />
+      ) : section.matrix ? (
         <MatrixGrid
           matrix={section.matrix}
           vals={vals}
@@ -455,6 +478,96 @@ function MatrixGrid({
           }),
         ])}
       </div>
+    </div>
+  )
+}
+
+/** ADR Openings to Staff: per school, each room takes children + teachers and
+ *  shows the calculated openings (teachers × ratio − children). The result is
+ *  stored in the plain cell key, the inputs beside it (see staffingKey). */
+function StaffingGrid({
+  matrix, vals, disabled, onPatch,
+}: {
+  matrix: MatrixDef
+  vals: Record<string, OrgFieldValue>
+  disabled: boolean
+  onPatch: (patch: Record<string, OrgFieldValue>) => void
+}) {
+  const num = (v: OrgFieldValue | undefined) => (typeof v === 'number' ? v : 0)
+
+  function set(site: SiteId, room: string, part: 'kids' | 'teachers', raw: string) {
+    const n = raw === '' ? 0 : parseInt(raw, 10)
+    if (Number.isNaN(n) || n < 0) return
+    const kids = part === 'kids' ? n : num(vals[staffingKey(site, room, 'kids')])
+    const teachers = part === 'teachers' ? n : num(vals[staffingKey(site, room, 'teachers')])
+    const open = openingsFor(site, room, kids, teachers)
+    onPatch({
+      [staffingKey(site, room, part)]: n,
+      // '' = not calculable yet (no teachers entered); readers skip it.
+      [matrixCellKey(site, room)]: open ?? '',
+      [STAFFING_CALC_FLAG]: 1,
+    })
+  }
+
+  return (
+    <div className="space-y-5">
+      {matrix.columns.map((c) => {
+        const site = c.key as SiteId
+        const waiver = RATIO_WAIVERS[site] ?? 0
+        return (
+          <div key={site}>
+            <div className="mb-2 flex flex-wrap items-baseline gap-x-2 border-b border-[var(--color-border)] pb-1.5">
+              <span className="text-sm font-extrabold text-[var(--color-charcoal)]">{c.label}</span>
+              {waiver > 0 && <span className="text-xs font-semibold text-[var(--color-coral-dark)]">ratio waiver +{waiver} per teacher</span>}
+            </div>
+            <div className="grid items-center gap-x-2 gap-y-2" style={{ gridTemplateColumns: 'minmax(96px,1.4fr) minmax(58px,72px) minmax(58px,72px) minmax(78px,1fr)' }}>
+              <div />
+              <div className="text-center text-[11px] font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">Children</div>
+              <div className="text-center text-[11px] font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">Teachers</div>
+              <div className="text-center text-[11px] font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">Openings</div>
+              {matrix.rows.flatMap((r) => {
+                const kids = num(vals[staffingKey(site, r.key, 'kids')])
+                const teachers = num(vals[staffingKey(site, r.key, 'teachers')])
+                const open = openingsFor(site, r.key, kids, teachers)
+                const pill =
+                  open === null
+                    ? { cls: 'text-[var(--color-mid-gray)]', text: '—' }
+                    : open > 0
+                      ? { cls: 'bg-[var(--color-good-soft)] text-[var(--color-good)]', text: `+${open} open` }
+                      : open < 0
+                        ? { cls: 'bg-[var(--color-critical-soft)] text-[var(--color-critical)]', text: `${open} over` }
+                        : { cls: 'bg-[var(--color-secondary)] text-[var(--color-dk-gray)]', text: 'full' }
+                const cell = (part: 'kids' | 'teachers', value: number) => (
+                  <Input
+                    key={`${site}-${r.key}-${part}`}
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    step="1"
+                    value={value === 0 ? '' : value}
+                    placeholder="0"
+                    disabled={disabled}
+                    aria-label={`${r.label} at ${c.label}: ${part === 'kids' ? 'children' : 'teachers'}`}
+                    onChange={(e) => set(site, r.key, part, e.target.value)}
+                    className="h-9 px-2 text-center text-base font-semibold sm:text-sm"
+                  />
+                )
+                return [
+                  <div key={`${site}-${r.key}-label`} className="leading-tight">
+                    <div className="text-sm font-semibold text-[var(--color-charcoal)]">{r.label}</div>
+                    <div className="text-[10px] text-[var(--color-mid-gray)]">{r.sub} · 1:{effectiveRatio(site, r.key)}</div>
+                  </div>,
+                  cell('kids', kids),
+                  cell('teachers', teachers),
+                  <div key={`${site}-${r.key}-open`} className="text-center">
+                    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold ${pill.cls}`}>{pill.text}</span>
+                  </div>,
+                ]
+              })}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

@@ -67,8 +67,8 @@ const ADR: OrgReportDef = {
       { key: 'withdrawals', label: 'Withdrawals', kind: 'count' },
       { key: 'followUps', label: 'Follow-ups outstanding', kind: 'count' },
     ], note: true },
-    { key: 'openingsToStaff', title: 'Openings to Staff', hint: 'Spots open per room based on today’s teacher count + ratio — not raw licensed capacity. Can go negative if a room is over ratio for its current staffing.', fields: [],
-      matrix: { rows: CLASSROOMS.map((c) => ({ key: c.key, label: c.name, sub: c.ageGroup })), columns: SITES.map((s) => ({ key: s.id, label: s.name })), kind: 'number' },
+    { key: 'openingsToStaff', title: 'Openings to Staff', hint: 'Enter the children and teachers in each room right now. Openings are calculated for you: teachers × ratio − children (Crozet and Forest Lakes include their +1 waiver). Negative means the room is over ratio.', fields: [],
+      matrix: { rows: CLASSROOMS.map((c) => ({ key: c.key, label: c.name, sub: c.ageGroup })), columns: SITES.map((s) => ({ key: s.id, label: s.name })), kind: 'number', staffing: true },
       note: true },
   ],
 }

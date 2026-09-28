@@ -25,7 +25,7 @@ import { where } from 'firebase/firestore'
 import { db } from './firebase'
 import { mirrorOpeningsHeadline } from './headlines'
 import { weekOf as weekOfFn, weekdayName } from './derive'
-import { orgDocId, siteName } from './schema'
+import { orgDocId, siteName, STAFFING_CALC_FLAG } from './schema'
 import type { FieldKind, LedgerNote, LedgerNoteComment, OrgFieldValue, OrgReport, OrgReportDef, ReportKey, RequestList, RequestTag, SiteId } from './schema'
 import type { RequestItem } from './reports'
 
@@ -76,16 +76,6 @@ export async function getOrgReport(col: string, docId: string): Promise<OrgRepor
   return snap.exists() ? (snap.data() as OrgReport) : null
 }
 
-/** The most recent org report in a collection (by date), for dashboard reads
- *  like the ADR's Openings-to-Staff grid. Single-field orderBy, no index. */
-export function subscribeLatestOrgReport(col: string, cb: (report: OrgReport | null) => void): Unsubscribe {
-  return onSnapshot(
-    query(collection(db, col), orderBy('date', 'desc'), limit(1)),
-    (snap) => cb(snap.empty ? null : (snap.docs[0].data() as OrgReport)),
-    () => cb(null)
-  )
-}
-
 /** Org reports whose date falls in [start, end] (inclusive), for the dashboard.
  *  Two range filters on one field need no composite index. */
 export function subscribeOrgReportsByRange(
@@ -100,6 +90,20 @@ export function subscribeOrgReportsByRange(
     () => cb([])
   )
 }
+
+/** The most recent ADR whose Openings to Staff grid was CALCULATED (children +
+ *  teachers entered). Skips days filed with an empty grid ("numbers are the
+ *  same") and the old hand-typed grids. */
+export function subscribeLatestOpeningsAdr(col: string, cb: (report: OrgReport | null) => void): Unsubscribe {
+  return onSnapshot(
+    query(collection(db, col), orderBy('date', 'desc'), limit(14)),
+    (snap) => cb((snap.docs.map((d) => d.data() as OrgReport).find(hasCalculatedOpenings)) ?? null),
+    () => cb(null)
+  )
+}
+
+export const hasCalculatedOpenings = (r: OrgReport): boolean =>
+  !!(r.data?.openingsToStaff as Record<string, unknown> | undefined)?.[STAFFING_CALC_FLAG]
 
 export async function upsertOrgDraft(col: string, report: OrgReport): Promise<void> {
   const payload: OrgReport = {

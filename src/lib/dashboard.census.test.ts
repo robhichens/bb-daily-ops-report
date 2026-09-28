@@ -45,6 +45,7 @@ describe('openingsToStaff', () => {
     id: '2026-09-22', date: '2026-09-22', day: '', weekOf: '', completedBy: '',
     data: {
       openingsToStaff: {
+        __calc: 1,
         crozet_lions: 3,
         crozet_tigers: -1,
         'mill-creek_cheetahs': 5,
@@ -60,6 +61,11 @@ describe('openingsToStaff', () => {
     expect(o.rooms[0]).toMatchObject({ site: 'Mill Creek', open: 5 })
     expect(o.totalOpen).toBe(8) // 5 + 3; the 0 and -1 don't add
     expect(o.asOfDate).toBe('2026-09-22')
+  })
+
+  it('ignores an old hand-typed grid (no calculated flag)', () => {
+    const legacy = { ...adr, data: { openingsToStaff: { crozet_cheetahs: 14 } } }
+    expect(openingsToStaff(legacy)).toEqual({ totalOpen: 0, asOfDate: '', rooms: [] })
   })
 
   it('is empty when there is no ADR yet', () => {

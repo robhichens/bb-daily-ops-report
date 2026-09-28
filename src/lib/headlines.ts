@@ -16,7 +16,7 @@
 import { collection, doc, getDoc, onSnapshot, query, setDoc, where, type Unsubscribe } from 'firebase/firestore'
 import { db } from './firebase'
 import { withdrawals, type CensusPoint, type Withdrawal } from './dashboard'
-import type { DailyOpsReport, OrgReport, SiteId } from './schema'
+import { STAFFING_CALC_FLAG, type DailyOpsReport, type OrgReport, type SiteId } from './schema'
 
 const COL = 'headlines'
 const OPENINGS_ID = 'openings'
@@ -63,6 +63,10 @@ export async function mirrorDdrHeadline(r: DailyOpsReport): Promise<void> {
 /** Keep the openings headline on the LATEST ADR date (an older day being
  *  edited mustn't overwrite today's grid). */
 export async function mirrorOpeningsHeadline(r: OrgReport): Promise<void> {
+  // Only a calculated grid replaces the headline — an ADR filed with an empty
+  // grid (or the old hand-typed one) mustn't blank out the last good numbers.
+  const cells = (r.data?.openingsToStaff ?? {}) as Record<string, unknown>
+  if (!cells[STAFFING_CALC_FLAG]) return
   try {
     const ref = doc(db, COL, OPENINGS_ID)
     const cur = await getDoc(ref)

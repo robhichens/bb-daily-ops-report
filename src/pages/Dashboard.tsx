@@ -20,7 +20,7 @@ import {
 import { exportCsv } from '@/lib/exportReports'
 import { exportReportsPdf } from '@/lib/exportPdf'
 import { subscribeFinanceReportsByRange } from '@/lib/finance'
-import { subscribeAllOrgNotes, subscribeLatestOrgReport, subscribeOrgReportsByRange } from '@/lib/orgReports'
+import { subscribeAllOrgNotes, subscribeLatestOpeningsAdr, subscribeOrgReportsByRange } from '@/lib/orgReports'
 import { ORG_DEFS, reportMeta } from '@/lib/reportRegistry'
 import { inputClass } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -107,7 +107,7 @@ export function Dashboard() {
   useEffect(() => (has.ddr ? subscribeDirectorView(setConfig) : undefined), [has.ddr])
   useEffect(() => (admin ? subscribeRecentReports(200, setRecentRows) : undefined), [admin])
   useEffect(() => (admin ? subscribeAllOrgNotes(setOrgNotes) : undefined), [admin])
-  useEffect(() => (has.adr ? subscribeLatestOrgReport(ADR_COL, setLatestAdr) : undefined), [has.adr])
+  useEffect(() => (has.adr ? subscribeLatestOpeningsAdr(ADR_COL, setLatestAdr) : undefined), [has.adr])
   const [openingsHl, setOpeningsHl] = useState<OpeningsHeadline | null>(null)
   useEffect(() => (has.adr ? undefined : subscribeOpeningsHeadline(setOpeningsHl)), [has.adr])
 

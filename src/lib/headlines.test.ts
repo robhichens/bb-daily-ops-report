@@ -32,7 +32,7 @@ describe('ddrHeadline', () => {
 
 describe('openingsFromCells', () => {
   it('matches openingsToStaff on the same grid', () => {
-    const adr = { date: '2026-09-22', data: { openingsToStaff: { crozet_lions: 3, 'mill-creek_tigers': -1 } } } as unknown as OrgReport
+    const adr = { date: '2026-09-22', data: { openingsToStaff: { __calc: 1, crozet_lions: 3, 'mill-creek_tigers': -1 } } } as unknown as OrgReport
     const cells = adr.data.openingsToStaff as Record<string, unknown>
     const out = openingsFromCells(cells, adr.date, ['crozet', 'mill-creek'])
     expect(out.totalOpen).toBe(3)

@@ -89,7 +89,7 @@ export function OpeningsHero({ openings }: { openings: OpeningsToStaff }) {
       </div>
 
       {openings.rooms.length === 0 ? (
-        <p className="mt-4 text-sm text-[var(--color-dk-gray)]">Openings appear here once Admissions logs the Openings to Staff grid on the ADR.</p>
+        <p className="mt-4 text-sm text-[var(--color-dk-gray)]">Openings appear here once Admissions enters the children and teachers in each room on the ADR.</p>
       ) : shown.length === 0 ? (
         <p className="mt-4 text-sm text-[var(--color-dk-gray)]">No open spots right now — every logged room is at or over ratio. Use “Read more” to see them.</p>
       ) : (
