@@ -9,9 +9,10 @@ describe('classroom ratios', () => {
     expect(effectiveRatio('mill-creek', 'monkeys')).toBe(8)
   })
 
-  it('uses a school override where one exists: Mill Creek Hippos is 1:4', () => {
+  it('treats Hippos as an infant room: 1:4 base, waiver still applies', () => {
     expect(effectiveRatio('mill-creek', 'hippos')).toBe(4)
-    expect(effectiveRatio('crozet', 'hippos')).toBe(6) // base 5 + waiver
+    expect(effectiveRatio('crozet', 'hippos')).toBe(5)
+    expect(effectiveRatio('forest-lakes', 'hippos')).toBe(5)
     expect(openingsFor('mill-creek', 'hippos', 8, 2)).toBe(0) // 2 × 4 − 8
   })
 })

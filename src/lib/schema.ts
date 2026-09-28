@@ -434,12 +434,11 @@ export const matrixCellKey = (colKey: string, rowKey: string): string => `${colK
 
 /** Base ratio, 1 teacher : N children, used at every school unless overridden below. */
 export const ROOM_RATIOS: Record<string, number> = {
-  lions: 4, hippos: 5, elephants: 6, monkeys: 8, tigers: 10, zebras: 10, cheetahs: 10,
+  lions: 4, hippos: 4, elephants: 6, monkeys: 8, tigers: 10, zebras: 10, cheetahs: 10,
 };
-/** A school whose room runs a different base ratio (Rob, 2026-09-28). */
-export const SITE_RATIO_OVERRIDES: Partial<Record<SiteId, Record<string, number>>> = {
-  'mill-creek': { hippos: 4 },
-};
+/** A school whose room runs a different base ratio than ROOM_RATIOS. None today
+ *  (Hippos is an infant room: 1:4 at every school — Rob, 2026-09-28). */
+export const SITE_RATIO_OVERRIDES: Partial<Record<SiteId, Record<string, number>>> = {};
 /** Extended ratio waivers: extra children allowed per teacher at a school. */
 export const RATIO_WAIVERS: Record<SiteId, number> = { crozet: 1, 'forest-lakes': 1, 'mill-creek': 0 };
 
