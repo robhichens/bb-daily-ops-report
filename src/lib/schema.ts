@@ -221,6 +221,10 @@ export interface CountNoteField<K extends string = string> {
   goal?: number; // when set, render a goal pill (green at >= goal, amber below)
   /** When set, the count expands into this many structured item rows. */
   itemFields?: ItemFieldDef[];
+  /** Just the number — no notes line under it. */
+  countOnly?: boolean;
+  /** Must be above 0 to submit (checked in validateForSubmit). */
+  required?: boolean;
 }
 
 // Reusable per-item sub-fields for the structured breakouts.
@@ -229,7 +233,7 @@ const F_ROOM: ItemFieldDef = { key: 'room', label: 'Room', type: 'text' };
 const F_REASON: ItemFieldDef = { key: 'reason', label: 'Reason', type: 'text' };
 
 export const ENROLLMENT_FIELDS: CountNoteField<keyof EnrollmentMarketing>[] = [
-  { key: 'fullTimeEnrollment', label: 'Full-Time Enrollment', notesPrompt: 'Current full-time headcount at your campus today' },
+  { key: 'fullTimeEnrollment', label: 'Full-Time Enrollment', notesPrompt: 'Current full-time headcount at your campus today', countOnly: true, required: true },
   { key: 'toursGiven', label: 'Number of Tours Given', notesPrompt: 'Add names', itemFields: [F_NAME] },
   { key: 'toursScheduled', label: 'Number of Tours Scheduled', notesPrompt: 'Check IKS', itemFields: [F_NAME, { key: 'tourDate', label: 'Tour date', type: 'date' }] },
   { key: 'callsInEmailsWeb', label: 'Number of Calls In/Emails & Web Inq', notesPrompt: 'Provide all details', itemFields: [{ key: 'type', label: 'Type', type: 'select', options: ['Call', 'Email', 'Web', 'Walk-in'], allowOther: true }, F_NAME] },

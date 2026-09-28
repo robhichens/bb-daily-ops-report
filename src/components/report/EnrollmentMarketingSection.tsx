@@ -27,6 +27,8 @@ export function EnrollmentMarketingSection({ value, onChange, disabled }: Props)
             notesPrompt={f.notesPrompt}
             goal={f.goal}
             itemFields={f.itemFields}
+            countOnly={f.countOnly}
+            required={f.required}
             value={value[f.key]}
             onChange={(next) => setField(f.key, next)}
             disabled={disabled}

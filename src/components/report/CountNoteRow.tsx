@@ -19,6 +19,10 @@ interface CountNoteRowProps {
   disabled?: boolean
   /** When set, the count expands into this many structured item rows. */
   itemFields?: ItemFieldDef[]
+  /** Just the number — no notes line. */
+  countOnly?: boolean
+  /** Shows a required marker (the check itself is in validateForSubmit). */
+  required?: boolean
 }
 
 const MAX_ROWS = 40
@@ -42,6 +46,8 @@ export function CountNoteRow({
   unit,
   disabled = false,
   itemFields,
+  countOnly = false,
+  required = false,
 }: CountNoteRowProps) {
   const hasItems = !!itemFields && itemFields.length > 0
   // Tracks which (row, field) selects are in free-type "Other" mode, keyed `${i}:${key}`.
@@ -80,7 +86,10 @@ export function CountNoteRow({
     <div className="py-3">
       {/* Header: label + goal pill + count */}
       <div className="flex flex-wrap items-center gap-2">
-        <label className="text-sm font-semibold text-[var(--color-charcoal)]">{label}</label>
+        <label className="text-sm font-semibold text-[var(--color-charcoal)]">
+          {label}
+          {required && <span className="text-[var(--color-coral-dark)]" title="Required"> *</span>}
+        </label>
         {goal != null && (
           <motion.span
             key={goalMet ? 'met' : 'below'}
@@ -201,7 +210,7 @@ export function CountNoteRow({
             )}
           </div>
         )
-      ) : (
+      ) : countOnly ? null : (
         <Input
           value={value.notes}
           onChange={(e) => onChange({ ...value, notes: e.target.value })}

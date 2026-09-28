@@ -118,6 +118,9 @@ export function validateForSubmit(r: DailyOpsReport): ValidationResult {
   if (!r.siteId) errors.push('Select a site.');
   if (!r.date) errors.push('Enter the report date.');
   if (!r.director.trim()) errors.push('Enter the director name.');
+  if (!((r.enrollmentMarketing.fullTimeEnrollment?.count ?? 0) > 0)) {
+    errors.push('Enter today’s Full-Time Enrollment (your campus’s full-time headcount).');
+  }
 
   if (!r.directorPacket.completed && !r.directorPacket.incompleteReason.trim()) {
     errors.push('Director Packet marked "No" — say what was not completed and what got in the way.');
