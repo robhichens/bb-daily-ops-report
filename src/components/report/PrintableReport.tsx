@@ -74,7 +74,8 @@ function Block({ block }: { block: PrintBlock }) {
     return (
       <div className="space-y-1">
         {t.label && <div className="text-[12px] font-semibold">{t.label}</div>}
-        <table className="w-full border-collapse text-[11.5px]">
+        <table className={`w-full border-collapse text-[11.5px] ${t.widths ? 'table-fixed' : ''}`}>
+        {t.widths && <colgroup>{t.widths.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>}
         <thead>
           <tr>
             {t.columns.map((c, i) => (

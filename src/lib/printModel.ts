@@ -13,7 +13,14 @@ import { formatLong } from './dates'
 import { weekdayName } from './derive'
 
 export interface PrintField { label: string; value?: string }
-export interface PrintTable { label?: string; columns: string[]; rows: string[][]; minRows?: number }
+export interface PrintTable {
+  label?: string
+  columns: string[]
+  rows: string[][]
+  minRows?: number
+  /** Fixed column widths (e.g. ['8%', '56%', ...]) so stacked tables line up. */
+  widths?: string[]
+}
 export type PrintBlock =
   | { kind: 'fields'; fields: PrintField[] }
   | { kind: 'table'; table: PrintTable }

@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react'
-import { ShoppingCart, Wrench, Check, CheckCircle2, Trash2 } from 'lucide-react'
+import { ShoppingCart, Wrench, Check, CheckCircle2, Trash2, Printer } from 'lucide-react'
 import { CollapsibleCard } from './CollapsibleCard'
+import { Button } from '@/components/ui/button'
+import { usePrintSheet } from '@/components/report/PrintSheet'
+import { buildRequestsPrintModel } from '@/lib/requestPrint'
 import { ReportSection } from './ReportSections'
 import {
   REQUEST_LISTS,
@@ -21,7 +24,7 @@ import {
   setOrgRequestDone,
   setOrgNoteRequest,
 } from '@/lib/orgReports'
-import { formatShort } from '@/lib/dates'
+import { formatShort, todayIso } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 
 const LIST_META: Record<
@@ -68,8 +71,32 @@ const removeItem = (i: RequestItem) =>
 /** Admin-only Purchase + Maintenance lists (+ a Completed archive), derived from
  *  Buy/Fix tags across every report's Day Notes. */
 export function RequestLists({ reports, orgNotes }: { reports: DailyOpsReport[]; orgNotes: LedgerNote[] }) {
+  const { print, sheet } = usePrintSheet()
+  const groups = useMemo(
+    () => REQUEST_LISTS.map((l) => ({
+      list: l.id,
+      label: l.label,
+      items: [...collectRequests(reports, l.id), ...collectOrgRequests(orgNotes, l.id)],
+    })),
+    [reports, orgNotes]
+  )
+  const printLists = (ids: RequestList[]) =>
+    print(buildRequestsPrintModel(groups.filter((g) => ids.includes(g.list)), todayIso()))
+
   return (
     <ReportSection title="Day Note Requests" sub="Purchase & maintenance" storageKey="requests">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">
+          <Printer className="size-3.5" /> Print / PDF
+        </span>
+        {groups.map((g) => (
+          <Button key={g.list} size="sm" variant="outline" onClick={() => printLists([g.list])}>
+            {g.list === 'purchase' ? 'Purchase' : 'Maintenance'} ({g.items.length})
+          </Button>
+        ))}
+        <Button size="sm" variant="outline" onClick={() => printLists(groups.map((g) => g.list))}>Both</Button>
+      </div>
+      {sheet}
       <div className="grid items-start gap-4 md:grid-cols-2">
         {REQUEST_LISTS.map((l) => (
           <ActiveListCard key={l.id} list={l.id} label={l.label} reports={reports} orgNotes={orgNotes} />

@@ -175,4 +175,8 @@
   body {
     background: #fff !important;
   }
+  /* usePrintSheet: print only the one sheet, not the page behind it. */
+  body.print-sheet-active > #root {
+    display: none !important;
+  }
 }
