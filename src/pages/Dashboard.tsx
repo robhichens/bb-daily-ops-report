@@ -154,7 +154,11 @@ export function Dashboard() {
 
   const ddrBody = view && (
     <>
-      <DashboardSections view={view} sections={ddrSections} />
+      <DashboardSections
+        view={view}
+        sections={ddrSections}
+        afterFunnel={admin && <RequestLists reports={recentRows} orgNotes={orgNotes} />}
+      />
       <ReportsTable rows={view.tableRows} />
     </>
   )
@@ -219,7 +223,6 @@ export function Dashboard() {
       {adrData && <AdrSection summary={adrData} collapsible={multi} />}
       {fdrData && <FdrSection summary={fdrData} collapsible={multi} />}
 
-      {admin && <RequestLists reports={recentRows} orgNotes={orgNotes} />}
 
       {admin && <DirectorViewConfig config={config} />}
       {admin && <UsersPanel />}
