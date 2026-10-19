@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { enrollmentCensus, withdrawals, openingsToStaff } from './dashboard'
+import { censusFromPoints, enrollmentCensus, withdrawals, openingsToStaff } from './dashboard'
 import { emptyReport, type DailyOpsReport, type OrgReport, type SiteId } from './schema'
 
 function ft(site: SiteId, date: string, count: number): DailyOpsReport {
@@ -20,6 +20,19 @@ describe('enrollmentCensus', () => {
     expect(c.open).toBe(40)
     expect(c.delta).toBe(2) // 95 now vs 93 last week
     expect(c.bySite[0]).toMatchObject({ siteId: 'crozet', enrolled: 95 })
+  })
+})
+
+describe('census from the latest headcount (never 0 on a quiet day)', () => {
+  it('uses the most recent submitted count even if it is older than the period', () => {
+    const points = [
+      { siteId: 'crozet' as const, date: '2026-10-14', fullTime: 50 },
+      { siteId: 'crozet' as const, date: '2026-10-16', fullTime: 51 },
+    ]
+    // "Today" (10/19) has no DDR yet: the card still shows 51, as of 10/16.
+    const c = censusFromPoints(points, points.filter((p) => p.date < '2026-10-19'), ['crozet'])
+    expect(c.bySite[0]).toMatchObject({ enrolled: 51, asOf: '2026-10-16', delta: 0 })
+    expect(censusFromPoints([], [], ['crozet']).bySite[0]).toMatchObject({ enrolled: 0, asOf: '' })
   })
 })
 

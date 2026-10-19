@@ -18,7 +18,7 @@ function Delta({ n }: { n: number }) {
   const up = n > 0
   return (
     <span
-      title="vs. the prior period"
+      title="vs. the last headcount before this period"
       className={cn(
         'inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-bold',
         up ? 'bg-[var(--color-good-soft)] text-[var(--color-good)]' : 'bg-[var(--color-critical-soft)] text-[var(--color-critical)]'
@@ -134,7 +134,9 @@ function SiteCard({ s }: { s: SiteCensus }) {
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--color-secondary)]">
         <div className="h-full rounded-full" style={{ width: `${Math.min(100, s.pct)}%`, background: SITE_BAR[s.siteId] }} />
       </div>
-      <p className="mt-1.5 text-xs text-[var(--color-mid-gray)]">{s.pct}% full · {s.open} under licensed cap</p>
+      <p className="mt-1.5 text-xs text-[var(--color-mid-gray)]">
+        {s.asOf ? `as of ${formatShort(s.asOf)} · ` : 'No headcount submitted yet · '}{s.pct}% full · {s.open} under licensed cap
+      </p>
     </Card>
   )
 }

@@ -92,6 +92,17 @@ export function subscribeDdrHeadlines(start: string, end: string, cb: (rows: Ddr
   )
 }
 
+/** Every DDR headline dated on or before `end` — for "latest headcount so far"
+ *  (the pinned enrollment cards never fall back to 0 just because today's DDR
+ *  isn't in yet). One small doc per submitted DDR. */
+export function subscribeDdrHeadlinesUpTo(end: string, cb: (rows: DdrHeadline[]) => void): Unsubscribe {
+  return onSnapshot(
+    query(collection(db, COL), where('date', '<=', end)),
+    (snap) => cb(snap.docs.map((d) => d.data()).filter((d): d is DdrHeadline => d.kind === 'ddr')),
+    () => cb([])
+  )
+}
+
 export function subscribeOpeningsHeadline(cb: (h: OpeningsHeadline | null) => void): Unsubscribe {
   return onSnapshot(
     doc(db, COL, OPENINGS_ID),

@@ -8,7 +8,7 @@ import { weekOf as weekOfFn } from '@/lib/derive'
 import { todayIso, addIsoDays, daysBetween, formatRange } from '@/lib/dates'
 import { subscribeRecentReports, subscribeReportsByRange } from '@/lib/reports'
 import { buildDashboardView, censusFromPoints, openingsFromCells, openingsToStaff, sortWithdrawals, type DashboardView } from '@/lib/dashboard'
-import { headlinePoints, subscribeDdrHeadlines, subscribeOpeningsHeadline, type DdrHeadline, type OpeningsHeadline } from '@/lib/headlines'
+import { headlinePoints, subscribeDdrHeadlines, subscribeDdrHeadlinesUpTo, subscribeOpeningsHeadline, type DdrHeadline, type OpeningsHeadline } from '@/lib/headlines'
 import { adrSummary, cdrSummary, fdrSummary } from '@/lib/dashboardReports'
 import {
   subscribeDirectorView,
@@ -99,6 +99,10 @@ export function Dashboard() {
   const fdr = usePeriodRows(has.fdr, subFdr, range)
   // People who can't read DDRs get the pinned enrollment numbers from the shared headline record.
   const hl = usePeriodRows(!has.ddr, subHeadlines, range)
+  // Enrollment cards: each school's LATEST submitted headcount up to the end of
+  // the period, wherever it falls, so a quiet day never reads 0.
+  const [allHl, setAllHl] = useState<DdrHeadline[]>([])
+  useEffect(() => subscribeDdrHeadlinesUpTo(range.end, setAllHl), [range.end])
 
   const [config, setConfig] = useState<Config>(DEFAULT_DIRECTOR_VIEW)
   const [recentRows, setRecentRows] = useState<DailyOpsReport[]>([])
@@ -138,14 +142,16 @@ export function Dashboard() {
   // else reads the shared headline record (lib/headlines.ts).
   const pinned = useMemo(() => {
     const inScope = <T extends { siteId: SiteId }>(rows: T[]) => rows.filter((r) => scope.includes(r.siteId))
-    const census = view ? view.census : censusFromPoints(headlinePoints(inScope(hl.cur)), headlinePoints(inScope(hl.prev)), scope)
+    const upToEnd = headlinePoints(inScope(allHl))
+    const beforeStart = upToEnd.filter((p) => p.date < range.start)
+    const census = censusFromPoints(upToEnd, beforeStart, scope)
     const withdrawn = view ? view.withdrawals : sortWithdrawals(inScope(hl.cur).flatMap((h) => h.withdrawals))
     const openings = has.adr
       ? openingsToStaff(latestAdr, scope)
       : openingsFromCells(openingsHl?.cells ?? {}, openingsHl?.date ?? '', scope)
     return { census, withdrawn, openings }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, hl.cur, hl.prev, scope.join(), has.adr, latestAdr, openingsHl])
+  }, [view, hl.cur, allHl, range.start, scope.join(), has.adr, latestAdr, openingsHl])
 
   const reportCount = [anyDdrCard, has.cdr, has.adr, has.fdr].filter(Boolean).length
   // Sections fold away behind their headings once there's more than one to scroll past.

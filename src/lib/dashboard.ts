@@ -139,6 +139,8 @@ export interface SiteCensus {
   pct: number // 0–100
   open: number
   delta: number // vs the same point last week
+  /** Date of the report the headcount came from ('' when none yet). */
+  asOf: string
 }
 
 export interface EnrollmentCensus {
@@ -162,9 +164,9 @@ export const censusPoints = (rows: DailyOpsReport[]): CensusPoint[] =>
   rows.map((r) => ({ siteId: r.siteId, date: r.date, fullTime: r.enrollmentMarketing.fullTimeEnrollment?.count ?? 0 }))
 
 /** Most recent non-zero full-time enrollment a site reported within `points`. */
-function latestFullTime(points: CensusPoint[], siteId: SiteId): number {
+function latestFullTime(points: CensusPoint[], siteId: SiteId): { n: number; date: string } {
   const mine = points.filter((p) => p.siteId === siteId && p.fullTime > 0).sort((a, b) => (a.date < b.date ? 1 : -1))
-  return mine[0]?.fullTime ?? 0
+  return { n: mine[0]?.fullTime ?? 0, date: mine[0]?.date ?? '' }
 }
 
 /** Current full-time enrollment vs licensed capacity, org-wide and per site,
@@ -183,8 +185,9 @@ export function censusFromPoints(
   scope: SiteId[] = SITE_IDS
 ): EnrollmentCensus {
   const bySite: SiteCensus[] = SITES.filter((s) => scope.includes(s.id)).map((s) => {
-    const enrolled = latestFullTime(points, s.id)
-    const prev = latestFullTime(prevPoints, s.id)
+    const latest = latestFullTime(points, s.id)
+    const enrolled = latest.n
+    const prev = latestFullTime(prevPoints, s.id).n
     const capacity = siteCapacity(s.id)
     return {
       siteId: s.id,
@@ -194,6 +197,7 @@ export function censusFromPoints(
       pct: capacity > 0 ? Math.round((enrolled / capacity) * 100) : 0,
       open: Math.max(0, capacity - enrolled),
       delta: enrolled - prev,
+      asOf: latest.date,
     }
   })
   const total = sum(bySite.map((c) => c.enrolled))
