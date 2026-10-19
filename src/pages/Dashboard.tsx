@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { LayoutDashboard, Download, FileText } from 'lucide-react'
+import { LayoutDashboard, Download, FileText, FileUp } from 'lucide-react'
 import type { Unsubscribe } from 'firebase/firestore'
 import { useAuth } from '@/auth/AuthProvider'
 import { accessibleReportKeys, isAdmin as isAdminRole, userSites } from '@/lib/users'
@@ -7,8 +7,8 @@ import { SITES, siteName, type SiteId, type DailyOpsReport, type FinanceReport, 
 import { weekOf as weekOfFn } from '@/lib/derive'
 import { todayIso, addIsoDays, daysBetween, formatRange } from '@/lib/dates'
 import { subscribeRecentReports, subscribeReportsByRange } from '@/lib/reports'
-import { buildDashboardView, censusFromPoints, openingsFromCells, openingsToStaff, sortWithdrawals, type DashboardView } from '@/lib/dashboard'
-import { headlinePoints, subscribeDdrHeadlines, subscribeDdrHeadlinesUpTo, subscribeOpeningsHeadline, type DdrHeadline, type OpeningsHeadline } from '@/lib/headlines'
+import { buildDashboardView, censusFromPoints, mergeOpeningsSources, sortWithdrawals, type DashboardView } from '@/lib/dashboard'
+import { headlinePoints, latestRollCalls, subscribeDdrHeadlines, subscribeDdrHeadlinesUpTo, subscribeOpeningsHeadline, subscribeRollCalls, type DdrHeadline, type OpeningsHeadline, type RollCallHeadline } from '@/lib/headlines'
 import { adrSummary, cdrSummary, fdrSummary } from '@/lib/dashboardReports'
 import {
   subscribeDirectorView,
@@ -23,7 +23,8 @@ import { subscribeFinanceReportsByRange } from '@/lib/finance'
 import { subscribeAllOrgNotes, subscribeLatestOpeningsAdr, subscribeOrgReportsByRange } from '@/lib/orgReports'
 import { ORG_DEFS, reportMeta } from '@/lib/reportRegistry'
 import { inputClass } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { Link } from 'react-router-dom'
 import { Card } from '@/components/ui/card'
 import { DashboardSections } from '@/components/dashboard/DashboardSections'
 import { CensusPanel } from '@/components/dashboard/CensusPanel'
@@ -103,6 +104,10 @@ export function Dashboard() {
   // the period, wherever it falls, so a quiet day never reads 0.
   const [allHl, setAllHl] = useState<DdrHeadline[]>([])
   useEffect(() => subscribeDdrHeadlinesUpTo(range.end, setAllHl), [range.end])
+  // Openings to Staff can also come from each school's weekly roll call upload.
+  const [rollCalls, setRollCalls] = useState<RollCallHeadline[]>([])
+  useEffect(() => subscribeRollCalls(setRollCalls), [])
+  const canUploadRollCall = admin || profile?.role === 'director'
 
   const [config, setConfig] = useState<Config>(DEFAULT_DIRECTOR_VIEW)
   const [recentRows, setRecentRows] = useState<DailyOpsReport[]>([])
@@ -146,12 +151,14 @@ export function Dashboard() {
     const beforeStart = upToEnd.filter((p) => p.date < range.start)
     const census = censusFromPoints(upToEnd, beforeStart, scope)
     const withdrawn = view ? view.withdrawals : sortWithdrawals(inScope(hl.cur).flatMap((h) => h.withdrawals))
-    const openings = has.adr
-      ? openingsToStaff(latestAdr, scope)
-      : openingsFromCells(openingsHl?.cells ?? {}, openingsHl?.date ?? '', scope)
+    // Per school, the newer of the ADR grid and that school's latest roll call.
+    const adrSource = has.adr
+      ? latestAdr && { cells: (latestAdr.data?.openingsToStaff ?? {}) as Record<string, unknown>, date: latestAdr.date }
+      : openingsHl && { cells: openingsHl.cells, date: openingsHl.date }
+    const openings = mergeOpeningsSources(adrSource || null, latestRollCalls(rollCalls), scope)
     return { census, withdrawn, openings }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, hl.cur, allHl, range.start, scope.join(), has.adr, latestAdr, openingsHl])
+  }, [view, hl.cur, allHl, range.start, scope.join(), has.adr, latestAdr, openingsHl, rollCalls])
 
   const reportCount = [anyDdrCard, has.cdr, has.adr, has.fdr].filter(Boolean).length
   // Sections fold away behind their headings once there's more than one to scroll past.
@@ -202,7 +209,16 @@ export function Dashboard() {
         </div>
       </div>
 
-      <CensusPanel census={pinned.census} withdrawals={pinned.withdrawn} openings={pinned.openings} />
+      <CensusPanel
+        census={pinned.census}
+        withdrawals={pinned.withdrawn}
+        openings={pinned.openings}
+        openingsAction={canUploadRollCall && (
+          <Link to="/roll-call" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+            <FileUp className="size-3.5" /> Upload roll call
+          </Link>
+        )}
+      />
 
       {reportCount === 0 && (
         <Card accent="sky" className="p-8 text-center">

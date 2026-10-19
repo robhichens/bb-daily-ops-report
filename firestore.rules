@@ -83,7 +83,9 @@ service cloud.firestore {
       allow create, update: if isSignedIn() && (
         role() == 'admin' ||
         (id == 'openings' && canFillReport('adr')) ||
-        (role() == 'director' && request.resource.data.kind == 'ddr' && request.resource.data.siteId in userSites())
+        (role() == 'director' && request.resource.data.kind == 'ddr' && request.resource.data.siteId in userSites()) ||
+        // Weekly roll call upload (Openings to Staff): a director for their own school.
+        (role() == 'director' && request.resource.data.kind == 'rollcall' && request.resource.data.siteId in userSites())
       );
       allow delete: if isSignedIn() && role() == 'admin';
     }

@@ -12,6 +12,7 @@ import { SetPassword } from '@/pages/SetPassword'
 const Report = lazy(() => import('@/pages/Report').then((m) => ({ default: m.Report })))
 const Dashboard = lazy(() => import('@/pages/Dashboard').then((m) => ({ default: m.Dashboard })))
 const DayNotes = lazy(() => import('@/pages/DayNotes').then((m) => ({ default: m.DayNotes })))
+const RollCall = lazy(() => import('@/pages/RollCall').then((m) => ({ default: m.RollCall })))
 const FinanceReport = lazy(() => import('@/pages/FinanceReport').then((m) => ({ default: m.FinanceReport })))
 const OrgReport = lazy(() => import('@/pages/OrgReport').then((m) => ({ default: m.OrgReport })))
 
@@ -51,6 +52,14 @@ export default function App() {
                 element={
                   <Suspense fallback={<PageLoader />}>
                     <Dashboard />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/roll-call"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <RollCall />
                   </Suspense>
                 }
               />

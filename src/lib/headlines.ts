@@ -111,5 +111,47 @@ export function subscribeOpeningsHeadline(cb: (h: OpeningsHeadline | null) => vo
   )
 }
 
+// --- Roll call uploads (Openings to Staff from ProCare's Monthly Roll Call) ---
+
+export interface RollCallRoomCount { kids: number; teachers: number; teacherNames: string[]; age: string }
+
+/** headlines/rollcall_<site>_<monday>: one school's reviewed roll call for a week.
+ *  `cells` uses the same keys as the ADR Openings grid, so the dashboard reads
+ *  either source the same way. Counts and teacher names only — no children. */
+export interface RollCallHeadline {
+  kind: 'rollcall'
+  siteId: SiteId
+  date: string // Monday of the week it covers
+  month: string // "October 2026" — which roll call it came from
+  rooms: Record<string, RollCallRoomCount>
+  cells: Record<string, number | string>
+  uploadedBy: string
+  updatedAt: string
+}
+
+export async function saveRollCall(h: Omit<RollCallHeadline, 'kind' | 'updatedAt'>): Promise<void> {
+  const body: RollCallHeadline = { ...h, kind: 'rollcall', updatedAt: new Date().toISOString() }
+  await setDoc(doc(db, COL, `rollcall_${h.siteId}_${h.date}`), body)
+}
+
+/** Every roll call upload (small: one doc per school per week). */
+export function subscribeRollCalls(cb: (rows: RollCallHeadline[]) => void): Unsubscribe {
+  return onSnapshot(
+    query(collection(db, COL), where('kind', '==', 'rollcall')),
+    (snap) => cb(snap.docs.map((d) => d.data() as RollCallHeadline)),
+    () => cb([])
+  )
+}
+
+/** The newest upload per school. */
+export function latestRollCalls(rows: RollCallHeadline[]): Partial<Record<SiteId, RollCallHeadline>> {
+  const out: Partial<Record<SiteId, RollCallHeadline>> = {}
+  for (const r of rows) {
+    const cur = out[r.siteId]
+    if (!cur || r.date > cur.date || (r.date === cur.date && r.updatedAt > cur.updatedAt)) out[r.siteId] = r
+  }
+  return out
+}
+
 export const headlinePoints = (rows: DdrHeadline[]): CensusPoint[] =>
   rows.map((h) => ({ siteId: h.siteId, date: h.date, fullTime: h.fullTime }))

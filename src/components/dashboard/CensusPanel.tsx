@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { ArrowUpRight, ArrowDownRight, DoorOpen } from 'lucide-react'
 import type { EnrollmentCensus, SiteCensus, Withdrawal, OpeningsToStaff, RoomOpening } from '@/lib/dashboard'
 import type { SiteId } from '@/lib/schema'
@@ -36,15 +36,17 @@ export function CensusPanel({
   census,
   withdrawals,
   openings,
+  openingsAction,
 }: {
   census: EnrollmentCensus
   withdrawals: Withdrawal[]
-  /** Omitted for viewers without ADR access (the grid lives on the ADR). */
   openings?: OpeningsToStaff
+  /** Shown in the Openings card's header (e.g. "Upload roll call"). */
+  openingsAction?: ReactNode
 }) {
   return (
     <div className="space-y-4">
-      {openings && <OpeningsHero openings={openings} />}
+      {openings && <OpeningsHero openings={openings} action={openingsAction} />}
 
       <div className="grid items-start gap-4 lg:grid-cols-[1.5fr_1fr]">
         <div className="grid gap-4 sm:grid-cols-3">
@@ -56,7 +58,7 @@ export function CensusPanel({
   )
 }
 
-export function OpeningsHero({ openings }: { openings: OpeningsToStaff }) {
+export function OpeningsHero({ openings, action }: { openings: OpeningsToStaff; action?: ReactNode }) {
   const [showAll, setShowAll] = useState(false)
   const positive = openings.rooms.filter((r) => r.open > 0)
   const shown = showAll ? openings.rooms : positive.slice(0, 5)
@@ -74,22 +76,26 @@ export function OpeningsHero({ openings }: { openings: OpeningsToStaff }) {
             <span className="pb-1.5 text-sm text-[var(--color-dk-gray)]">spots open right now</span>
           </div>
           <p className="mt-2 text-xs text-[var(--color-mid-gray)]">
-            Ratio-adjusted for today’s staffing — not licensed capacity{openings.asOfDate && ` · from the ADR ${formatShort(openings.asOfDate)}`}
+            Ratio-adjusted for current staffing — not licensed capacity
+            {openings.sourceNote ? ` · from ${openings.sourceNote}` : openings.asOfDate && ` · from the ADR ${formatShort(openings.asOfDate)}`}
           </p>
         </div>
-        {canToggle && (
-          <button
-            type="button"
-            onClick={() => setShowAll((v) => !v)}
-            className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-coral)] transition-colors hover:bg-[var(--color-secondary)]"
-          >
-            {showAll ? 'Show top rooms' : `Read more · all ${openings.rooms.length} rooms`}
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {action}
+          {canToggle && (
+            <button
+              type="button"
+              onClick={() => setShowAll((v) => !v)}
+              className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-coral)] transition-colors hover:bg-[var(--color-secondary)]"
+            >
+              {showAll ? 'Show top rooms' : `Read more · all ${openings.rooms.length} rooms`}
+            </button>
+          )}
+        </div>
       </div>
 
       {openings.rooms.length === 0 ? (
-        <p className="mt-4 text-sm text-[var(--color-dk-gray)]">Openings appear here once Admissions enters the children and teachers in each room on the ADR.</p>
+        <p className="mt-4 text-sm text-[var(--color-dk-gray)]">Openings appear here once a school’s roll call is uploaded, or children and teachers are entered on the ADR.</p>
       ) : shown.length === 0 ? (
         <p className="mt-4 text-sm text-[var(--color-dk-gray)]">No open spots right now — every logged room is at or over ratio. Use “Read more” to see them.</p>
       ) : (

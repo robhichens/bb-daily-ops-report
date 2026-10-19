@@ -228,6 +228,50 @@ export interface OpeningsToStaff {
   totalOpen: number // sum of positive openings
   asOfDate: string
   rooms: RoomOpening[] // entered cells only, ranked most-open first
+  /** Where the numbers came from, when mixed (e.g. "Roll call wk of Oct 19: Crozet · ADR Oct 9: Mill Creek"). */
+  sourceNote?: string
+}
+
+/** One source of an Openings grid: the ADR's, or a school's roll call upload. */
+export interface OpeningsSource { cells: Record<string, unknown>; date: string }
+
+/**
+ * Openings to Staff from two sources, per school: the newest of the ADR grid and
+ * that school's latest roll call upload (Rob: keep both, use whichever is newer;
+ * a tie goes to the roll call). Returns one combined grid plus a source note.
+ */
+export function mergeOpeningsSources(
+  adr: OpeningsSource | null,
+  rollCalls: Partial<Record<SiteId, OpeningsSource>>,
+  scope: SiteId[] = SITE_IDS
+): OpeningsToStaff {
+  const cells: Record<string, unknown> = {}
+  const used: { label: string; site: string }[] = []
+  let latest = ''
+  for (const s of SITES.filter((x) => scope.includes(x.id))) {
+    const rc = rollCalls[s.id]
+    const adrHas = !!adr?.cells[STAFFING_CALC_FLAG]
+    const pick = rc && (!adrHas || rc.date >= (adr?.date ?? '')) ? { src: rc, label: `Roll call wk of ${shortDate(rc.date)}` }
+      : adrHas && adr ? { src: adr, label: `ADR ${shortDate(adr.date)}` } : null
+    if (!pick) continue
+    for (const c of CLASSROOMS) {
+      const k = matrixCellKey(s.id, c.key)
+      for (const key of [k, `${k}__kids`, `${k}__teachers`]) if (key in pick.src.cells) cells[key] = pick.src.cells[key]
+    }
+    cells[STAFFING_CALC_FLAG] = 1
+    used.push({ label: pick.label, site: s.name })
+    if (pick.src.date > latest) latest = pick.src.date
+  }
+  const out = openingsFromCells(cells, latest, scope)
+  const bySource = new Map<string, string[]>()
+  for (const u of used) bySource.set(u.label, [...(bySource.get(u.label) ?? []), u.site])
+  out.sourceNote = [...bySource].map(([label, sites]) => (bySource.size > 1 ? `${label}: ${sites.join(', ')}` : label)).join(' · ')
+  return out
+}
+
+const shortDate = (iso: string) => {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 /** Reads the latest ADR's Openings-to-Staff matrix (classrooms × sites) into a

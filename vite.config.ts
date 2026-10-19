@@ -44,6 +44,9 @@ export default defineConfig({
         // App shell only. Large brand PNGs are deliberately left out of the install
         // precache (keeps first install fast on flaky wifi) and cached on demand below.
         globPatterns: ['**/*.{js,css,html,svg,woff,woff2}', 'icons/*.png'],
+        // PDF.js is only for the roll call upload page; fetch it when used rather than
+        // making every phone download it with each app update.
+        globIgnores: ['**/pdf-*.js', '**/pdf.worker*'],
         navigateFallback: '/index.html',
         cleanupOutdatedCaches: true,
         clientsClaim: true,
