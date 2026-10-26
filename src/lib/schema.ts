@@ -98,6 +98,7 @@ export interface Labor {
 
 export interface EnrollmentMarketing {
   fullTimeEnrollment: CountNote; // current FT census (a headcount, not a daily event)
+  iksCallsOut: CountNote; // outbound enrollment calls made today (any call) — number only, required
   toursGiven: CountNote;
   toursScheduled: CountNote;
   callsInEmailsWeb: CountNote;
@@ -234,10 +235,11 @@ const F_REASON: ItemFieldDef = { key: 'reason', label: 'Reason', type: 'text' };
 
 export const ENROLLMENT_FIELDS: CountNoteField<keyof EnrollmentMarketing>[] = [
   { key: 'fullTimeEnrollment', label: 'Full-Time Enrollment', notesPrompt: 'Current full-time headcount at your campus today', countOnly: true, required: true },
+  { key: 'iksCallsOut', label: 'IKS Calls Out', notesPrompt: 'Outbound enrollment calls you made today (any call)', countOnly: true, required: true },
   { key: 'toursGiven', label: 'Number of Tours Given', notesPrompt: 'Add names', itemFields: [F_NAME] },
   { key: 'toursScheduled', label: 'Number of Tours Scheduled', notesPrompt: 'Check IKS', itemFields: [F_NAME, { key: 'tourDate', label: 'Tour date', type: 'date' }] },
   { key: 'callsInEmailsWeb', label: 'Number of Calls In/Emails & Web Inq', notesPrompt: 'Provide all details', itemFields: [{ key: 'type', label: 'Type', type: 'select', options: ['Call', 'Email', 'Web', 'Walk-in'], allowOther: true }, F_NAME] },
-  { key: 'enrollmentCommsOut', label: 'Enrollment Communication Out/IKS', notesPrompt: 'Provide all details (daily goal is 15 — two-way comms)', goal: ENROLLMENT_COMMS_DAILY_GOAL, itemFields: [{ key: 'type', label: 'Type', type: 'select', options: ['Call', 'Email', 'Text', 'IKS'], allowOther: true }, F_NAME, { key: 'detail', label: 'Detail', type: 'text' }] },
+  { key: 'enrollmentCommsOut', label: 'Enrollment Communication Out/IKS', notesPrompt: 'Provide all details (daily goal is 15 — two-way comms)', goal: ENROLLMENT_COMMS_DAILY_GOAL, itemFields: [{ key: 'type', label: 'Type', type: 'select', options: ['Email', 'Text'], allowOther: true }, F_NAME, { key: 'detail', label: 'Detail', type: 'text' }] },
   { key: 'regFeesPaid', label: 'Number of Reg Fees Paid', notesPrompt: 'With Names, Room and Start Date', itemFields: [F_NAME, F_ROOM, { key: 'startDate', label: 'Start date', type: 'date' }] },
   { key: 'newStarts', label: 'Number of New Starts', notesPrompt: 'With Names, Room', itemFields: [F_NAME, F_ROOM] },
   { key: 'enrollmentsToday', label: 'Number of Enrollments (Today)', notesPrompt: 'With Names, Rooms, Start Date (Reg PD, Enhancement PD, Start Date confirmed)', itemFields: [F_NAME, F_ROOM, { key: 'startDate', label: 'Start date', type: 'date' }] },
