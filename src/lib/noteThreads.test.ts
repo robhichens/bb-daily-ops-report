@@ -32,3 +32,14 @@ describe('formatStamp', () => {
     expect(formatStamp('not a date', now)).toBe('')
   })
 })
+
+describe('Buy/Fix completion note', () => {
+  it('keeps what was said and who said it, and drops blanks', async () => {
+    const { cleanDoneInfo } = await import('./reports')
+    expect(cleanDoneInfo({ doneNote: '  Ordered 4 cartridges  ', doneBy: 'Katlin Gordon', doneByUid: 'k1' })).toEqual({
+      doneNote: 'Ordered 4 cartridges', doneBy: 'Katlin Gordon', doneByUid: 'k1',
+    })
+    expect(cleanDoneInfo({ doneNote: '   ', doneBy: 'Katlin Gordon' })).toEqual({ doneBy: 'Katlin Gordon' }) // skipped note
+    expect(cleanDoneInfo(undefined)).toEqual({})
+  })
+})

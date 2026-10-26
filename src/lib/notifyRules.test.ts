@@ -59,3 +59,13 @@ describe('helpers', () => {
     expect(preview('x'.repeat(200), 20).endsWith('…')).toBe(true)
   })
 })
+
+describe('requestOwners — who made the request', () => {
+  it('a DDR request goes to that school’s poster(s); an org request to the note’s author', async () => {
+    const { requestOwners } = await import('./notifyRules')
+    expect(requestOwners({ kind: 'ddr' }, { report: { siteId: 'mill-creek', createdByUid: 'laura' } }, users)).toEqual(['laura'])
+    expect(requestOwners({ kind: 'org' }, { noteAuthorUid: 'hannah' }, users)).toEqual(['hannah'])
+    expect(requestOwners({ kind: 'org' }, {}, users)).toEqual([])
+    expect(requestOwners({ kind: 'ddr' }, {}, users)).toEqual([])
+  })
+})

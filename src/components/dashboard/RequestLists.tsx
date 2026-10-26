@@ -2,6 +2,10 @@ import { useMemo, useState } from 'react'
 import { ShoppingCart, Wrench, Check, CheckCircle2, Trash2, Printer } from 'lucide-react'
 import { CollapsibleCard } from './CollapsibleCard'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { useAuth } from '@/auth/AuthProvider'
+import { useUserDirectory } from '@/lib/userDirectory'
+import { completeRequest } from '@/lib/noteActions'
 import { usePrintSheet } from '@/components/report/PrintSheet'
 import { buildRequestsPrintModel } from '@/lib/requestPrint'
 import { ReportSection } from './ReportSections'
@@ -14,17 +18,15 @@ import {
 import {
   collectRequests,
   collectCompletedRequests,
-  setRequestDone,
   setNoteTag,
   type RequestItem,
 } from '@/lib/reports'
 import {
   collectOrgRequests,
   collectOrgCompletedRequests,
-  setOrgRequestDone,
   setOrgNoteRequest,
 } from '@/lib/orgReports'
-import { formatShort, todayIso } from '@/lib/dates'
+import { formatShort, formatStamp, todayIso } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 
 const LIST_META: Record<
@@ -58,11 +60,7 @@ function useItemBusy() {
 const byDateDesc = (a: RequestItem, b: RequestItem) =>
   a.date < b.date ? 1 : a.date > b.date ? -1 : a.contextLabel.localeCompare(b.contextLabel)
 
-// Dispatch the done/reopen actions to the right data layer for each item kind.
-const markDone = (i: RequestItem) =>
-  i.kind === 'ddr'
-    ? setRequestDone(i.reportId!, i.tags, i.note, i.list, true)
-    : setOrgRequestDone(i.noteId!, i.requests, i.list, true)
+// Dispatch the reopen/remove actions to the right data layer for each item kind.
 const removeItem = (i: RequestItem) =>
   i.kind === 'ddr'
     ? setNoteTag(i.reportId!, i.tags, i.note, i.list, false)
@@ -121,6 +119,23 @@ function ActiveListCard({
     [reports, orgNotes, list]
   )
   const { busy, run } = useItemBusy()
+  const { user, profile } = useAuth()
+  const users = useUserDirectory()
+  // The item whose "what was done?" box is open (checking an item off opens it).
+  const [completing, setCompleting] = useState<string | null>(null)
+
+  const finish = (item: RequestItem, text: string) =>
+    run(item.key, async () => {
+      await completeRequest({
+        item,
+        text,
+        by: { uid: user?.uid ?? '', name: profile?.displayName || user?.email || 'Leadership', role: 'admin' },
+        reports,
+        orgNotes,
+        users,
+      })
+      setCompleting(null)
+    })
 
   return (
     <CollapsibleCard
@@ -143,21 +158,33 @@ function ActiveListCard({
       ) : (
         <ul className="divide-y divide-[var(--color-border)]">
           {items.map((item) => (
-            <li key={item.key} className="flex items-start gap-3 px-5 py-3">
-              <button
-                type="button"
-                onClick={() => run(item.key, () => markDone(item))}
-                disabled={busy.has(item.key)}
-                title="Mark done"
-                aria-label="Mark done"
-                className={cn(
-                  'mt-0.5 grid size-5 shrink-0 place-items-center rounded-md border-2 border-[var(--color-mid-gray)] text-transparent transition-colors hover:border-[var(--color-good)] hover:text-[var(--color-good)]',
-                  busy.has(item.key) && 'opacity-50'
-                )}
-              >
-                <Check className="size-3.5" strokeWidth={3} />
-              </button>
-              <RequestBody item={item} />
+            <li key={item.key} className="px-5 py-3">
+              <div className="flex items-start gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCompleting(completing === item.key ? null : item.key)}
+                  disabled={busy.has(item.key)}
+                  title="Mark done"
+                  aria-label="Mark done"
+                  aria-expanded={completing === item.key}
+                  className={cn(
+                    'mt-0.5 grid size-5 shrink-0 place-items-center rounded-md border-2 transition-colors hover:border-[var(--color-good)] hover:text-[var(--color-good)]',
+                    completing === item.key ? 'border-[var(--color-good)] text-[var(--color-good)]' : 'border-[var(--color-mid-gray)] text-transparent',
+                    busy.has(item.key) && 'opacity-50'
+                  )}
+                >
+                  <Check className="size-3.5" strokeWidth={3} />
+                </button>
+                <RequestBody item={item} />
+              </div>
+              {completing === item.key && (
+                <CompleteForm
+                  list={list}
+                  busy={busy.has(item.key)}
+                  onCancel={() => setCompleting(null)}
+                  onDone={(text) => void finish(item, text)}
+                />
+              )}
             </li>
           ))}
         </ul>
@@ -228,6 +255,45 @@ function CompletedCard({ reports, orgNotes }: { reports: DailyOpsReport[]; orgNo
   )
 }
 
+/** The little "what was done?" box that opens when an item is checked off. The note
+ *  is optional; it's saved with the item and sent to whoever made the request. */
+function CompleteForm({
+  list, busy, onCancel, onDone,
+}: {
+  list: RequestList
+  busy: boolean
+  onCancel: () => void
+  onDone: (text: string) => void
+}) {
+  const [text, setText] = useState('')
+  return (
+    <div className="ml-8 mt-2.5 space-y-2 rounded-xl border border-[var(--color-good)]/40 bg-[var(--color-good-soft)] p-3">
+      <label className="block text-xs font-semibold text-[var(--color-charcoal)]" htmlFor={`done-note-${list}`}>
+        {list === 'purchase' ? 'What was purchased?' : 'How was it fixed?'}
+        <span className="ml-1 font-normal text-[var(--color-dk-gray)]">Optional. Goes to whoever made the request.</span>
+      </label>
+      <Textarea
+        id={`done-note-${list}`}
+        autoFocus
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={list === 'purchase' ? 'e.g. Ordered 4 black + 2 color cartridges, arriving Thursday' : 'e.g. Plumber replaced the flush valve on Tuesday'}
+        className="min-h-[56px] bg-white"
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') onCancel()
+          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') onDone(text)
+        }}
+      />
+      <div className="flex items-center gap-2">
+        <Button size="sm" onClick={() => onDone(text)} disabled={busy}>
+          <Check className="size-3.5" /> Mark done
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onCancel} disabled={busy}>Cancel</Button>
+      </div>
+    </div>
+  )
+}
+
 function RequestBody({ item, done = false }: { item: RequestItem; done?: boolean }) {
   return (
     <div className="min-w-0 flex-1">
@@ -244,6 +310,19 @@ function RequestBody({ item, done = false }: { item: RequestItem; done?: boolean
         {' · '}
         {formatShort(item.date)}
       </p>
+      {done && (
+        <div className="mt-1.5 rounded-lg bg-[var(--color-secondary)] px-3 py-2">
+          <p className="text-[11px] font-semibold text-[var(--color-dk-gray)]">
+            {item.doneBy ? `Done by ${item.doneBy}` : 'Done'}
+            {item.doneAt && <time dateTime={item.doneAt}> · {formatStamp(item.doneAt)}</time>}
+          </p>
+          {item.doneNote ? (
+            <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--color-charcoal)]">{item.doneNote}</p>
+          ) : (
+            <p className="mt-0.5 text-xs italic text-[var(--color-mid-gray)]">No note added</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }

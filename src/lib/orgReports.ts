@@ -29,7 +29,7 @@ import { mirrorOpeningsHeadline } from './headlines'
 import { weekOf as weekOfFn, weekdayName } from './derive'
 import { orgDocId, siteName, STAFFING_CALC_FLAG } from './schema'
 import type { FieldKind, LedgerNote, LedgerNoteComment, OrgFieldValue, OrgReport, OrgReportDef, ReportKey, RequestList, RequestTag, SiteId } from './schema'
-import type { RequestItem } from './reports'
+import { cleanDoneInfo, type DoneInfo, type RequestItem } from './reports'
 
 // --- Daily report doc -------------------------------------------------------
 
@@ -217,10 +217,11 @@ export async function setOrgRequestDone(
   id: string,
   existing: RequestTag[] | undefined,
   list: RequestList,
-  done: boolean
+  done: boolean,
+  info?: DoneInfo
 ): Promise<void> {
   const next = (existing ?? []).map((t) =>
-    t.list === list ? { list, done, ...(done ? { doneAt: new Date().toISOString() } : {}) } : t
+    t.list === list ? { list, done, ...(done ? { doneAt: new Date().toISOString(), ...cleanDoneInfo(info) } : {}) } : t
   )
   await updateDoc(noteRef(id), { requests: next })
 }
@@ -234,6 +235,8 @@ function toOrgRequestItem(n: LedgerNote, t: RequestTag): RequestItem {
     contextLabel: `${n.source.toUpperCase()}${n.siteId ? ` · ${siteName(n.siteId)}` : ''}`,
     date: n.at.slice(0, 10),
     doneAt: t.doneAt,
+    doneNote: t.doneNote,
+    doneBy: t.doneBy,
     noteId: n.id,
     requests: n.requests ?? [],
   }

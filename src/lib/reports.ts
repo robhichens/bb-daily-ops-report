@@ -359,16 +359,28 @@ export async function setNoteTag(
 }
 
 /** Mark a request done (→ Completed section) or reopen it (→ active list). */
+/** What the person checking an item off said (and who they are). Kept with the
+ *  item in the Completed log; empty fields are simply left out. */
+export interface DoneInfo { doneNote?: string; doneBy?: string; doneByUid?: string }
+export const cleanDoneInfo = (d?: DoneInfo): DoneInfo => {
+  const out: DoneInfo = {};
+  if (d?.doneNote?.trim()) out.doneNote = d.doneNote.trim();
+  if (d?.doneBy) out.doneBy = d.doneBy;
+  if (d?.doneByUid) out.doneByUid = d.doneByUid;
+  return out;
+};
+
 export async function setRequestDone(
   reportId: string,
   existing: NoteTag[] | undefined,
   note: string,
   list: RequestList,
-  done: boolean
+  done: boolean,
+  info?: DoneInfo
 ): Promise<void> {
   const next = (existing ?? []).map((t) =>
     t.note === note && t.list === list
-      ? { note, list, done, ...(done ? { doneAt: new Date().toISOString() } : {}) }
+      ? { note, list, done, ...(done ? { doneAt: new Date().toISOString(), ...cleanDoneInfo(info) } : {}) }
       : t
   );
   await updateDoc(reportRef(reportId), { noteTags: next });
@@ -380,6 +392,8 @@ export interface RequestItem {
   kind: 'ddr' | 'org';
   note: string;             // display text
   list: RequestList;
+  doneNote?: string;        // what was bought / how it was fixed (said when checked off)
+  doneBy?: string;          // who checked it off
   contextLabel: string;     // "Crozet · Jacqueline" or "FDR · Crozet"
   date: string;
   doneAt?: string;
@@ -400,6 +414,8 @@ function toRequestItem(r: DailyOpsReport, t: NoteTag, tags: NoteTag[]): RequestI
     contextLabel: `${r.siteName || siteName(r.siteId)}${r.director ? ` · ${r.director}` : ''}`,
     date: r.date,
     doneAt: t.doneAt,
+    doneNote: t.doneNote,
+    doneBy: t.doneBy,
     reportId: r.id,
     tags,
   };
