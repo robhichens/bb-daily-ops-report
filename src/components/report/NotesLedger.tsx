@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Flag, Trash2, Send, CornerDownRight, AlertTriangle, Check, ShoppingCart, Wrench } from 'lucide-react'
+import { Flag, Trash2, Send, AlertTriangle, Check, ShoppingCart, Wrench } from 'lucide-react'
 import { REQUEST_LISTS, type LedgerNote, type ReportKey } from '@/lib/schema'
 import {
   subscribeOrgNotesBySource, addOrgNote, setOrgNoteAck, setOrgNoteFlag,
   addOrgNoteComment, deleteOrgNote, setOrgNoteRequest,
 } from '@/lib/orgReports'
 import { Card } from '@/components/ui/card'
+import { Thread } from './NoteThread'
+import { useAuth } from '@/auth/AuthProvider'
+import { isAdmin } from '@/lib/users'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
@@ -17,6 +20,8 @@ import { cn } from '@/lib/utils'
 export function NotesLedger({
   source, author, uid, readOnly = false,
 }: { source: ReportKey; author: string; uid: string; readOnly?: boolean }) {
+  const { profile } = useAuth()
+  const role: 'admin' | 'director' = isAdmin(profile?.role) ? 'admin' : 'director'
   const [notes, setNotes] = useState<LedgerNote[]>([])
   const [busy, setBusy] = useState<Set<string>>(new Set())
   const [text, setText] = useState('')
@@ -74,7 +79,7 @@ export function NotesLedger({
         <div className="space-y-2.5">
           <AnimatePresence initial={false}>
             {sorted.map((n) => (
-              <NoteCard key={n.id} note={n} author={author} readOnly={readOnly} busy={busy} run={run} />
+              <NoteCard key={n.id} note={n} author={author} uid={uid} role={role} readOnly={readOnly} busy={busy} run={run} />
             ))}
           </AnimatePresence>
         </div>
@@ -84,10 +89,12 @@ export function NotesLedger({
 }
 
 function NoteCard({
-  note, author, readOnly, busy, run,
+  note, author, uid, role, readOnly, busy, run,
 }: {
   note: LedgerNote
   author: string
+  uid: string
+  role: 'admin' | 'director'
   readOnly: boolean
   busy: Set<string>
   run: (key: string, fn: () => Promise<void>) => Promise<void>
@@ -99,7 +106,7 @@ function NoteCard({
     const t = reply.trim()
     if (!t) return
     await run(note.id, () =>
-      addOrgNoteComment(note.id, note.comments, { text: t, author, at: new Date().toISOString() })
+      addOrgNoteComment(note.id, note.comments, { text: t, author, authorUid: uid, role, at: new Date().toISOString() })
     )
     setReply(''); setReplyOpen(false)
   }
@@ -180,18 +187,7 @@ function NoteCard({
       </div>
 
       <div className="mt-3 pl-9">
-        {note.comments.length > 0 && (
-          <div className="mb-2 space-y-2">
-            {note.comments.map((c, i) => (
-              <div key={`${c.at}-${i}`} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-secondary)] px-3.5 py-2.5">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-dk-gray)]">
-                  <CornerDownRight className="mr-1 inline size-3" />{c.author}
-                </p>
-                <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--color-charcoal)]">{c.text}</p>
-              </div>
-            ))}
-          </div>
-        )}
+        <Thread thread={note.comments} viewerRole={role} className="mb-2" />
         {!readOnly && (replyOpen ? (
           <div className="space-y-2">
             <Textarea

@@ -23,6 +23,17 @@ export function formatShort(iso: string): string {
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+/** An ISO timestamp as a short local date + time for comment stamps:
+ *  "Oct 26, 2:41 PM" (year added when it isn't the current year). */
+export function formatStamp(iso: string, now: Date = new Date()): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) })
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  return `${date}, ${time}`
+}
+
 /** First day of the month containing `iso`, as 'YYYY-MM-DD'. */
 export function monthStart(iso: string): string {
   const [y, m] = iso.split('-').map(Number)

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { NotebookPen, Check, Send, Eye, Flag, ArrowUpRight, Trash2, CornerDownRight, ShoppingCart, Wrench, Search, X, ChevronDown } from 'lucide-react'
+import { NotebookPen, Check, Eye, Flag, ArrowUpRight, Trash2, CornerDownRight, ShoppingCart, Wrench, Search, X, ChevronDown } from 'lucide-react'
+import { Composer, Thread } from '@/components/report/NoteThread'
 import { useAuth } from '@/auth/AuthProvider'
 import { isAdmin, userSites } from '@/lib/users'
 import {
@@ -36,8 +37,6 @@ import {
 } from '@/lib/orgReports'
 import { markDayNotesSeen } from '@/lib/dayNotesRead'
 import { Card } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 
 type Role = 'admin' | 'director'
@@ -317,6 +316,7 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
 
 /** A director-report note on the admin board (check off, tag, comment, flag). */
 function AdminDirectorCard({ e, busy, runBusy, author }: { e: NoteEntry; busy: Set<string>; runBusy: RunBusy; author: string }) {
+  const uid = useAuth().user?.uid
   const key = noteKey(e)
   return (
     <Card
@@ -354,12 +354,12 @@ function AdminDirectorCard({ e, busy, runBusy, author }: { e: NoteEntry; busy: S
         </div>
       </div>
       <div className="mt-3 pl-9">
-        <Thread thread={e.thread} viewerRole="admin" onDelete={(c) => runBusy(key, () => removeNoteComment(e.reportId, e.allComments, c))} />
+        <Thread thread={e.thread} viewerRole="admin" legacyRole="admin" onDelete={(c) => runBusy(key, () => removeNoteComment(e.reportId, e.allComments, c))} />
         <Composer
           placeholder="Comment or question for the director…"
           submitLabel="Send"
           busy={busy.has(key)}
-          onSend={(text) => runBusy(key, () => addNoteComment(e.reportId, e.allComments, { note: e.note, text, author, at: new Date().toISOString(), role: 'admin' }))}
+          onSend={(text) => runBusy(key, () => addNoteComment(e.reportId, e.allComments, { note: e.note, text, author, authorUid: uid, at: new Date().toISOString(), role: 'admin' }))}
         />
       </div>
     </Card>
@@ -368,6 +368,7 @@ function AdminDirectorCard({ e, busy, runBusy, author }: { e: NoteEntry; busy: S
 
 /** An org-report note (FDR/ADR/MDR/EDR) on the admin board. */
 function AdminOrgCard({ note, busy, runBusy, author }: { note: LedgerNote; busy: Set<string>; runBusy: RunBusy; author: string }) {
+  const uid = useAuth().user?.uid
   const [reply, setReply] = useState('')
   const meta = reportMeta(note.source)
   return (
@@ -410,16 +411,7 @@ function AdminOrgCard({ note, busy, runBusy, author }: { note: LedgerNote; busy:
         <FlagButton flagged={note.flagged} busy={busy.has(`${note.id}:flag`)} onClick={() => runBusy(`${note.id}:flag`, () => setOrgNoteFlag(note.id, !note.flagged))} />
       </div>
       <div className="mt-3 pl-9">
-        {note.comments.length > 0 && (
-          <div className="mb-2 space-y-2">
-            {note.comments.map((c, i) => (
-              <div key={`${c.at}-${i}`} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-secondary)] px-3.5 py-2.5">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-dk-gray)]"><CornerDownRight className="mr-1 inline size-3" />{c.author}</p>
-                <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--color-charcoal)]">{c.text}</p>
-              </div>
-            ))}
-          </div>
-        )}
+        <Thread thread={note.comments} viewerRole="admin" className="mb-2" />
         <div className="flex items-start gap-2">
           <input
             value={reply}
@@ -429,7 +421,7 @@ function AdminOrgCard({ note, busy, runBusy, author }: { note: LedgerNote; busy:
             onKeyDown={(ev) => {
               if (ev.key === 'Enter' && reply.trim()) {
                 const t = reply.trim(); setReply('')
-                void runBusy(note.id, () => addOrgNoteComment(note.id, note.comments, { text: t, author, at: new Date().toISOString() }))
+                void runBusy(note.id, () => addOrgNoteComment(note.id, note.comments, { text: t, author, authorUid: uid, role: 'admin', at: new Date().toISOString() }))
               }
             }}
           />
@@ -644,7 +636,7 @@ function DirectorDayNotes({ reports }: { reports: DailyOpsReport[] }) {
 
                     {(e.thread.length > 0 || flagged) && (
                       <div className="mt-3">
-                        <Thread thread={e.thread} viewerRole="director" onDelete={(c) =>
+                        <Thread thread={e.thread} viewerRole="director" legacyRole="admin" onDelete={(c) =>
                           runBusy(key, () => removeNoteComment(e.reportId, e.allComments, c))} />
                         <Composer
                           placeholder="Reply to leadership…"
@@ -656,6 +648,7 @@ function DirectorDayNotes({ reports }: { reports: DailyOpsReport[] }) {
                                 note: e.note,
                                 text,
                                 author,
+                                authorUid: user?.uid,
                                 at: new Date().toISOString(),
                                 role: 'director',
                               })
@@ -695,119 +688,6 @@ function useBusy(setBusy: React.Dispatch<React.SetStateAction<Set<string>>>) {
       })
     }
   }
-}
-
-function Thread({
-  thread,
-  viewerRole,
-  onDelete,
-}: {
-  thread: NoteComment[]
-  viewerRole: Role
-  onDelete: (c: NoteComment) => void
-}) {
-  if (thread.length === 0) return null
-  return (
-    <div className="mb-3 space-y-2">
-      {thread.map((c, i) => {
-        const fromAdmin = commentRole(c) === 'admin'
-        const mine = commentRole(c) === viewerRole
-        return (
-          <div
-            key={`${c.at}-${i}`}
-            className={cn(
-              'group rounded-xl border px-3.5 py-2.5',
-              fromAdmin
-                ? 'border-[var(--color-good)]/30 bg-[var(--color-good-soft)]'
-                : 'border-[var(--color-border)] bg-[var(--color-secondary)]'
-            )}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <p
-                className={cn(
-                  'text-[11px] font-bold uppercase tracking-wide',
-                  fromAdmin ? 'text-[var(--color-good)]' : 'text-[var(--color-dk-gray)]'
-                )}
-              >
-                {fromAdmin ? <Flag className="mr-1 inline size-3" /> : <CornerDownRight className="mr-1 inline size-3" />}
-                {c.author}
-              </p>
-              {mine && (
-                <button
-                  type="button"
-                  onClick={() => onDelete(c)}
-                  title="Delete your message"
-                  className="text-[var(--color-mid-gray)] opacity-0 transition-opacity hover:text-[var(--color-coral)] group-hover:opacity-100"
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
-              )}
-            </div>
-            <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--color-charcoal)]">{c.text}</p>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function Composer({
-  placeholder,
-  submitLabel,
-  busy,
-  onSend,
-}: {
-  placeholder: string
-  submitLabel: string
-  busy: boolean
-  onSend: (text: string) => Promise<void> | void
-}) {
-  const [text, setText] = useState('')
-  const [open, setOpen] = useState(false)
-
-  async function send() {
-    const t = text.trim()
-    if (!t) return
-    await onSend(t)
-    setText('')
-    setOpen(false)
-  }
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--color-coral)] hover:underline"
-      >
-        <Send className="size-3.5" /> {submitLabel === 'Reply' ? 'Reply' : 'Add comment / question'}
-      </button>
-    )
-  }
-
-  return (
-    <div className="space-y-2">
-      <Textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder={placeholder}
-        className="min-h-[60px]"
-        autoFocus
-        onKeyDown={(e) => {
-          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') void send()
-        }}
-      />
-      <div className="flex items-center gap-2">
-        <Button size="sm" disabled={busy || !text.trim()} onClick={() => void send()}>
-          {submitLabel}
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => { setText(''); setOpen(false) }}>
-          Cancel
-        </Button>
-        <span className="ml-auto text-[11px] text-[var(--color-mid-gray)]">⌘/Ctrl + Enter</span>
-      </div>
-    </div>
-  )
 }
 
 const LIST_ICON: Record<RequestList, typeof ShoppingCart> = {

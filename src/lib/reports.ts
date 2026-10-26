@@ -89,6 +89,18 @@ export async function getReport(
  * Autosave. Upserts as a draft, recomputing derived fields and updatedAt.
  * Never downgrades an already-submitted report back to draft.
  */
+/** Fields leadership writes through their own functions (Day Notes comments,
+ *  checks, flags, Buy/Fix tags). A director's autosave carries a copy of them from
+ *  when the form was opened; saving that copy would overwrite anything an admin
+ *  added since (arrays are replaced wholesale on merge), so director saves leave
+ *  them out entirely. */
+const ADMIN_OWNED = ['noteComments', 'acknowledgedNotes', 'flaggedNotes', 'noteTags'] as const;
+export function withoutAdminOwned<T extends Partial<DailyOpsReport>>(report: T): T {
+  const out = { ...report };
+  for (const k of ADMIN_OWNED) delete out[k];
+  return out;
+}
+
 export async function upsertDraft(report: DailyOpsReport): Promise<void> {
   const derived = withDerived(report);
   const payload: DailyOpsReport = {
@@ -97,7 +109,7 @@ export async function upsertDraft(report: DailyOpsReport): Promise<void> {
     status: derived.status === 'submitted' ? 'submitted' : 'draft',
     updatedAt: new Date().toISOString(),
   };
-  await setDoc(reportRef(payload.id), payload, { merge: true });
+  await setDoc(reportRef(payload.id), withoutAdminOwned(payload), { merge: true });
   void mirrorDdrHeadline(payload);
 }
 
@@ -174,7 +186,7 @@ export async function submitReport(
     createdByUid: derived.createdByUid || uid,
   };
 
-  await setDoc(reportRef(payload.id), payload, { merge: true });
+  await setDoc(reportRef(payload.id), withoutAdminOwned(payload), { merge: true });
   void mirrorDdrHeadline(payload);
   return { ok: true, errors: [] };
 }
@@ -292,8 +304,10 @@ export async function addNoteComment(
 ): Promise<void> {
   const text = comment.text.trim();
   if (!text) return;
-  const next = [...(existing ?? []), { ...comment, text }];
-  await updateDoc(reportRef(reportId), { noteComments: next });
+  // arrayUnion: an atomic append, so two people commenting at once (or a
+  // director's save in the same moment) can't drop each other's message.
+  void existing;
+  await updateDoc(reportRef(reportId), { noteComments: arrayUnion({ ...comment, text }) });
 }
 
 /** Remove one message from a thread (delete-your-own). Matches on the full
@@ -303,11 +317,11 @@ export async function removeNoteComment(
   existing: NoteComment[] | undefined,
   comment: NoteComment
 ): Promise<void> {
-  const next = (existing ?? []).filter(
-    (c) =>
-      !(c.note === comment.note && c.at === comment.at && c.author === comment.author && c.text === comment.text)
-  );
-  await updateDoc(reportRef(reportId), { noteComments: next });
+  const stored =
+    (existing ?? []).find(
+      (c) => c.note === comment.note && c.at === comment.at && c.author === comment.author && c.text === comment.text
+    ) ?? comment;
+  await updateDoc(reportRef(reportId), { noteComments: arrayRemove(stored) });
 }
 
 /**

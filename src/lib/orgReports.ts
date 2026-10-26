@@ -8,6 +8,7 @@
 
 import {
   addDoc,
+  arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -189,7 +190,8 @@ export async function addOrgNoteComment(
 ): Promise<void> {
   const text = comment.text.trim()
   if (!text) return
-  await updateDoc(noteRef(id), { comments: [...(existing ?? []), { ...comment, text }] })
+  void existing // atomic append (arrayUnion) — never overwrites a concurrent comment
+  await updateDoc(noteRef(id), { comments: arrayUnion({ ...comment, text }) })
 }
 
 export async function deleteOrgNote(id: string): Promise<void> {

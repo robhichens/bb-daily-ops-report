@@ -9,7 +9,9 @@ import {
   type SiteId,
 } from '@/lib/schema'
 import { withDerived } from '@/lib/derive'
-import { getPreviousReport, getReport, upsertDraft, submitReport, validateForSubmit } from '@/lib/reports'
+import { addNoteComment, getPreviousReport, getReport, removeNoteComment, subscribeReport, upsertDraft, submitReport, validateForSubmit } from '@/lib/reports'
+import { useAuth } from '@/auth/AuthProvider'
+import type { NoteComment } from '@/lib/schema'
 import { readLocalDraft, writeLocalDraft, clearLocalDraft, reconcile } from '@/lib/localMirror'
 import { formatLong, formatShort } from '@/lib/dates'
 import { Button } from '@/components/ui/button'
@@ -48,6 +50,12 @@ export function ReportForm({ siteId, date, isAdmin, sites, uid, onSite, onDate }
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const id = reportDocId(siteId, date)
+  const { profile, user } = useAuth()
+
+  // The conversation under each note, live — so an admin's comment shows up for
+  // everyone looking at this report (and is never taken from the stale draft).
+  const [comments, setComments] = useState<NoteComment[]>([])
+  useEffect(() => subscribeReport(siteId, date, (r) => setComments(r?.noteComments ?? [])), [siteId, date])
 
   useEffect(() => {
     let cancelled = false
@@ -240,6 +248,22 @@ export function ReportForm({ siteId, date, isAdmin, sites, uid, onSite, onDate }
         value={draft.directorReport}
         onChange={(directorReport) => update({ directorReport })}
         disabled={locked}
+        viewerRole={isAdmin ? 'admin' : 'director'}
+        commentsFor={(line) => comments.filter((c) => c.note === line).sort((a, b) => (a.at < b.at ? -1 : 1))}
+        onComment={
+          draft.status === 'submitted'
+            ? (line, text) =>
+                addNoteComment(id, comments, {
+                  note: line,
+                  text,
+                  author: profile?.displayName || user?.email || (isAdmin ? 'Leadership' : 'Director'),
+                  authorUid: user?.uid,
+                  at: new Date().toISOString(),
+                  role: isAdmin ? 'admin' : 'director',
+                })
+            : undefined
+        }
+        onDeleteComment={(c) => void removeNoteComment(id, comments, c)}
       />
 
       {/* Action bar */}

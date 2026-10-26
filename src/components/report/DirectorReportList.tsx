@@ -2,14 +2,22 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { NotebookPen, Plus, X } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { SectionCard } from './SectionCard'
+import { Composer, Thread } from './NoteThread'
+import type { NoteComment } from '@/lib/schema'
 
 interface Props {
   value: string[]
   onChange: (lines: string[]) => void
   disabled: boolean
+  /** Leadership/director conversation on each line, shown right under it. */
+  commentsFor?: (line: string) => NoteComment[]
+  viewerRole?: 'admin' | 'director'
+  /** Present once the report is filed (a comment needs a saved report). */
+  onComment?: (line: string, text: string) => Promise<void>
+  onDeleteComment?: (c: NoteComment) => void
 }
 
-export function DirectorReportList({ value, onChange, disabled }: Props) {
+export function DirectorReportList({ value, onChange, disabled, commentsFor, viewerRole = 'director', onComment, onDeleteComment }: Props) {
   const lines = value.length ? value : ['']
 
   const setLine = (i: number, text: string) => {
@@ -39,8 +47,8 @@ export function DirectorReportList({ value, onChange, disabled }: Props) {
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, x: -8 }}
-              className="flex items-start gap-2"
             >
+             <div className="flex items-start gap-2">
               <span className="mt-2.5 grid size-6 shrink-0 place-items-center rounded-full bg-[var(--color-coral-soft)] text-xs font-bold text-[var(--color-coral-dark)]">
                 {i + 1}
               </span>
@@ -61,6 +69,26 @@ export function DirectorReportList({ value, onChange, disabled }: Props) {
                   <X className="size-4" />
                 </button>
               )}
+             </div>
+             {commentsFor && line.trim() && (() => {
+               const thread = commentsFor(line.trim())
+               // Leadership can open a thread on any filed note; the poster can reply once there is one.
+               const canReply = !!onComment && (viewerRole === 'admin' || thread.length > 0)
+               if (thread.length === 0 && !canReply) return null
+               return (
+                 <div className="mt-2 pl-8">
+                   <Thread thread={thread} viewerRole={viewerRole} legacyRole="admin" onDelete={onDeleteComment} />
+                   {canReply && (
+                     <Composer
+                       placeholder={viewerRole === 'admin' ? 'Comment or question for the director…' : 'Reply to leadership…'}
+                       submitLabel={viewerRole === 'admin' ? 'Send' : 'Reply'}
+                       busy={false}
+                       onSend={(text) => onComment!(line.trim(), text)}
+                     />
+                   )}
+                 </div>
+               )
+             })()}
             </motion.div>
           ))}
         </AnimatePresence>

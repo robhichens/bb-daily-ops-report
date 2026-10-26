@@ -141,6 +141,9 @@ export interface NoteTag {
   list: RequestList;
   done?: boolean;
   doneAt?: string;   // ISO — when it was marked done
+  doneNote?: string; // what was purchased / how it was fixed (said when checked off)
+  doneBy?: string;   // display name of who checked it off
+  doneByUid?: string;
 }
 
 /** One message in a Day-Notes thread hanging off a Director-Report line.
@@ -153,6 +156,7 @@ export interface NoteComment {
   author: string;  // display name of who wrote it
   at: string;      // ISO timestamp
   role?: 'admin' | 'director';
+  authorUid?: string; // who wrote it (so replies can notify them); absent on older comments
 }
 
 /** When a Director-Report line was first written, for the Day Notes timestamp.
@@ -545,10 +549,12 @@ export interface LedgerNoteComment {
   text: string;
   author: string;
   at: string;
+  role?: 'admin' | 'director'; // 'admin' = leadership; anyone else is 'director'
+  authorUid?: string;
 }
 /** A Buy/Fix request-list tag on an org note. Mirrors NoteTag but scoped to the
  *  single note it lives on, so it needs no note-text key. */
-export interface RequestTag { list: RequestList; done?: boolean; doneAt?: string }
+export interface RequestTag { list: RequestList; done?: boolean; doneAt?: string; doneNote?: string; doneBy?: string; doneByUid?: string }
 
 /** A running Flags-&-Notes entry. All reports write these to ONE central
  *  `orgDayNotes` collection, tagged by `source` (report) + optional `siteId`,
