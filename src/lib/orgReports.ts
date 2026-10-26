@@ -102,9 +102,12 @@ export function subscribeOrgReportsByRange(
 /** The most recent ADR whose Openings to Staff grid was CALCULATED (children +
  *  teachers entered). Skips days filed with an empty grid ("numbers are the
  *  same") and the old hand-typed grids. */
-export function subscribeLatestOpeningsAdr(col: string, cb: (report: OrgReport | null) => void): Unsubscribe {
+export function subscribeLatestOpeningsAdr(col: string, cb: (report: OrgReport | null) => void, asOf?: string): Unsubscribe {
+  // asOf = "time machine": only ADRs dated on or before it. Same-field range +
+  // orderBy needs no composite index.
+  const base = collection(db, col)
   return onSnapshot(
-    query(collection(db, col), orderBy('date', 'desc'), limit(14)),
+    asOf ? query(base, where('date', '<=', asOf), orderBy('date', 'desc'), limit(14)) : query(base, orderBy('date', 'desc'), limit(14)),
     (snap) => cb((snap.docs.map((d) => d.data() as OrgReport).find(hasCalculatedOpenings)) ?? null),
     () => cb(null)
   )

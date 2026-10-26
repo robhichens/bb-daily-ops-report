@@ -95,3 +95,14 @@ describe('mergeOpeningsSources (ADR grid vs roll call uploads)', () => {
     expect(o.sourceNote).toBe('ADR Oct 9')
   })
 })
+
+describe('time machine: roll calls as of a date', () => {
+  it('ignores uploads for weeks that start after the period end', async () => {
+    const { latestRollCalls } = await import('./headlines')
+    const up = (date: string) => ({ kind: 'rollcall' as const, siteId: 'crozet' as const, date, month: '', rooms: {}, cells: {}, uploadedBy: 'x', updatedAt: `${date}T12:00:00Z` })
+    const rows = [up('2026-10-05'), up('2026-10-12'), up('2026-10-19')]
+    expect(latestRollCalls(rows).crozet?.date).toBe('2026-10-19') // now
+    expect(latestRollCalls(rows, '2026-10-18').crozet?.date).toBe('2026-10-12') // "last week" view
+    expect(latestRollCalls(rows, '2026-10-04').crozet).toBeUndefined() // before any upload
+  })
+})

@@ -143,10 +143,12 @@ export function subscribeRollCalls(cb: (rows: RollCallHeadline[]) => void): Unsu
   )
 }
 
-/** The newest upload per school. */
-export function latestRollCalls(rows: RollCallHeadline[]): Partial<Record<SiteId, RollCallHeadline>> {
+/** The newest upload per school; with `asOf`, only uploads for weeks starting on
+ *  or before that date (the dashboard's "time machine"). */
+export function latestRollCalls(rows: RollCallHeadline[], asOf?: string): Partial<Record<SiteId, RollCallHeadline>> {
   const out: Partial<Record<SiteId, RollCallHeadline>> = {}
   for (const r of rows) {
+    if (asOf && r.date > asOf) continue
     const cur = out[r.siteId]
     if (!cur || r.date > cur.date || (r.date === cur.date && r.updatedAt > cur.updatedAt)) out[r.siteId] = r
   }

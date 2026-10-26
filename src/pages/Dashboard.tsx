@@ -5,7 +5,7 @@ import { useAuth } from '@/auth/AuthProvider'
 import { accessibleReportKeys, isAdmin as isAdminRole, userSites } from '@/lib/users'
 import { SITES, siteName, type SiteId, type DailyOpsReport, type FinanceReport, type LedgerNote, type OrgReport } from '@/lib/schema'
 import { weekOf as weekOfFn } from '@/lib/derive'
-import { todayIso, addIsoDays, daysBetween, formatRange } from '@/lib/dates'
+import { todayIso, addIsoDays, daysBetween, formatRange, formatShort } from '@/lib/dates'
 import { subscribeRecentReports, subscribeReportsByRange } from '@/lib/reports'
 import { buildDashboardView, censusFromPoints, mergeOpeningsSources, sortWithdrawals, type DashboardView } from '@/lib/dashboard'
 import { headlinePoints, latestRollCalls, subscribeDdrHeadlines, subscribeDdrHeadlinesUpTo, subscribeOpeningsHeadline, subscribeRollCalls, type DdrHeadline, type OpeningsHeadline, type RollCallHeadline } from '@/lib/headlines'
@@ -116,7 +116,7 @@ export function Dashboard() {
   useEffect(() => (has.ddr ? subscribeDirectorView(setConfig) : undefined), [has.ddr])
   useEffect(() => (admin ? subscribeRecentReports(200, setRecentRows) : undefined), [admin])
   useEffect(() => (admin ? subscribeAllOrgNotes(setOrgNotes) : undefined), [admin])
-  useEffect(() => (has.adr ? subscribeLatestOpeningsAdr(ADR_COL, setLatestAdr) : undefined), [has.adr])
+  useEffect(() => (has.adr ? subscribeLatestOpeningsAdr(ADR_COL, setLatestAdr, range.end) : undefined), [has.adr, range.end])
   const [openingsHl, setOpeningsHl] = useState<OpeningsHeadline | null>(null)
   useEffect(() => (has.adr ? undefined : subscribeOpeningsHeadline(setOpeningsHl)), [has.adr])
 
@@ -154,11 +154,12 @@ export function Dashboard() {
     // Per school, the newer of the ADR grid and that school's latest roll call.
     const adrSource = has.adr
       ? latestAdr && { cells: (latestAdr.data?.openingsToStaff ?? {}) as Record<string, unknown>, date: latestAdr.date }
-      : openingsHl && { cells: openingsHl.cells, date: openingsHl.date }
-    const openings = mergeOpeningsSources(adrSource || null, latestRollCalls(rollCalls), scope)
+      : openingsHl && openingsHl.date <= range.end && { cells: openingsHl.cells, date: openingsHl.date }
+    // "Time machine": only what existed by the end of the selected period.
+    const openings = mergeOpeningsSources(adrSource || null, latestRollCalls(rollCalls, range.end), scope)
     return { census, withdrawn, openings }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, hl.cur, allHl, range.start, scope.join(), has.adr, latestAdr, openingsHl, rollCalls])
+  }, [view, hl.cur, allHl, range.start, range.end, scope.join(), has.adr, latestAdr, openingsHl, rollCalls])
 
   const reportCount = [anyDdrCard, has.cdr, has.adr, has.fdr].filter(Boolean).length
   // Sections fold away behind their headings once there's more than one to scroll past.
@@ -213,6 +214,7 @@ export function Dashboard() {
         census={pinned.census}
         withdrawals={pinned.withdrawn}
         openings={pinned.openings}
+        timeNote={range.end < today ? `Showing the latest numbers up to ${formatShort(range.end)}` : undefined}
         openingsAction={canUploadRollCall && (
           <Link to="/roll-call" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
             <FileUp className="size-3.5" /> Upload roll call
