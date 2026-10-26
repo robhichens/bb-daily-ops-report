@@ -26,6 +26,10 @@ interface CountNoteRowProps {
   required?: boolean
   /** Extra control under the header (e.g. "Copy from last report"). */
   action?: ReactNode
+  /** Helper line under the label. */
+  hint?: string
+  /** Tick box label for a confirmed "none today" (see CountNoteField.allowNone). */
+  allowNone?: string
 }
 
 const MAX_ROWS = 40
@@ -52,6 +56,8 @@ export function CountNoteRow({
   countOnly = false,
   required = false,
   action,
+  hint,
+  allowNone,
 }: CountNoteRowProps) {
   const hasItems = !!itemFields && itemFields.length > 0
   // Tracks which (row, field) selects are in free-type "Other" mode, keyed `${i}:${key}`.
@@ -72,6 +78,8 @@ export function CountNoteRow({
     if (Number.isNaN(n) || n < 0) return
     onChange({
       ...value,
+      // A real number replaces a "none today" tick.
+      noneToday: n > 0 ? false : value.noneToday,
       count: n,
       items: hasItems ? ensureLen(value.items ?? [], Math.min(n, MAX_ROWS)) : value.items,
     })
@@ -118,12 +126,27 @@ export function CountNoteRow({
             value={value.count === 0 ? '' : value.count}
             onChange={(e) => setCount(e.target.value)}
             placeholder="0"
-            disabled={disabled}
+            disabled={disabled || !!value.noneToday}
             className="h-9 w-20 text-center font-semibold"
           />
           {unit && <span className="text-xs text-[var(--color-dk-gray)]">{unit}</span>}
         </div>
       </div>
+
+      {hint && <p className="mt-0.5 text-xs text-[var(--color-dk-gray)]">{hint}</p>}
+
+      {allowNone && (
+        <label className="mt-1.5 flex w-fit cursor-pointer items-center gap-2 text-sm text-[var(--color-charcoal)]">
+          <input
+            type="checkbox"
+            checked={!!value.noneToday}
+            disabled={disabled}
+            onChange={(e) => onChange({ ...value, noneToday: e.target.checked, count: e.target.checked ? 0 : value.count })}
+            className="size-4 accent-[var(--color-coral)]"
+          />
+          {allowNone}
+        </label>
+      )}
 
       {action && <div className="mt-1.5">{action}</div>}
 

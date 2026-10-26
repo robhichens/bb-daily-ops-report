@@ -64,11 +64,13 @@ export interface CountNote {
   count: number;
   notes: string;
   items?: ItemDetail[];
+  /** Director confirmed the honest answer is none today (a real 0, not a blank). */
+  noneToday?: boolean;
 }
 export const emptyCountNote = (): CountNote => ({ count: 0, notes: '', items: [] });
 
-/** Daily target for Enrollment Communication Out / IKS. Drives the goal pill. */
-export const ENROLLMENT_COMMS_DAILY_GOAL = 15;
+/** Daily target for Enrollment Communication Out / IKS (two-way comms only). Drives the goal pill. */
+export const ENROLLMENT_COMMS_DAILY_GOAL = 10;
 
 /** Flat registration fee ($). Reg Fees Paid count × this = the dashboard $ figure. */
 export const REGISTRATION_FEE = 200;
@@ -224,6 +226,11 @@ export interface CountNoteField<K extends string = string> {
   itemFields?: ItemFieldDef[];
   /** Just the number — no notes line under it. */
   countOnly?: boolean;
+  /** Small helper line under the label (what counts, what the goal means). */
+  hint?: string;
+  /** Adds a tick box with this label that records a confirmed "none today",
+   *  which satisfies `required` without a number above 0. */
+  allowNone?: string;
   /** Must be above 0 to submit (checked in validateForSubmit). */
   required?: boolean;
 }
@@ -235,11 +242,11 @@ const F_REASON: ItemFieldDef = { key: 'reason', label: 'Reason', type: 'text' };
 
 export const ENROLLMENT_FIELDS: CountNoteField<keyof EnrollmentMarketing>[] = [
   { key: 'fullTimeEnrollment', label: 'Full-Time Enrollment', notesPrompt: 'Current full-time headcount at your campus today', countOnly: true, required: true },
-  { key: 'iksCallsOut', label: 'IKS Calls Out', notesPrompt: 'Outbound enrollment calls you made today (any call)', countOnly: true, required: true },
+  { key: 'iksCallsOut', label: 'IKS Calls Out', notesPrompt: 'Outbound enrollment calls you made today (any call)', countOnly: true, required: true, allowNone: 'No calls today' },
   { key: 'toursGiven', label: 'Number of Tours Given', notesPrompt: 'Add names', itemFields: [F_NAME] },
   { key: 'toursScheduled', label: 'Number of Tours Scheduled', notesPrompt: 'Check IKS', itemFields: [F_NAME, { key: 'tourDate', label: 'Tour date', type: 'date' }] },
   { key: 'callsInEmailsWeb', label: 'Number of Calls In/Emails & Web Inq', notesPrompt: 'Provide all details', itemFields: [{ key: 'type', label: 'Type', type: 'select', options: ['Call', 'Email', 'Web', 'Walk-in'], allowOther: true }, F_NAME] },
-  { key: 'enrollmentCommsOut', label: 'Enrollment Communication Out/IKS', notesPrompt: 'Provide all details (daily goal is 15 — two-way comms)', goal: ENROLLMENT_COMMS_DAILY_GOAL, itemFields: [{ key: 'type', label: 'Type', type: 'select', options: ['Email', 'Text'], allowOther: true }, F_NAME, { key: 'detail', label: 'Detail', type: 'text' }] },
+  { key: 'enrollmentCommsOut', label: 'Enrollment Communication Out/IKS', hint: 'Daily goal is 10. Only two-way communications count toward this goal.', notesPrompt: 'Provide all details (two-way comms only count toward the goal)', goal: ENROLLMENT_COMMS_DAILY_GOAL, itemFields: [{ key: 'type', label: 'Type', type: 'select', options: ['Email', 'Text'], allowOther: true }, F_NAME, { key: 'detail', label: 'Detail', type: 'text' }] },
   { key: 'regFeesPaid', label: 'Number of Reg Fees Paid', notesPrompt: 'With Names, Room and Start Date', itemFields: [F_NAME, F_ROOM, { key: 'startDate', label: 'Start date', type: 'date' }] },
   { key: 'newStarts', label: 'Number of New Starts', notesPrompt: 'With Names, Room', itemFields: [F_NAME, F_ROOM] },
   { key: 'enrollmentsToday', label: 'Number of Enrollments (Today)', notesPrompt: 'With Names, Rooms, Start Date (Reg PD, Enhancement PD, Start Date confirmed)', itemFields: [F_NAME, F_ROOM, { key: 'startDate', label: 'Start date', type: 'date' }] },

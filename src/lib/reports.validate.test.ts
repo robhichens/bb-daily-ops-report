@@ -29,6 +29,19 @@ describe('validateForSubmit — required enrollment numbers', () => {
     expect(res.errors.join(' ')).not.toMatch(/Full-Time/)
   })
 
+  it('accepts a confirmed "No calls today" as an honest zero', () => {
+    const r = ready()
+    r.enrollmentMarketing.iksCallsOut.noneToday = true
+    expect(validateForSubmit(r)).toEqual({ ok: true, errors: [] })
+  })
+
+  it('does not let the tick stand in for Full-Time Enrollment', () => {
+    const r = ready()
+    r.enrollmentMarketing.fullTimeEnrollment.count = 0
+    r.enrollmentMarketing.iksCallsOut.noneToday = true
+    expect(validateForSubmit(r).errors.join(' ')).toMatch(/Full-Time Enrollment/)
+  })
+
   it('submits once both numbers are entered', () => {
     const r = ready()
     r.enrollmentMarketing.iksCallsOut.count = 6

@@ -75,7 +75,7 @@ export function buildDdrPrintModel(r: DailyOpsReport): PrintModel {
         columns: ['Item', '#', 'Details'],
         rows: ENROLLMENT_FIELDS.map((f) => {
           const c = r.enrollmentMarketing[f.key as keyof EnrollmentMarketing]
-          return [f.label, numStr(c.count), countNoteSummary(c, f.itemFields)]
+          return [f.label, numStr(c.count), c.noneToday ? 'None today (confirmed)' : countNoteSummary(c, f.itemFields)]
         }),
       } }] },
       { title: 'Staff', blocks: [{ kind: 'table', table: {

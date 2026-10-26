@@ -32,6 +32,8 @@ export function EnrollmentMarketingSection({ value, onChange, disabled, onCopyFu
             itemFields={f.itemFields}
             countOnly={f.countOnly}
             required={f.required}
+            hint={f.hint}
+            allowNone={f.allowNone}
             value={value[f.key]}
             onChange={(next) => setField(f.key, next)}
             disabled={disabled}

@@ -122,8 +122,9 @@ export function validateForSubmit(r: DailyOpsReport): ValidationResult {
   if (!((r.enrollmentMarketing.fullTimeEnrollment?.count ?? 0) > 0)) {
     errors.push('Enter today’s Full-Time Enrollment (your campus’s full-time headcount).');
   }
-  if (!((r.enrollmentMarketing.iksCallsOut?.count ?? 0) > 0)) {
-    errors.push('Enter today’s IKS Calls Out (the enrollment calls you made).');
+  const iks = r.enrollmentMarketing.iksCallsOut;
+  if (!((iks?.count ?? 0) > 0) && !iks?.noneToday) {
+    errors.push('Enter today’s IKS Calls Out (the enrollment calls you made), or tick “No calls today”.');
   }
 
   if (!r.directorPacket.completed && !r.directorPacket.incompleteReason.trim()) {
