@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { ClipboardList, LayoutDashboard, LogOut, HelpCircle, NotebookPen, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/auth/AuthProvider'
+import { NotificationBell } from '@/components/NotificationBell'
 import { isAdmin, userSites, subscribeDayNotesSeenAt, accessibleReportKeys, type UserProfile } from '@/lib/users'
 import { siteName, type DailyOpsReport } from '@/lib/schema'
 import { REPORTS } from '@/lib/reportRegistry'
@@ -219,7 +220,8 @@ export function AppShell() {
               })}
             </nav>
 
-            <div className="flex items-center gap-2 border-l border-[var(--color-border)] pl-2 sm:pl-4">
+            <div className="flex items-center gap-1 border-l border-[var(--color-border)] pl-2 sm:gap-2 sm:pl-4">
+              <NotificationBell />
               <a
                 href="/how-to-use-the-dor.html"
                 target="_blank"

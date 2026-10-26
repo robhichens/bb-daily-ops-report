@@ -4,12 +4,14 @@ import { Flag, Trash2, Send, AlertTriangle, Check, ShoppingCart, Wrench } from '
 import { REQUEST_LISTS, type LedgerNote, type ReportKey } from '@/lib/schema'
 import {
   subscribeOrgNotesBySource, addOrgNote, setOrgNoteAck, setOrgNoteFlag,
-  addOrgNoteComment, deleteOrgNote, setOrgNoteRequest,
+  deleteOrgNote, setOrgNoteRequest,
 } from '@/lib/orgReports'
 import { Card } from '@/components/ui/card'
 import { Thread } from './NoteThread'
 import { useAuth } from '@/auth/AuthProvider'
 import { isAdmin } from '@/lib/users'
+import { postOrgComment } from '@/lib/noteActions'
+import { useUserDirectory } from '@/lib/userDirectory'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
@@ -99,6 +101,7 @@ function NoteCard({
   busy: Set<string>
   run: (key: string, fn: () => Promise<void>) => Promise<void>
 }) {
+  const users = useUserDirectory()
   const [reply, setReply] = useState('')
   const [replyOpen, setReplyOpen] = useState(false)
 
@@ -106,7 +109,7 @@ function NoteCard({
     const t = reply.trim()
     if (!t) return
     await run(note.id, () =>
-      addOrgNoteComment(note.id, note.comments, { text: t, author, authorUid: uid, role, at: new Date().toISOString() })
+      postOrgComment({ note, text: t, by: { uid, name: author, role }, users })
     )
     setReply(''); setReplyOpen(false)
   }

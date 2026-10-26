@@ -9,8 +9,10 @@ import {
   type SiteId,
 } from '@/lib/schema'
 import { withDerived } from '@/lib/derive'
-import { addNoteComment, getPreviousReport, getReport, removeNoteComment, subscribeReport, upsertDraft, submitReport, validateForSubmit } from '@/lib/reports'
+import { getPreviousReport, getReport, removeNoteComment, subscribeReport, upsertDraft, submitReport, validateForSubmit } from '@/lib/reports'
 import { useAuth } from '@/auth/AuthProvider'
+import { postDdrComment } from '@/lib/noteActions'
+import { useUserDirectory } from '@/lib/userDirectory'
 import type { NoteComment } from '@/lib/schema'
 import { readLocalDraft, writeLocalDraft, clearLocalDraft, reconcile } from '@/lib/localMirror'
 import { formatLong, formatShort } from '@/lib/dates'
@@ -51,6 +53,7 @@ export function ReportForm({ siteId, date, isAdmin, sites, uid, onSite, onDate }
 
   const id = reportDocId(siteId, date)
   const { profile, user } = useAuth()
+  const users = useUserDirectory()
 
   // The conversation under each note, live — so an admin's comment shows up for
   // everyone looking at this report (and is never taken from the stale draft).
@@ -253,13 +256,17 @@ export function ReportForm({ siteId, date, isAdmin, sites, uid, onSite, onDate }
         onComment={
           draft.status === 'submitted'
             ? (line, text) =>
-                addNoteComment(id, comments, {
-                  note: line,
+                postDdrComment({
+                  report: { id, siteId: draft.siteId, date: draft.date, createdByUid: draft.createdByUid },
+                  line,
                   text,
-                  author: profile?.displayName || user?.email || (isAdmin ? 'Leadership' : 'Director'),
-                  authorUid: user?.uid,
-                  at: new Date().toISOString(),
-                  role: isAdmin ? 'admin' : 'director',
+                  by: {
+                    uid: user?.uid ?? '',
+                    name: profile?.displayName || user?.email || (isAdmin ? 'Leadership' : 'Director'),
+                    role: isAdmin ? 'admin' : 'director',
+                  },
+                  thread: comments.filter((c) => c.note === line),
+                  users,
                 })
             : undefined
         }

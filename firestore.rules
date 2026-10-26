@@ -90,6 +90,21 @@ service cloud.firestore {
       allow delete: if isSignedIn() && role() == 'admin';
     }
 
+    // In-app notifications (bell): "X replied to your note", "your request is done".
+    // Anyone who uses the DOR can create one addressed to someone else (from their
+    // own uid); only the person it's for can read it, mark it read, or delete it.
+    match /notifications/{id} {
+      allow read: if isSignedIn() && resource.data.toUid == request.auth.uid;
+      allow create: if isSignedIn()
+        && role() in ['admin', 'director', 'co_director', 'finance', 'admissions']
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.read == false;
+      allow update: if isSignedIn()
+        && resource.data.toUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if isSignedIn() && resource.data.toUid == request.auth.uid;
+    }
+
     // Central Flags & Notes ledger for every report (tagged by `source`).
     // Admins read all (the Day Notes board); others read only a report they can
     // view (report page queries filter by source). Writers need fill on the source.

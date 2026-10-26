@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { NotebookPen, Check, Eye, Flag, ArrowUpRight, Trash2, CornerDownRight, ShoppingCart, Wrench, Search, X, ChevronDown } from 'lucide-react'
 import { Composer, Thread } from '@/components/report/NoteThread'
+import { postDdrComment, postOrgComment } from '@/lib/noteActions'
+import { useUserDirectory } from '@/lib/userDirectory'
 import { useAuth } from '@/auth/AuthProvider'
 import { isAdmin, userSites } from '@/lib/users'
 import {
@@ -23,7 +25,6 @@ import {
   subscribeRecentReports,
   setNoteAck,
   setNoteFlag,
-  addNoteComment,
   removeNoteComment,
   setNoteTag,
 } from '@/lib/reports'
@@ -31,7 +32,6 @@ import {
   subscribeAllOrgNotes,
   setOrgNoteAck,
   setOrgNoteFlag,
-  addOrgNoteComment,
   deleteOrgNote,
   setOrgNoteRequest,
 } from '@/lib/orgReports'
@@ -67,6 +67,7 @@ interface NoteEntry {
   director: string
   date: string
   note: string
+  createdByUid?: string // who started this day's report (a director who posted the note)
   at: string // ISO — when the note was first written (Day Notes stamp)
   acked: boolean
   flagged: boolean // red-flagged "high alert"
@@ -96,6 +97,7 @@ function toEntries(reports: DailyOpsReport[]): NoteEntry[] {
       if (!note) continue
       out.push({
         reportId: r.id,
+        createdByUid: r.createdByUid,
         siteId: r.siteId,
         siteName: r.siteName || siteName(r.siteId),
         director: r.director,
@@ -316,7 +318,8 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
 
 /** A director-report note on the admin board (check off, tag, comment, flag). */
 function AdminDirectorCard({ e, busy, runBusy, author }: { e: NoteEntry; busy: Set<string>; runBusy: RunBusy; author: string }) {
-  const uid = useAuth().user?.uid
+  const uid = useAuth().user?.uid ?? ''
+  const users = useUserDirectory()
   const key = noteKey(e)
   return (
     <Card
@@ -359,7 +362,7 @@ function AdminDirectorCard({ e, busy, runBusy, author }: { e: NoteEntry; busy: S
           placeholder="Comment or question for the director…"
           submitLabel="Send"
           busy={busy.has(key)}
-          onSend={(text) => runBusy(key, () => addNoteComment(e.reportId, e.allComments, { note: e.note, text, author, authorUid: uid, at: new Date().toISOString(), role: 'admin' }))}
+          onSend={(text) => runBusy(key, () => postDdrComment({ report: { id: e.reportId, siteId: e.siteId, date: e.date, createdByUid: e.createdByUid }, line: e.note, text, by: { uid, name: author, role: 'admin' }, thread: e.thread, users }))}
         />
       </div>
     </Card>
@@ -368,7 +371,8 @@ function AdminDirectorCard({ e, busy, runBusy, author }: { e: NoteEntry; busy: S
 
 /** An org-report note (FDR/ADR/MDR/EDR) on the admin board. */
 function AdminOrgCard({ note, busy, runBusy, author }: { note: LedgerNote; busy: Set<string>; runBusy: RunBusy; author: string }) {
-  const uid = useAuth().user?.uid
+  const uid = useAuth().user?.uid ?? ''
+  const users = useUserDirectory()
   const [reply, setReply] = useState('')
   const meta = reportMeta(note.source)
   return (
@@ -421,7 +425,7 @@ function AdminOrgCard({ note, busy, runBusy, author }: { note: LedgerNote; busy:
             onKeyDown={(ev) => {
               if (ev.key === 'Enter' && reply.trim()) {
                 const t = reply.trim(); setReply('')
-                void runBusy(note.id, () => addOrgNoteComment(note.id, note.comments, { text: t, author, authorUid: uid, role: 'admin', at: new Date().toISOString() }))
+                void runBusy(note.id, () => postOrgComment({ note, text: t, by: { uid, name: author, role: 'admin' }, users }))
               }
             }}
           />
@@ -541,6 +545,7 @@ function MultiSelect<T extends string>({
 function DirectorDayNotes({ reports }: { reports: DailyOpsReport[] }) {
   const { user, profile } = useAuth()
   const author = profile?.displayName || user?.email || 'Director'
+  const users = useUserDirectory()
   const mySites = userSites(profile)
   const [attentionOnly, setAttentionOnly] = useState(false)
   const [busy, setBusy] = useState<Set<string>>(new Set())
@@ -644,13 +649,13 @@ function DirectorDayNotes({ reports }: { reports: DailyOpsReport[] }) {
                           busy={busy.has(key)}
                           onSend={(text) =>
                             runBusy(key, () =>
-                              addNoteComment(e.reportId, e.allComments, {
-                                note: e.note,
+                              postDdrComment({
+                                report: { id: e.reportId, siteId: e.siteId, date: e.date, createdByUid: e.createdByUid },
+                                line: e.note,
                                 text,
-                                author,
-                                authorUid: user?.uid,
-                                at: new Date().toISOString(),
-                                role: 'director',
+                                by: { uid: user?.uid ?? '', name: author, role: 'director' },
+                                thread: e.thread,
+                                users,
                               })
                             )
                           }
