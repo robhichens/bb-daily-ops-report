@@ -29,7 +29,7 @@ import { mirrorOpeningsHeadline } from './headlines'
 import { weekOf as weekOfFn, weekdayName } from './derive'
 import { localDateOf } from './dates'
 import { sourceShort } from './reportRegistry'
-import { orgDocId, siteName, STAFFING_CALC_FLAG } from './schema'
+import { ADMIN_NOTE_SOURCE, orgDocId, siteName, STAFFING_CALC_FLAG } from './schema'
 import type { FieldKind, LedgerNote, LedgerNoteComment, NoteSource, OrgFieldValue, OrgReport, OrgReportDef, ReportKey, RequestList, RequestTag, SiteId } from './schema'
 import { cleanDoneInfo, type DoneInfo, type RequestItem } from './reports'
 
@@ -228,13 +228,24 @@ export async function setOrgRequestDone(
   await updateDoc(noteRef(id), { requests: next })
 }
 
+/** Who a Buy/Fix request came from, for the lists. A report note is named for its
+ *  report ("ADR · Crozet"). A standalone admin note has no report, so — like a
+ *  director's request ("Mill Creek · Laura Baker") — it is named for its author,
+ *  with the campus first when one was chosen ("Forest Lakes · Katlin Gordon"). */
+export function orgRequestLabel(n: Pick<LedgerNote, 'source' | 'siteId' | 'author'>): string {
+  const campus = n.siteId ? siteName(n.siteId) : ''
+  const author = (n.author ?? '').trim()
+  if (n.source === ADMIN_NOTE_SOURCE && author) return [campus, author].filter(Boolean).join(' · ')
+  return `${sourceShort(n.source)}${campus ? ` · ${campus}` : ''}`
+}
+
 function toOrgRequestItem(n: LedgerNote, t: RequestTag): RequestItem {
   return {
     key: `org:${n.id}:${t.list}`,
     kind: 'org',
     note: n.text,
     list: t.list,
-    contextLabel: `${sourceShort(n.source)}${n.siteId ? ` · ${siteName(n.siteId)}` : ''}`,
+    contextLabel: orgRequestLabel(n),
     date: localDateOf(n.at),
     doneAt: t.doneAt,
     doneNote: t.doneNote,

@@ -399,8 +399,11 @@ function AdminOrgCard({ note, busy, runBusy, author }: { note: LedgerNote; busy:
             <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-secondary)] px-2 py-0.5 font-bold uppercase tracking-wide text-[var(--color-charcoal)]">
               {sourceShort(note.source)}
             </span>
-            {note.siteId && <span>{siteName(note.siteId)}</span>}
-            <span>· {note.author} · {new Date(note.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+            {/* Who wrote it — bold, the way a director's note leads with its school. */}
+            <span className="font-semibold text-[var(--color-charcoal)]">{note.author}</span>
+            {note.siteId && <span>· {siteName(note.siteId)}</span>}
+            <span aria-hidden>·</span>
+            <span title={new Date(note.at).toLocaleString()}>{fmtStamp(note.at)}</span>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-mid-gray)]">Add to list</span>

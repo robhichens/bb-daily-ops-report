@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 // pure unit test (vi.mock is hoisted above the imports below).
 vi.mock('./firebase', () => ({ auth: {}, db: {} }))
 import { collectOrgRequests } from './orgReports'
-import { itemSchool } from './requestPrint'
+import { buildRequestsPrintModel, itemSchool } from './requestPrint'
 import { localDateOf } from './dates'
 import { reportMeta, sourceShort } from './reportRegistry'
 import { ADMIN_NOTE_SOURCE, type LedgerNote } from './schema'
@@ -51,20 +51,37 @@ describe('a standalone admin note filed to a Buy/Fix list', () => {
     ...over,
   })
 
-  it('lands on the list dated the day it was written, labelled NOTE, under HQ when untagged', () => {
+  it('lands on the list dated the day it was written, named for its author, under HQ when untagged', () => {
     const [item] = collectOrgRequests([note()], 'maintenance')
-    expect(item).toMatchObject({ kind: 'org', contextLabel: 'NOTE', date: '2026-11-10', noteId: 'n1' })
+    expect(item).toMatchObject({ kind: 'org', contextLabel: 'Katlin Gordon', date: '2026-11-10', noteId: 'n1' })
     expect(itemSchool(item)).toBe('Org-wide (HQ)')
   })
 
-  it('groups under its campus when one was chosen', () => {
+  it('is tagged like a director request — "Campus · Author" — and groups under its campus', () => {
     const [item] = collectOrgRequests([note({ siteId: 'forest-lakes' })], 'maintenance')
-    expect(item.contextLabel).toBe('NOTE · Forest Lakes')
+    expect(item.contextLabel).toBe('Forest Lakes · Katlin Gordon') // cf. "Mill Creek · Laura Baker"
     expect(itemSchool(item)).toBe('Forest Lakes')
   })
 
-  it('a CDR note on the list now reads CDR, not the old EDR key', () => {
-    const [item] = collectOrgRequests([note({ source: 'edr' })], 'maintenance')
-    expect(item.contextLabel).toBe('CDR')
+  it('names the author in the printed list too (the "who asked" column)', () => {
+    const items = collectOrgRequests(
+      [note({ id: 'a', siteId: 'forest-lakes' }), note({ id: 'b', text: 'Printer is out of toner', author: 'Rob Hichens' })],
+      'maintenance'
+    )
+    const model = buildRequestsPrintModel([{ list: 'maintenance', label: 'Maintenance Requests', items }], '2026-11-11')
+    const rows = model.sections.flatMap((s) => s.blocks.flatMap((b) => (b.kind === 'table' ? b.table.rows : [])))
+    expect(rows.map((r) => r[2]).sort()).toEqual(['Katlin Gordon', 'Rob Hichens'])
+  })
+
+  it('falls back to NOTE if a note somehow has no author', () => {
+    const [item] = collectOrgRequests([note({ author: '  ' })], 'maintenance')
+    expect(item.contextLabel).toBe('NOTE')
+  })
+
+  it('report notes keep their report label — only standalone notes are named for the author', () => {
+    const [adr] = collectOrgRequests([note({ source: 'adr', siteId: 'crozet' })], 'maintenance')
+    expect(adr.contextLabel).toBe('ADR · Crozet')
+    const [cdr] = collectOrgRequests([note({ source: 'edr' })], 'maintenance') // the CDR reuses the old key
+    expect(cdr.contextLabel).toBe('CDR')
   })
 })
