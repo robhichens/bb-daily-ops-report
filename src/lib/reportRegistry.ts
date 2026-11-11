@@ -11,7 +11,7 @@
 // (its work is covered by the CDR); removed from the nav and the engine.
 
 import { ClipboardList, Wallet, Ticket, Users } from 'lucide-react'
-import { CLASSROOMS, SITES } from './schema'
+import { ADMIN_NOTE_SOURCE, CLASSROOMS, SITES } from './schema'
 import type { OrgReportDef, OrgSubField, ReportKey } from './schema'
 
 export interface ReportMeta {
@@ -30,7 +30,14 @@ export const REPORTS: ReportMeta[] = [
   { key: 'fdr', short: 'FDR', title: 'Finance Daily Report', icon: Wallet, route: '/finance', kind: 'fdr' },
 ]
 
-export const reportMeta = (key: ReportKey): ReportMeta | undefined => REPORTS.find((r) => r.key === key)
+/** A report's metadata, or undefined for a key that isn't a report (a retired
+ *  one, or a standalone admin note's source) — callers fall back sensibly. */
+export const reportMeta = (key: string): ReportMeta | undefined => REPORTS.find((r) => r.key === key)
+
+/** Short badge text for where a note came from: the report's code (DDR, CDR…),
+ *  "NOTE" for a standalone admin note, else the raw key upper-cased. */
+export const sourceShort = (source: string): string =>
+  reportMeta(source)?.short ?? (source === ADMIN_NOTE_SOURCE ? 'NOTE' : source.toUpperCase())
 
 // --- The config-driven org reports -----------------------------------------
 

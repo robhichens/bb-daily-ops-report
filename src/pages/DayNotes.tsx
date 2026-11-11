@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { NotebookPen, Check, Eye, Flag, ArrowUpRight, Trash2, CornerDownRight, ShoppingCart, Wrench, Search, X, ChevronDown } from 'lucide-react'
 import { Composer, Thread } from '@/components/report/NoteThread'
+import { AddNoteCard } from '@/components/report/AddNoteCard'
 import { postDdrComment, postOrgComment } from '@/lib/noteActions'
 import { useUserDirectory } from '@/lib/userDirectory'
 import { useAuth } from '@/auth/AuthProvider'
@@ -10,16 +11,17 @@ import {
   SITES,
   siteName,
   REQUEST_LISTS,
+  ADMIN_NOTE_SOURCE,
   type SiteId,
   type DailyOpsReport,
   type NoteComment,
   type NoteTag,
   type RequestList,
   type LedgerNote,
-  type ReportKey,
+  type NoteSource,
 } from '@/lib/schema'
-import { REPORTS, reportMeta } from '@/lib/reportRegistry'
-import { formatLong } from '@/lib/dates'
+import { REPORTS, sourceShort } from '@/lib/reportRegistry'
+import { formatLong, localDateOf } from '@/lib/dates'
 import { inputClass } from '@/components/ui/input'
 import {
   subscribeRecentReports,
@@ -30,6 +32,7 @@ import {
 } from '@/lib/reports'
 import {
   subscribeAllOrgNotes,
+  addOrgNote,
   setOrgNoteAck,
   setOrgNoteFlag,
   deleteOrgNote,
@@ -48,12 +51,18 @@ const SITE_ACCENT: Record<SiteId, 'coral' | 'yellow' | 'sky' | 'gray'> = {
   'mill-creek': 'yellow',
 }
 
-/** Report sources that still exist — hides notes from retired reports (e.g. MDR)
- *  and drives the Reports filter, so the filter can never list a dead report. */
-const CURRENT_SOURCES = new Set<ReportKey>(REPORTS.map((r) => r.key))
+/** Note sources that still exist — the live reports plus standalone admin notes.
+ *  Hides notes from retired reports (e.g. MDR) so a dead report never shows up. */
+const CURRENT_SOURCES = new Set<NoteSource>([...REPORTS.map((r) => r.key), ADMIN_NOTE_SOURCE])
 
-/** Site filter options: the three campuses + "HQ" for org-level report notes
- *  (ADR/CDR/FDR) that aren't tied to a director's site. */
+/** Reports filter options: each live report, plus the notes admins write directly. */
+const SOURCE_OPTIONS: { value: NoteSource; label: string }[] = [
+  ...REPORTS.map((r) => ({ value: r.key, label: r.short })),
+  { value: ADMIN_NOTE_SOURCE, label: 'Notes' },
+]
+
+/** Site filter options: the three campuses + "HQ" for org-level notes (ADR/CDR/FDR
+ *  and standalone admin notes) that aren't tied to a campus. */
 const SITE_OPTIONS: { value: SiteId | 'hq'; label: string }[] = [
   ...SITES.map((s) => ({ value: s.id, label: s.name })),
   { value: 'hq', label: 'HQ' },
@@ -199,7 +208,7 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
   const { user, profile } = useAuth()
   const author = profile?.displayName || user?.email || 'Leadership'
 
-  const [sources, setSources] = useState<Set<ReportKey>>(new Set())
+  const [sources, setSources] = useState<Set<NoteSource>>(new Set())
   const [siteSel, setSiteSel] = useState<Set<SiteId | 'hq'>>(new Set())
   const [hideAcked, setHideAcked] = useState(false)
   const [query, setQuery] = useState('')
@@ -218,17 +227,17 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
     const hitDir = (e: NoteEntry) =>
       !q || [e.note, e.director, e.siteName, ...e.thread.map((c) => `${c.text} ${c.author}`)].join(' ').toLowerCase().includes(q)
     const hitOrg = (n: LedgerNote) =>
-      !q || [n.text, n.author, reportMeta(n.source)?.short ?? n.source, n.siteId ? siteName(n.siteId) : '', ...n.comments.map((c) => `${c.text} ${c.author}`)].join(' ').toLowerCase().includes(q)
+      !q || [n.text, n.author, sourceShort(n.source), n.siteId ? siteName(n.siteId) : '', ...n.comments.map((c) => `${c.text} ${c.author}`)].join(' ').toLowerCase().includes(q)
     // Empty selection = all. Org notes with no site fall in the "HQ" bucket.
-    const srcOk = (k: ReportKey) => sources.size === 0 || sources.has(k)
+    const srcOk = (k: NoteSource) => sources.size === 0 || sources.has(k)
     const siteOk = (s: SiteId | 'hq') => siteSel.size === 0 || siteSel.has(s)
 
     const dir: BoardItem[] = directorEntries
       .filter((e) => srcOk('ddr') && siteOk(e.siteId) && (!hideAcked || !e.acked) && (!dateFilter || e.date === dateFilter) && hitDir(e))
       .map((e) => ({ kind: 'director', date: e.date, at: e.at || e.date, flagged: e.flagged, entry: e }))
     const org: BoardItem[] = orgNotes
-      .filter((n) => CURRENT_SOURCES.has(n.source) && srcOk(n.source) && siteOk(n.siteId ?? 'hq') && (!hideAcked || !n.acked) && (!dateFilter || n.at.slice(0, 10) === dateFilter) && hitOrg(n))
-      .map((n) => ({ kind: 'org', date: n.at.slice(0, 10), at: n.at, flagged: n.flagged, note: n }))
+      .filter((n) => CURRENT_SOURCES.has(n.source) && srcOk(n.source) && siteOk(n.siteId ?? 'hq') && (!hideAcked || !n.acked) && (!dateFilter || localDateOf(n.at) === dateFilter) && hitOrg(n))
+      .map((n) => ({ kind: 'org', date: localDateOf(n.at), at: n.at, flagged: n.flagged, note: n }))
     return [...dir, ...org]
   }, [directorEntries, orgNotes, siteSel, sources, hideAcked, query, dateFilter])
 
@@ -246,12 +255,7 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
           </>
         }
       >
-        <MultiSelect
-          label="Reports"
-          options={REPORTS.map((r) => ({ value: r.key, label: r.short }))}
-          selected={sources}
-          onChange={setSources}
-        />
+        <MultiSelect label="Reports" options={SOURCE_OPTIONS} selected={sources} onChange={setSources} />
         <MultiSelect label="Sites" options={SITE_OPTIONS} selected={siteSel} onChange={setSiteSel} />
         <HideCheckedToggle checked={hideAcked} onChange={setHideAcked} />
       </FeedHeader>
@@ -287,10 +291,13 @@ function AdminDayNotes({ reports }: { reports: DailyOpsReport[] }) {
         )}
       </div>
 
+      {/* A note an admin writes straight onto the board, outside any report. */}
+      <AddNoteCard onAdd={(text, siteId) => addOrgNote(ADMIN_NOTE_SOURCE, text, author, user?.uid ?? '', siteId)} />
+
       {groups.length === 0 ? (
         <EmptyCard>
           {directorEntries.length === 0 && orgNotes.length === 0
-            ? 'No notes yet. They’ll show up here as reports are filed.'
+            ? 'No notes yet. They’ll show up here as reports are filed — or add one above.'
             : query || dateFilter
               ? 'No notes match your search.'
               : hideAcked
@@ -369,12 +376,11 @@ function AdminDirectorCard({ e, busy, runBusy, author }: { e: NoteEntry; busy: S
   )
 }
 
-/** An org-report note (FDR/ADR/MDR/EDR) on the admin board. */
+/** An org-report note (FDR/ADR/CDR) or a standalone admin note on the admin board. */
 function AdminOrgCard({ note, busy, runBusy, author }: { note: LedgerNote; busy: Set<string>; runBusy: RunBusy; author: string }) {
   const uid = useAuth().user?.uid ?? ''
   const users = useUserDirectory()
   const [reply, setReply] = useState('')
-  const meta = reportMeta(note.source)
   return (
     <Card
       accent="gray"
@@ -391,7 +397,7 @@ function AdminOrgCard({ note, busy, runBusy, author }: { note: LedgerNote; busy:
           <p className={cn('whitespace-pre-wrap text-[15px] leading-snug text-[var(--color-charcoal)]', note.acked && 'text-[var(--color-dk-gray)] line-through')}>{note.text}</p>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-dk-gray)]">
             <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-secondary)] px-2 py-0.5 font-bold uppercase tracking-wide text-[var(--color-charcoal)]">
-              {meta?.short ?? note.source.toUpperCase()}
+              {sourceShort(note.source)}
             </span>
             {note.siteId && <span>{siteName(note.siteId)}</span>}
             <span>· {note.author} · {new Date(note.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>

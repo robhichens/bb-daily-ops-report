@@ -403,6 +403,13 @@ export const totalDeposits = (loc: FinanceLocation): number =>
 export type ReportKey = 'ddr' | 'fdr' | 'adr' | 'mdr' | 'edr';
 export type ReportAccessLevel = 'view' | 'fill';
 
+/** `source` of a Day Note an admin writes straight onto the board, outside any
+ *  report. It is a note source, not a report: it has no page, no access grant,
+ *  and only admins can write or read it (the orgDayNotes rules already say so). */
+export const ADMIN_NOTE_SOURCE = 'admin' as const;
+/** Where a Day Note came from: one of the reports, or a standalone admin note. */
+export type NoteSource = ReportKey | typeof ADMIN_NOTE_SOURCE;
+
 /** Field input kinds. dollar/count clamp ≥ 0; number allows decimals + negatives;
  *  text is free text; toggle is a Yes/No boolean; list is a set of repeating
  *  named rows (subFields) that auto-adds a blank row as you type. */
@@ -562,7 +569,7 @@ export interface RequestTag { list: RequestList; done?: boolean; doneAt?: string
  *  `requests` files it onto the dashboard Purchase/Maintenance lists. */
 export interface LedgerNote {
   id: string;
-  source: ReportKey;        // which report this note came from
+  source: NoteSource;       // which report this note came from, or a standalone admin note
   siteId?: SiteId | null;   // optional location tag (org reports usually null)
   text: string;
   author: string;

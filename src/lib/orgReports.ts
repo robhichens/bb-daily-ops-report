@@ -27,8 +27,10 @@ import { where } from 'firebase/firestore'
 import { db } from './firebase'
 import { mirrorOpeningsHeadline } from './headlines'
 import { weekOf as weekOfFn, weekdayName } from './derive'
+import { localDateOf } from './dates'
+import { sourceShort } from './reportRegistry'
 import { orgDocId, siteName, STAFFING_CALC_FLAG } from './schema'
-import type { FieldKind, LedgerNote, LedgerNoteComment, OrgFieldValue, OrgReport, OrgReportDef, ReportKey, RequestList, RequestTag, SiteId } from './schema'
+import type { FieldKind, LedgerNote, LedgerNoteComment, NoteSource, OrgFieldValue, OrgReport, OrgReportDef, ReportKey, RequestList, RequestTag, SiteId } from './schema'
 import { cleanDoneInfo, type DoneInfo, type RequestItem } from './reports'
 
 // --- Daily report doc -------------------------------------------------------
@@ -165,7 +167,7 @@ export function subscribeAllOrgNotes(cb: (notes: LedgerNote[]) => void): Unsubsc
 }
 
 export async function addOrgNote(
-  source: ReportKey, text: string, author: string, uid: string, siteId: SiteId | null = null
+  source: NoteSource, text: string, author: string, uid: string, siteId: SiteId | null = null
 ): Promise<void> {
   const t = text.trim()
   if (!t) return
@@ -232,8 +234,8 @@ function toOrgRequestItem(n: LedgerNote, t: RequestTag): RequestItem {
     kind: 'org',
     note: n.text,
     list: t.list,
-    contextLabel: `${n.source.toUpperCase()}${n.siteId ? ` · ${siteName(n.siteId)}` : ''}`,
-    date: n.at.slice(0, 10),
+    contextLabel: `${sourceShort(n.source)}${n.siteId ? ` · ${siteName(n.siteId)}` : ''}`,
+    date: localDateOf(n.at),
     doneAt: t.doneAt,
     doneNote: t.doneNote,
     doneBy: t.doneBy,

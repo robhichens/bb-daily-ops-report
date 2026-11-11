@@ -34,6 +34,15 @@ export function formatStamp(iso: string, now: Date = new Date()): string {
   return `${date}, ${time}`
 }
 
+/** The LOCAL calendar date ('YYYY-MM-DD') of an ISO timestamp. `iso.slice(0, 10)`
+ *  is the UTC date, which flips to "tomorrow" after ~7pm Eastern — wrong for
+ *  grouping a note under the day it was written. */
+export function localDateOf(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 /** First day of the month containing `iso`, as 'YYYY-MM-DD'. */
 export function monthStart(iso: string): string {
   const [y, m] = iso.split('-').map(Number)
