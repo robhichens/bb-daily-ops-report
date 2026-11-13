@@ -125,7 +125,7 @@ export function RollCall() {
           </label>
         </div>
         <p className="text-xs text-[var(--color-dk-gray)]">
-          Children = each room’s busiest scheduled day, {formatShort(monday)}–{formatShort(addIsoDays(monday, 4))}. Teachers = the names in the room’s header.
+          Children = each room’s busiest scheduled day, {formatShort(monday)}–{formatShort(addIsoDays(monday, 4))}. Teachers = the names in the room’s header; fix a name or add one (separate with commas) and the count follows.
         </p>
         {allowed.length > 0 && (
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--color-dk-gray)]">
@@ -177,7 +177,7 @@ function SchoolReview({
             <ul className="mt-3 list-disc pl-5 text-xs text-[var(--color-dk-gray)]">{p.rc.warnings.map((w, k) => <li key={k}>{w}</li>)}</ul>
           )}
           <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[520px] text-sm">
+            <table className="w-full min-w-[640px] text-sm">
               <thead className="text-left text-[11px] font-bold uppercase tracking-wide text-[var(--color-dk-gray)]">
                 <tr>
                   <th className="py-2 pr-3">Room</th>
@@ -207,7 +207,17 @@ function SchoolReview({
                   return (
                     <tr key={r.roomKey} className="border-t border-[var(--color-border)] align-middle">
                       <td className="py-2 pr-3"><div className="font-semibold text-[var(--color-charcoal)]">{r.label}</div><div className="text-[11px] text-[var(--color-mid-gray)]">{r.age}</div></td>
-                      <td className="py-2 pr-3"><div className="flex items-center gap-2">{num(r.teachers, 'teachers')}<span className="text-xs text-[var(--color-dk-gray)]">{r.teacherNames.join(', ')}</span></div></td>
+                      <td className="py-2 pr-3">
+                        <div className="flex items-center gap-2">
+                          {num(r.teachers, 'teachers')}
+                          <TeacherNames
+                            names={r.teacherNames}
+                            room={r.label}
+                            disabled={p.saved}
+                            onChange={(teacherNames) => onEdit(r.roomKey, { teacherNames, teachers: teacherNames.length })}
+                          />
+                        </div>
+                      </td>
                       <td className="py-2 pr-3">{num(r.kids, 'kids')}</td>
                       <td className="py-2 pr-3 text-[var(--color-dk-gray)]">{site ? `1:${effectiveRatio(site, r.roomKey)}` : ''}</td>
                       <td className="py-2"><span className={cn('inline-block rounded-full px-2 py-0.5 text-xs font-bold', pill.cls)}>{pill.text}</span></td>
@@ -227,5 +237,27 @@ function SchoolReview({
         </>
       )}
     </Card>
+  )
+}
+
+/** "Ashley, Liliana": the room's teachers, editable. Keeps what's typed as-is
+ *  (so a trailing comma or space doesn't vanish mid-word) and tidies it on blur. */
+function TeacherNames({ names, room, disabled, onChange }: { names: string[]; room: string; disabled?: boolean; onChange: (names: string[]) => void }) {
+  const joined = names.join(', ')
+  const [text, setText] = useState(joined)
+  const split = (t: string) => t.split(/[,/]/).map((n) => n.trim()).filter(Boolean)
+  // Follow outside changes (a new file for this school) without fighting typing.
+  useEffect(() => { if (split(text).join(', ') !== joined) setText(joined) }, [joined]) // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <input
+      type="text"
+      value={text}
+      disabled={disabled}
+      placeholder="Add names"
+      aria-label={`${room} teacher names`}
+      onChange={(e) => { setText(e.target.value); onChange(split(e.target.value)) }}
+      onBlur={() => setText(joined)}
+      className={cn(inputClass, 'h-9 min-w-[150px] flex-1 px-2 text-xs')}
+    />
   )
 }
