@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import type { DashboardView } from '@/lib/dashboard'
 import type { DashboardSection } from '@/lib/settings'
 import { KpiCards } from './KpiCards'
@@ -15,12 +14,9 @@ type Sections = Record<DashboardSection, boolean>
 export function DashboardSections({
   view,
   sections,
-  afterFunnel,
 }: {
   view: DashboardView
   sections: Sections
-  /** Rendered right under the Enrollment pipeline (admin Day Note Requests). */
-  afterFunnel?: ReactNode
 }) {
   const gameRow = sections.leaderboard || sections.teamGoal || sections.celebrations
   const opsRow = sections.staffWatch || sections.packet
@@ -32,8 +28,6 @@ export function DashboardSections({
       )}
 
       {sections.funnel && <EnrollmentFunnelBySite groups={view.funnelBySite} />}
-
-      {afterFunnel}
 
       {opsRow && (
         <div className="grid items-start gap-4 lg:grid-cols-2">

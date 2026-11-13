@@ -168,11 +168,7 @@ export function Dashboard() {
 
   const ddrBody = view && (
     <>
-      <DashboardSections
-        view={view}
-        sections={ddrSections}
-        afterFunnel={admin && <RequestLists reports={recentRows} orgNotes={orgNotes} />}
-      />
+      <DashboardSections view={view} sections={ddrSections} />
       <ReportsTable rows={view.tableRows} />
     </>
   )
@@ -242,6 +238,9 @@ export function Dashboard() {
       ) : (
         <div className="space-y-4">{ddrBody}</div>
       ))}
+
+      {/* Its own section, so it stays put when the Director Daily Report is folded. */}
+      {admin && <RequestLists reports={recentRows} orgNotes={orgNotes} />}
 
       {cdrData && <CdrSection summary={cdrData} title="Co-Director Daily Report" collapsible={multi} />}
       {adrData && <AdrSection summary={adrData} collapsible={multi} />}
