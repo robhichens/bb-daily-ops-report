@@ -54,6 +54,11 @@ describe('matching rooms', () => {
     expect(roomKeyFor('Giraffe')).toBeNull()
   })
 
+  it('knows a school’s own extra rooms — Giraffes is Crozet’s only', () => {
+    expect(roomKeyFor('Giraffe', 'crozet')).toBe('giraffes')
+    expect(roomKeyFor('Giraffe', 'mill-creek')).toBeNull()
+  })
+
   it('places a room under an old name by its age', () => {
     expect(roomKeyForAge("2's")).toBe('monkeys')
     expect(roomKeyForAge("3's & 4's")).toBe('zebras')
@@ -113,21 +118,27 @@ describe('parseRollCall', () => {
     expect(parseRollCall([page('Crozet', 'Lions: 0-8 months Ashley', lions, { title: 'Roll Call' })]).siteId).toBe('crozet')
   })
 
-  it('an old-name room stands in for a missing room, but a separate room beside the real one isn’t merged', () => {
+  it('an old-name room stands in for a missing room; Crozet’s Giraffes is its own eighth row', () => {
     const cr = parseRollCall([
       page('Crozet', "Alligator: 3's & 4's", lions.map(() => 1)),
       page('Crozet', 'Elephant: Toddlers Candace', lions),
       page('Crozet', "Giraffe: 2's Staci", lions.map(() => 8)),
       page('Crozet', 'Monkeys: 2-year olds Sam', lions),
     ])
-    expect(cr.rooms.map((r) => r.roomKey)).toEqual(['zebras', 'elephants', null, 'monkeys'])
-    const notes = cr.warnings.join(' ')
-    expect(notes).toMatch(/Alligator.*counted as Zebras/)
-    expect(notes).toMatch(/Giraffe.*its own room/)
+    expect(cr.rooms.map((r) => r.roomKey)).toEqual(['zebras', 'elephants', 'giraffes', 'monkeys'])
+    expect(cr.warnings).toEqual(["ProCare still calls one room “Alligator” (3's & 4's) — counted as Zebras."])
     const rows = rollCallRows(cr, '2026-08-17')
+    expect(rows.map((r) => r.roomKey)).toEqual(['elephants', 'monkeys', 'giraffes', 'zebras']) // by age
     expect(rows.find((r) => r.roomKey === 'monkeys')).toMatchObject({ kids: 7, teachers: 1, teacherNames: ['Sam'] })
-    expect(rows.find((r) => r.roomKey === 'elephants')).toMatchObject({ kids: 7, teachers: 1 })
-    expect(rows.find((r) => r.roomKey === 'zebras')).toMatchObject({ kids: 1, teachers: 0 })
+    expect(rows.find((r) => r.roomKey === 'giraffes')).toMatchObject({ label: 'Giraffes', kids: 8, teachers: 1, teacherNames: ['Staci'] })
+    // 1 teacher × (8 + Crozet's waiver of 1) − 8 = 1 open
+    expect(rollCallCells('crozet', rows)).toMatchObject({ crozet_giraffes: 1, crozet_giraffes__kids: 8, crozet_giraffes__teachers: 1 })
+  })
+
+  it('a separate old-name room beside the real one at another school isn’t merged', () => {
+    const mc = parseRollCall([page('Mill Creek', "Giraffe: 2's Staci", lions), page('Mill Creek', "Monkeys: 2's Kamryn", lions)])
+    expect(mc.rooms.map((r) => r.roomKey)).toEqual([null, 'monkeys'])
+    expect(mc.warnings.join(' ')).toMatch(/Giraffe.*its own room/)
   })
 
   it('warns when the school or a room isn’t recognised', () => {
@@ -148,6 +159,12 @@ describe('mergeOpeningsSources (ADR grid vs roll call uploads)', () => {
     expect(open).toEqual({ crozet_Lions: 1, crozet_Cheetahs: 9, 'mill-creek_Lions': 3 }) // Crozet from the roll call, Mill Creek from the ADR
     expect(o.sourceNote).toBe('Roll call wk of Oct 19: Crozet · ADR Oct 9: Mill Creek')
     expect(o.asOfDate).toBe('2026-10-19')
+  })
+
+  it('carries Crozet’s Giraffes room onto the dashboard', async () => {
+    const { mergeOpeningsSources } = await import('./dashboard')
+    const o = mergeOpeningsSources(null, { crozet: { date: '2026-11-09', cells: { __calc: 1, crozet_monkeys: 2, crozet_giraffes: 1 } } }, ['crozet'])
+    expect(o.rooms.map((r) => `${r.room} ${r.open}`)).toEqual(['Monkeys 2', 'Giraffes 1'])
   })
 
   it('falls back to the ADR when a school has no upload, and shows nothing with neither', async () => {

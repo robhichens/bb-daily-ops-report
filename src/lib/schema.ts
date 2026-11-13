@@ -42,6 +42,26 @@ export const CLASSROOMS: ClassroomConfig[] = [
   { key: 'cheetahs', name: 'Cheetahs', ageGroup: 'Jr. Kindergarten' },
 ];
 
+/** Rooms one school runs beyond the standard seven (Rob, 2026-11-13: Crozet's
+ *  Giraffes is a separate 2s room alongside Monkeys). */
+export const SITE_EXTRA_ROOMS: Partial<Record<SiteId, (ClassroomConfig & { after: string })[]>> = {
+  crozet: [{ key: 'giraffes', name: 'Giraffes', ageGroup: '2s', after: 'monkeys' }],
+};
+
+/** Standard rooms with extra rooms slotted in by age (each after its `after` room). */
+function withExtras<T extends ClassroomConfig>(extras: (T & { after: string })[]): (ClassroomConfig | T)[] {
+  return CLASSROOMS.flatMap((c) => [c, ...extras.filter((e) => e.after === c.key)]);
+}
+
+/** A school's rooms: the standard seven plus any of its own, in age order. */
+export const roomsFor = (site: SiteId): ClassroomConfig[] => withExtras(SITE_EXTRA_ROOMS[site] ?? []);
+
+/** Every room at any school, each extra room once and marked with its school
+ *  (for grids across schools, e.g. the ADR's Openings to Staff). */
+export const ALL_ROOMS: (ClassroomConfig & { sites?: SiteId[] })[] = withExtras(
+  Object.entries(SITE_EXTRA_ROOMS).flatMap(([site, rooms]) => (rooms ?? []).map((r) => ({ ...r, sites: [site as SiteId] })))
+);
+
 /** Directors for the autocomplete (as of June 2026). */
 export const DIRECTORS = ['Jacqueline Lang', 'Jess Rybak', 'Laura Baker'];
 
@@ -442,7 +462,7 @@ export interface OrgFieldDef {
  *  `fields` when present — `fields` should be left empty on a matrix section.
  *  Cell values are stored flat in the section's data under `${col}_${row}`. */
 export interface MatrixDef {
-  rows: { key: string; label: string; sub?: string }[];
+  rows: { key: string; label: string; sub?: string; sites?: string[] }[]; // sites: row only for these columns
   columns: { key: string; label: string }[];
   kind: FieldKind; // typically 'number' so short-staffed (negative) rooms aren't clamped to 0
   /** Staffing mode (ADR Openings to Staff): each cell takes children + teachers
@@ -457,6 +477,7 @@ export const matrixCellKey = (colKey: string, rowKey: string): string => `${colK
 /** Base ratio, 1 teacher : N children, used at every school unless overridden below. */
 export const ROOM_RATIOS: Record<string, number> = {
   lions: 4, hippos: 4, elephants: 6, monkeys: 8, tigers: 10, zebras: 10, cheetahs: 10,
+  giraffes: 8, // Crozet's second 2s room, same ratio as Monkeys
 };
 /** A school whose room runs a different base ratio than ROOM_RATIOS. None today
  *  (Hippos is an infant room: 1:4 at every school — Rob, 2026-09-28). */
@@ -488,7 +509,7 @@ export function openingsFor(site: SiteId, room: string, kids: number, teachers: 
 export function carrySiteStaffing(prev: Record<string, unknown>, site: SiteId): Record<string, number | string> | null {
   const patch: Record<string, number | string> = {};
   let any = false;
-  for (const c of CLASSROOMS) {
+  for (const c of roomsFor(site)) {
     const k = prev[staffingKey(site, c.key, 'kids')];
     const t = prev[staffingKey(site, c.key, 'teachers')];
     const kids = typeof k === 'number' ? k : 0;

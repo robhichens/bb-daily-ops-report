@@ -11,7 +11,7 @@
 // (its work is covered by the CDR); removed from the nav and the engine.
 
 import { ClipboardList, Wallet, Ticket, Users } from 'lucide-react'
-import { ADMIN_NOTE_SOURCE, CLASSROOMS, SITES } from './schema'
+import { ADMIN_NOTE_SOURCE, ALL_ROOMS, SITES } from './schema'
 import type { OrgReportDef, OrgSubField, ReportKey } from './schema'
 
 export interface ReportMeta {
@@ -75,7 +75,7 @@ const ADR: OrgReportDef = {
       { key: 'followUps', label: 'Follow-ups outstanding', kind: 'count' },
     ], note: true },
     { key: 'openingsToStaff', title: 'Openings to Staff', hint: 'Enter the children and teachers in each room right now. Openings are calculated for you: teachers × ratio − children (Crozet and Forest Lakes include their +1 waiver). Negative means the room is over ratio.', fields: [],
-      matrix: { rows: CLASSROOMS.map((c) => ({ key: c.key, label: c.name, sub: c.ageGroup })), columns: SITES.map((s) => ({ key: s.id, label: s.name })), kind: 'number', staffing: true },
+      matrix: { rows: ALL_ROOMS.map((c) => ({ key: c.key, label: c.name, sub: c.ageGroup, sites: c.sites })), columns: SITES.map((s) => ({ key: s.id, label: s.name })), kind: 'number', staffing: true },
       note: true },
   ],
 }

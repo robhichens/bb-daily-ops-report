@@ -150,6 +150,7 @@ export function buildOrgPrintModel(def: OrgReportDef, r: OrgReport): PrintModel 
         rows: m.rows.map((row) => [
           row.sub ? `${row.label} (${row.sub})` : row.label,
           ...m.columns.map((c) => {
+            if (row.sites && !row.sites.includes(c.key)) return '—' // room this school doesn't have
             const v = vals[matrixCellKey(c.key, row.key)]
             const shown = typeof v === 'number' && v ? String(v) : (v ? String(v) : '')
             if (!m.staffing) return shown

@@ -6,7 +6,7 @@
 
 import {
   STAFFING_CALC_FLAG,
-  CLASSROOMS,
+  roomsFor,
   ENROLLMENT_COMMS_DAILY_GOAL,
   REGISTRATION_FEE,
   SITES,
@@ -254,7 +254,7 @@ export function mergeOpeningsSources(
     const pick = rc && (!adrHas || rc.date >= (adr?.date ?? '')) ? { src: rc, label: `Roll call wk of ${shortDate(rc.date)}` }
       : adrHas && adr ? { src: adr, label: `ADR ${shortDate(adr.date)}` } : null
     if (!pick) continue
-    for (const c of CLASSROOMS) {
+    for (const c of roomsFor(s.id)) {
       const k = matrixCellKey(s.id, c.key)
       for (const key of [k, `${k}__kids`, `${k}__teachers`]) if (key in pick.src.cells) cells[key] = pick.src.cells[key]
     }
@@ -287,7 +287,7 @@ export function openingsFromCells(cells: Record<string, unknown>, asOfDate: stri
   if (!cells[STAFFING_CALC_FLAG]) return { totalOpen: 0, asOfDate: '', rooms: [] }
   const rooms: RoomOpening[] = []
   for (const s of SITES.filter((x) => scope.includes(x.id))) {
-    for (const c of CLASSROOMS) {
+    for (const c of roomsFor(s.id)) {
       const raw = cells[matrixCellKey(s.id, c.key)]
       if (raw === undefined || raw === null || raw === '') continue
       const open = typeof raw === 'number' ? raw : Number(raw)

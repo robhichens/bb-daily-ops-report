@@ -11,7 +11,7 @@
 // Pure functions over positioned text (x, y, str) so they can be tested without a
 // PDF; lib/rollCallPdf.ts does the PDF → text step in the browser.
 
-import { CLASSROOMS, SITES, matrixCellKey, openingsFor, staffingKey, STAFFING_CALC_FLAG, type SiteId } from './schema'
+import { ALL_ROOMS, CLASSROOMS, SITES, matrixCellKey, roomsFor, openingsFor, staffingKey, STAFFING_CALC_FLAG, type SiteId } from './schema'
 import { addIsoDays } from './dates'
 
 export interface PdfText { x: number; y: number; str: string }
@@ -103,9 +103,10 @@ export function parseRoomHeader(raw: string): { label: string; age: string; teac
 /** "Elephant", "ELEPHANTS", "Tigers's" → "elephant" / "tiger". */
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '').replace(/s+$/, '')
 
-/** Room by printed name, forgiving case, plurals and stray apostrophes. */
-export const roomKeyFor = (label: string): string | null =>
-  CLASSROOMS.find((c) => norm(c.name) === norm(label))?.key ?? null
+/** Room by printed name, forgiving case, plurals and stray apostrophes —
+ *  including a school's own extra rooms (Crozet's Giraffes) once it's known. */
+export const roomKeyFor = (label: string, site?: SiteId | null): string | null =>
+  (site ? roomsFor(site) : CLASSROOMS).find((c) => norm(c.name) === norm(label))?.key ?? null
 
 /** Room by age, for a ProCare room still under an old name (e.g. Crozet's
  *  "Giraffe: 2's" → Monkeys, "Alligator: 3's & 4's" → Zebras). */
@@ -157,7 +158,7 @@ export function parseRollCall(pages: PdfPage[]): RollCall {
 
     let room = out.rooms[out.rooms.length - 1]
     if (!(h.cont && room && room.label.toLowerCase() === h.label.toLowerCase())) {
-      const byName = roomKeyFor(h.label)
+      const byName = roomKeyFor(h.label, out.siteId)
       const byAge = byName ? null : roomKeyForAge(h.age)
       room = { roomKey: byName ?? byAge, label: h.label, age: h.age, teacherNames: h.teacherNames, daily: {} }
       if (byAge) room.byAge = true
@@ -205,13 +206,13 @@ export function parseRollCall(pages: PdfPage[]): RollCall {
   }
   for (const r of out.rooms) {
     if (extra.has(r)) {
-      const name = CLASSROOMS.find((c) => c.key === r.roomKey)?.name
+      const name = ALL_ROOMS.find((c) => c.key === r.roomKey)?.name
       out.warnings.push(`“${r.label}” (${r.age}) is its own room, not one of the seven, so it isn’t counted — ${name} shows only the ${name} room.`)
       r.roomKey = null
       delete r.byAge
       continue
     }
-    const name = CLASSROOMS.find((c) => c.key === r.roomKey)?.name
+    const name = ALL_ROOMS.find((c) => c.key === r.roomKey)?.name
     if (!r.roomKey) out.warnings.push(`Couldn’t place “${r.label}${r.age ? ` (${r.age})` : ''}” in one of the seven rooms, so it’s left out.`)
     else if (!Object.keys(r.daily).length) out.warnings.push(`${r.label}: no Daily Count found.`)
     if (r.roomKey && r.byAge) out.warnings.push(`ProCare still calls one room “${r.label}” (${r.age}) — counted as ${name}.`)
@@ -238,7 +239,7 @@ export interface RollCallRow { roomKey: string; label: string; age: string; kids
 
 /** Review rows for one school/week: busiest day's children + teacher count. */
 export function rollCallRows(rc: RollCall, monday: string): RollCallRow[] {
-  return CLASSROOMS.flatMap((c) => {
+  return (rc.siteId ? roomsFor(rc.siteId) : CLASSROOMS).flatMap((c) => {
     const r = rc.rooms.find((x) => x.roomKey === c.key)
     if (!r) return []
     return [{ roomKey: c.key, label: c.name, age: r.age, kids: busiestInWeek(r.daily, monday) ?? 0, teachers: r.teacherNames.length, teacherNames: r.teacherNames }]

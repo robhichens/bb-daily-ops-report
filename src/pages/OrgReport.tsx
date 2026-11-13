@@ -4,7 +4,7 @@ import { Check, Lock, Pencil, Loader2, CloudOff, Eye } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { reportAccessLevel, userSites } from '@/lib/users'
 import { ORG_DEFS, reportMeta } from '@/lib/reportRegistry'
-import { carrySiteStaffing, CLASSROOMS, effectiveRatio, matrixCellKey, openingsFor, orgDocId, RATIO_WAIVERS, SITES, siteName, staffingKey, STAFFING_CALC_FLAG } from '@/lib/schema'
+import { carrySiteStaffing, effectiveRatio, roomsFor, matrixCellKey, openingsFor, orgDocId, RATIO_WAIVERS, SITES, siteName, staffingKey, STAFFING_CALC_FLAG } from '@/lib/schema'
 import type {
   FieldKind, MatrixDef, OrgFieldDef, OrgFieldValue, OrgListItem,
   OrgReport as TOrgReport, OrgReportDef, OrgSectionDef, OrgSubField, SiteId,
@@ -249,7 +249,7 @@ function SectionCard({
     for (const r of await getPreviousOrgReports(def.collection, draft.date)) {
       const patch = carrySiteStaffing((r.data?.[section.key] ?? {}) as Record<string, unknown>, site)
       if (!patch) continue
-      const hasNumbers = CLASSROOMS.some((c) => vals[staffingKey(site, c.key, 'kids')] || vals[staffingKey(site, c.key, 'teachers')])
+      const hasNumbers = roomsFor(site).some((c) => vals[staffingKey(site, c.key, 'kids')] || vals[staffingKey(site, c.key, 'teachers')])
       if (hasNumbers && !window.confirm(`Replace ${siteName(site)}’s numbers with the ones from ${formatShort(r.date)}?`)) {
         return 'Kept today’s numbers.'
       }
@@ -555,7 +555,7 @@ function StaffingGrid({
               <div className="text-center text-[11px] font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">Children</div>
               <div className="text-center text-[11px] font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">Teachers</div>
               <div className="text-center text-[11px] font-semibold uppercase tracking-wide text-[var(--color-dk-gray)]">Openings</div>
-              {matrix.rows.flatMap((r) => {
+              {matrix.rows.filter((r) => !r.sites || r.sites.includes(site)).flatMap((r) => {
                 const kids = num(vals[staffingKey(site, r.key, 'kids')])
                 const teachers = num(vals[staffingKey(site, r.key, 'teachers')])
                 const open = openingsFor(site, r.key, kids, teachers)
