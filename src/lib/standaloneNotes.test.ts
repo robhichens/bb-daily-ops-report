@@ -78,10 +78,17 @@ describe('a standalone admin note filed to a Buy/Fix list', () => {
     expect(item.contextLabel).toBe('NOTE')
   })
 
-  it('report notes keep their report label — only standalone notes are named for the author', () => {
+  it('report notes keep their report label (the CDR is the exception, below)', () => {
     const [adr] = collectOrgRequests([note({ source: 'adr', siteId: 'crozet' })], 'maintenance')
     expect(adr.contextLabel).toBe('ADR · Crozet')
-    const [cdr] = collectOrgRequests([note({ source: 'edr' })], 'maintenance') // the CDR reuses the old key
-    expect(cdr.contextLabel).toBe('CDR')
+  })
+
+  it('a CDR note names its campus and co-director — "CDR · Crozet · Name"', () => {
+    const [cdr] = collectOrgRequests([note({ source: 'edr', siteId: 'crozet', author: 'Cam Ward' })], 'maintenance') // the CDR reuses the old key
+    expect(cdr.contextLabel).toBe('CDR · Crozet · Cam Ward')
+    const [older] = collectOrgRequests([note({ source: 'edr', author: 'Cam Ward' })], 'maintenance') // posted before the campus was saved
+    expect(older.contextLabel).toBe('CDR · Cam Ward')
+    const [bare] = collectOrgRequests([note({ source: 'edr', author: '' })], 'maintenance')
+    expect(bare.contextLabel).toBe('CDR')
   })
 })

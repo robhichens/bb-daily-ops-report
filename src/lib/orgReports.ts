@@ -236,6 +236,8 @@ export function orgRequestLabel(n: Pick<LedgerNote, 'source' | 'siteId' | 'autho
   const campus = n.siteId ? siteName(n.siteId) : ''
   const author = (n.author ?? '').trim()
   if (n.source === ADMIN_NOTE_SOURCE && author) return [campus, author].filter(Boolean).join(' · ')
+  // A co-director runs one school per CDR, so say which co-director and school.
+  if (n.source === 'edr') return [sourceShort(n.source), campus, author].filter(Boolean).join(' · ')
   return `${sourceShort(n.source)}${campus ? ` · ${campus}` : ''}`
 }
 

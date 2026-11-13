@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Flag, Trash2, Send, AlertTriangle, Check, ShoppingCart, Wrench } from 'lucide-react'
-import { REQUEST_LISTS, type LedgerNote, type ReportKey } from '@/lib/schema'
+import { REQUEST_LISTS, siteName, type LedgerNote, type ReportKey, type SiteId } from '@/lib/schema'
 import {
   subscribeOrgNotesBySource, addOrgNote, setOrgNoteAck, setOrgNoteFlag,
   deleteOrgNote, setOrgNoteRequest,
@@ -20,8 +20,8 @@ import { cn } from '@/lib/utils'
  *  orgDayNotes ledger (also shown on the main Day Notes board). Red-flagged
  *  notes pin to the top. Used by FDR/ADR/MDR/EDR. */
 export function NotesLedger({
-  source, author, uid, readOnly = false,
-}: { source: ReportKey; author: string; uid: string; readOnly?: boolean }) {
+  source, author, uid, siteId = null, readOnly = false,
+}: { source: ReportKey; author: string; uid: string; siteId?: SiteId | null; readOnly?: boolean }) {
   const { profile } = useAuth()
   const role: 'admin' | 'director' = isAdmin(profile?.role) ? 'admin' : 'director'
   const [notes, setNotes] = useState<LedgerNote[]>([])
@@ -45,7 +45,7 @@ export function NotesLedger({
   async function add() {
     const t = text.trim()
     if (!t) return
-    await run('add', () => addOrgNote(source, t, author, uid))
+    await run('add', () => addOrgNote(source, t, author, uid, siteId))
     setText('')
   }
 
@@ -152,7 +152,7 @@ function NoteCard({
             {note.text}
           </p>
           <p className="mt-1 text-xs text-[var(--color-dk-gray)]">
-            {note.author} · {new Date(note.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+            {note.author}{note.siteId ? ` · ${siteName(note.siteId)}` : ''} · {new Date(note.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
           </p>
           {!readOnly && (
             <div className="mt-2 flex flex-wrap items-center gap-1.5">

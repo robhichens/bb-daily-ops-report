@@ -62,7 +62,7 @@ export function OrgReport() {
         uid={user?.uid ?? ''} author={author} readOnly={readOnly}
       />
       <div className="print:hidden">
-        <NotesLedger source={def.key} author={author} uid={user?.uid ?? ''} readOnly={readOnly} />
+        <NotesLedger source={def.key} author={author} uid={user?.uid ?? ''} siteId={def.siteScoped ? siteId : null} readOnly={readOnly} />
       </div>
     </div>
   )
