@@ -113,19 +113,19 @@ describe('parseRollCall', () => {
     expect(parseRollCall([page('Crozet', 'Lions: 0-8 months Ashley', lions, { title: 'Roll Call' })]).siteId).toBe('crozet')
   })
 
-  it('counts a room ProCare still lists under an old name with the matching room', () => {
-    const giraffe = lions.map(() => 8)
+  it('an old-name room stands in for a missing room, but a separate room beside the real one isn’t merged', () => {
     const cr = parseRollCall([
       page('Crozet', "Alligator: 3's & 4's", lions.map(() => 1)),
       page('Crozet', 'Elephant: Toddlers Candace', lions),
-      page('Crozet', "Giraffe: 2's Staci", giraffe),
+      page('Crozet', "Giraffe: 2's Staci", lions.map(() => 8)),
       page('Crozet', 'Monkeys: 2-year olds Sam', lions),
     ])
-    expect(cr.rooms.map((r) => r.roomKey)).toEqual(['zebras', 'elephants', 'monkeys', 'monkeys'])
-    expect(cr.warnings.join(' ')).not.toMatch(/left out/)
-    expect(cr.warnings.join(' ')).toMatch(/Giraffe.*counted as Monkeys/)
+    expect(cr.rooms.map((r) => r.roomKey)).toEqual(['zebras', 'elephants', null, 'monkeys'])
+    const notes = cr.warnings.join(' ')
+    expect(notes).toMatch(/Alligator.*counted as Zebras/)
+    expect(notes).toMatch(/Giraffe.*its own room/)
     const rows = rollCallRows(cr, '2026-08-17')
-    expect(rows.find((r) => r.roomKey === 'monkeys')).toMatchObject({ kids: 7 + 8, teachers: 2, teacherNames: ['Staci', 'Sam'], age: '2-year olds' })
+    expect(rows.find((r) => r.roomKey === 'monkeys')).toMatchObject({ kids: 7, teachers: 1, teacherNames: ['Sam'] })
     expect(rows.find((r) => r.roomKey === 'elephants')).toMatchObject({ kids: 7, teachers: 1 })
     expect(rows.find((r) => r.roomKey === 'zebras')).toMatchObject({ kids: 1, teachers: 0 })
   })

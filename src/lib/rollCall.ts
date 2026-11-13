@@ -193,14 +193,28 @@ export function parseRollCall(pages: PdfPage[]): RollCall {
 
   if (!out.siteId) out.warnings.push(`Couldn’t tell which school this is${out.schoolName ? ` (“${out.schoolName}”)` : ''}.`)
   if (!out.month) out.warnings.push('Couldn’t find the month on the roll call.')
+  // A room placed by age only stands in when the real room isn't on the roll
+  // call (Crozet's "Alligator" → Zebras). If the real room is there too it's a
+  // separate room (Crozet's "Giraffe" beside Monkeys), so it's kept out of the
+  // seven rather than merged into one.
+  const extra = new Set<RollCallRoom>()
   for (const r of out.rooms) {
+    if (!r.byAge || !r.roomKey) continue
+    const first = out.rooms.find((x) => x.roomKey === r.roomKey && !x.byAge) ?? out.rooms.find((x) => x.roomKey === r.roomKey)
+    if (first !== r) extra.add(r)
+  }
+  for (const r of out.rooms) {
+    if (extra.has(r)) {
+      const name = CLASSROOMS.find((c) => c.key === r.roomKey)?.name
+      out.warnings.push(`“${r.label}” (${r.age}) is its own room, not one of the seven, so it isn’t counted — ${name} shows only the ${name} room.`)
+      r.roomKey = null
+      delete r.byAge
+      continue
+    }
     const name = CLASSROOMS.find((c) => c.key === r.roomKey)?.name
     if (!r.roomKey) out.warnings.push(`Couldn’t place “${r.label}${r.age ? ` (${r.age})` : ''}” in one of the seven rooms, so it’s left out.`)
     else if (!Object.keys(r.daily).length) out.warnings.push(`${r.label}: no Daily Count found.`)
-    if (r.roomKey && r.byAge) {
-      const shared = out.rooms.some((x) => x !== r && x.roomKey === r.roomKey)
-      out.warnings.push(`ProCare still calls one room “${r.label}” (${r.age}) — counted as ${name}${shared ? `, added to the ${name} room’s children and teachers` : ''}.`)
-    }
+    if (r.roomKey && r.byAge) out.warnings.push(`ProCare still calls one room “${r.label}” (${r.age}) — counted as ${name}.`)
   }
   return out
 }
@@ -225,15 +239,9 @@ export interface RollCallRow { roomKey: string; label: string; age: string; kids
 /** Review rows for one school/week: busiest day's children + teacher count. */
 export function rollCallRows(rc: RollCall, monday: string): RollCallRow[] {
   return CLASSROOMS.flatMap((c) => {
-    // A room ProCare still lists under an old name lands on the same key as the
-    // real one: add its children day by day and its teachers to that room.
-    const rs = rc.rooms.filter((x) => x.roomKey === c.key)
-    if (!rs.length) return []
-    const daily: Record<string, number> = {}
-    for (const r of rs) for (const [d, n] of Object.entries(r.daily)) daily[d] = (daily[d] ?? 0) + n
-    const teacherNames = [...new Set(rs.flatMap((r) => r.teacherNames))]
-    const age = (rs.find((r) => !r.byAge) ?? rs[0]).age
-    return [{ roomKey: c.key, label: c.name, age, kids: busiestInWeek(daily, monday) ?? 0, teachers: teacherNames.length, teacherNames }]
+    const r = rc.rooms.find((x) => x.roomKey === c.key)
+    if (!r) return []
+    return [{ roomKey: c.key, label: c.name, age: r.age, kids: busiestInWeek(r.daily, monday) ?? 0, teachers: r.teacherNames.length, teacherNames: r.teacherNames }]
   })
 }
 
