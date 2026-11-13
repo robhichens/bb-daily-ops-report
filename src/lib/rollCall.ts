@@ -18,7 +18,8 @@ export interface PdfText { x: number; y: number; str: string }
 export type PdfPage = PdfText[]
 
 export interface RollCallRoom {
-  roomKey: string | null // matched CLASSROOMS key, null if the name wasn't recognised
+  roomKey: string | null // matched CLASSROOMS key, null if neither the name nor the age was recognised
+  byAge?: boolean // name wasn't one of the seven, so the room was placed by its age
   label: string // as printed, e.g. "Lions"
   age: string // e.g. "2-9mo"
   teacherNames: string[]
@@ -72,8 +73,17 @@ function lines(page: PdfPage): { y: number; items: PdfText[]; text: string }[] {
   })
 }
 
-/** "Lions:2-9mo Reagan/Saundra" → name, age, teachers. Age = everything up to the
- *  last word with a digit ("3s & 4s", "2's", "16-24mo."); the rest are teachers. */
+// Words that belong to the age description rather than a teacher's name
+// ("0-8 months", "2-year olds", "early threes", "Jr. K", "Toddlers").
+const AGE_WORDS = new Set(['mo', 'mos', 'month', 'months', 'wk', 'wks', 'week', 'weeks', 'yr', 'yrs', 'year', 'years', 'old', 'olds',
+  'toddler', 'toddlers', 'infant', 'infants', 'early', 'late', 'young', 'older', 'twos', 'threes', 'fours', 'ages', 'age',
+  '&', 'and', '-', '/', 'jr', 'k', 'prek', 'pre', 'kindergarten', 'junior'])
+const isAgeWord = (w: string) => /\d/.test(w) || AGE_WORDS.has(w.toLowerCase().replace(/[^a-z&/-]/g, ''))
+
+/** "Lions:2-9mo Reagan/Saundra" → name, age, teachers. The age is the run of
+ *  leading words that have a digit or are age words ("3s & 4s", "0-8 months",
+ *  "early threes", "Jr. K"); the rest are teachers. Blank lines ("______") and
+ *  "Closed" aren't teachers. */
 export function parseRoomHeader(raw: string): { label: string; age: string; teacherNames: string[]; cont: boolean } {
   const cont = /\(cont\)/i.test(raw)
   const text = raw.replace(/\(cont\)/gi, '').trim()
@@ -81,16 +91,35 @@ export function parseRoomHeader(raw: string): { label: string; age: string; teac
   const label = (colon >= 0 ? text.slice(0, colon) : text.split(' ')[0]).trim()
   const rest = (colon >= 0 ? text.slice(colon + 1) : text.slice(label.length)).trim()
   const words = rest.split(/\s+/).filter(Boolean)
-  let lastAge = -1
-  words.forEach((w, i) => { if (/\d/.test(w)) lastAge = i })
-  const age = words.slice(0, lastAge + 1).join(' ').replace(/\.$/, '')
-  const teacherText = words.slice(lastAge + 1).join(' ')
-  const teacherNames = teacherText.split('/').map((t) => t.trim()).filter(Boolean)
+  let n = 0
+  while (n < words.length && isAgeWord(words[n])) n++
+  const age = words.slice(0, n).join(' ').replace(/\.$/, '')
+  const teacherNames = words.slice(n).join(' ').split('/')
+    .map((t) => t.replace(/_+/g, ' ').trim())
+    .filter((t) => /[a-z]/i.test(t) && !/^closed$/i.test(t))
   return { label, age, teacherNames, cont }
 }
 
-const roomKeyFor = (label: string): string | null =>
-  CLASSROOMS.find((c) => c.name.toLowerCase() === label.trim().toLowerCase())?.key ?? null
+/** "Elephant", "ELEPHANTS", "Tigers's" → "elephant" / "tiger". */
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '').replace(/s+$/, '')
+
+/** Room by printed name, forgiving case, plurals and stray apostrophes. */
+export const roomKeyFor = (label: string): string | null =>
+  CLASSROOMS.find((c) => norm(c.name) === norm(label))?.key ?? null
+
+/** Room by age, for a ProCare room still under an old name (e.g. Crozet's
+ *  "Giraffe: 2's" → Monkeys, "Alligator: 3's & 4's" → Zebras). */
+export function roomKeyForAge(age: string): string | null {
+  const a = age.toLowerCase()
+  if (/jr\.?\s*k|pre-?\s*k|kinder/.test(a)) return 'cheetahs'
+  if (/\b3'?s?\s*(&|and|\/|-)\s*4|late\s*three|fours/.test(a)) return 'zebras'
+  if (/\b3'?s\b|three/.test(a)) return 'tigers'
+  if (/\b2'?s\b|\b2[\s-]*y(ea)?r|twos/.test(a)) return 'monkeys'
+  if (/toddler|\b1[5-8]\s*-\s*2[4-9]/.test(a)) return 'elephants'
+  if (/infant|week|wk|\b0\s*-|\b[0-3]\s*-\s*[6-9]\b|-\s*[6-9]\s*m/.test(a)) return 'lions'
+  if (/\b(9|1[0-2])\s*-\s*1[2-8]/.test(a)) return 'hippos'
+  return null
+}
 
 export function parseRollCall(pages: PdfPage[]): RollCall {
   const out: RollCall = { siteId: null, schoolName: '', month: '', days: [], rooms: [], warnings: [] }
@@ -99,10 +128,15 @@ export function parseRollCall(pages: PdfPage[]): RollCall {
     const ls = lines(page)
 
     if (!out.schoolName) {
-      const m = ls.map((l) => l.text.match(/^(.+?)\s+Roll Call$/i)).find(Boolean)
-      if (m) {
-        out.schoolName = m[1].trim()
-        out.siteId = SITES.find((s) => s.name.toLowerCase() === out.schoolName.toLowerCase())?.id ?? null
+      // "Crozet Roll Call", "Forest lakes Rollcall" — and the school's name is
+      // also printed on its own at the top of every page.
+      const m = ls.map((l) => l.text.match(/^(.+?)\s+Roll\s*-?\s*call$/i)).find(Boolean)
+      const siteIn = (t: string) => SITES.find((s) => norm(t).includes(norm(s.name)))
+      if (m) out.schoolName = m[1].trim()
+      const site = (m && siteIn(m[1])) || SITES.find((s) => ls.some((l) => norm(l.text) === norm(s.name)))
+      if (site) {
+        out.siteId = site.id
+        out.schoolName = site.name
       }
     }
     if (!out.month) {
@@ -123,7 +157,10 @@ export function parseRollCall(pages: PdfPage[]): RollCall {
 
     let room = out.rooms[out.rooms.length - 1]
     if (!(h.cont && room && room.label.toLowerCase() === h.label.toLowerCase())) {
-      room = { roomKey: roomKeyFor(h.label), label: h.label, age: h.age, teacherNames: h.teacherNames, daily: {} }
+      const byName = roomKeyFor(h.label)
+      const byAge = byName ? null : roomKeyForAge(h.age)
+      room = { roomKey: byName ?? byAge, label: h.label, age: h.age, teacherNames: h.teacherNames, daily: {} }
+      if (byAge) room.byAge = true
       out.rooms.push(room)
     }
 
@@ -157,8 +194,13 @@ export function parseRollCall(pages: PdfPage[]): RollCall {
   if (!out.siteId) out.warnings.push(`Couldn’t tell which school this is${out.schoolName ? ` (“${out.schoolName}”)` : ''}.`)
   if (!out.month) out.warnings.push('Couldn’t find the month on the roll call.')
   for (const r of out.rooms) {
-    if (!r.roomKey) out.warnings.push(`“${r.label}” isn’t one of the seven rooms, so it’s left out.`)
+    const name = CLASSROOMS.find((c) => c.key === r.roomKey)?.name
+    if (!r.roomKey) out.warnings.push(`Couldn’t place “${r.label}${r.age ? ` (${r.age})` : ''}” in one of the seven rooms, so it’s left out.`)
     else if (!Object.keys(r.daily).length) out.warnings.push(`${r.label}: no Daily Count found.`)
+    if (r.roomKey && r.byAge) {
+      const shared = out.rooms.some((x) => x !== r && x.roomKey === r.roomKey)
+      out.warnings.push(`ProCare still calls one room “${r.label}” (${r.age}) — counted as ${name}${shared ? `, added to the ${name} room’s children and teachers` : ''}.`)
+    }
   }
   return out
 }
@@ -183,9 +225,15 @@ export interface RollCallRow { roomKey: string; label: string; age: string; kids
 /** Review rows for one school/week: busiest day's children + teacher count. */
 export function rollCallRows(rc: RollCall, monday: string): RollCallRow[] {
   return CLASSROOMS.flatMap((c) => {
-    const r = rc.rooms.find((x) => x.roomKey === c.key)
-    if (!r) return []
-    return [{ roomKey: c.key, label: c.name, age: r.age, kids: busiestInWeek(r.daily, monday) ?? 0, teachers: r.teacherNames.length, teacherNames: r.teacherNames }]
+    // A room ProCare still lists under an old name lands on the same key as the
+    // real one: add its children day by day and its teachers to that room.
+    const rs = rc.rooms.filter((x) => x.roomKey === c.key)
+    if (!rs.length) return []
+    const daily: Record<string, number> = {}
+    for (const r of rs) for (const [d, n] of Object.entries(r.daily)) daily[d] = (daily[d] ?? 0) + n
+    const teacherNames = [...new Set(rs.flatMap((r) => r.teacherNames))]
+    const age = (rs.find((r) => !r.byAge) ?? rs[0]).age
+    return [{ roomKey: c.key, label: c.name, age, kids: busiestInWeek(daily, monday) ?? 0, teachers: teacherNames.length, teacherNames }]
   })
 }
 
