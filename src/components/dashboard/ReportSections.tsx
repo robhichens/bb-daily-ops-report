@@ -2,7 +2,8 @@ import type { ReactNode } from 'react'
 import { Briefcase, ChevronDown, CalendarCheck, DollarSign, Megaphone, Phone, Receipt, Ticket, UserPlus, Users, Wallet } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { formatShort } from '@/lib/dates'
-import type { AdrSummary, CdrSummary, FdrSummary } from '@/lib/dashboardReports'
+import type { AdrSummary, CdrSummary, CustomTotal, FdrSummary } from '@/lib/dashboardReports'
+import { orgFieldLabel } from '@/lib/reportRegistry'
 import { cn } from '@/lib/utils'
 import { usePersistentOpen } from '@/lib/usePersistentOpen'
 
@@ -112,6 +113,33 @@ function Figure({ label, value, strong }: { label: string; value: ReactNode; str
   )
 }
 
+/** Fields added on the Customize page: each one's period total vs the prior period. */
+function CustomCard({ title, items }: { title: string; items: CustomTotal[] }) {
+  if (!items.length) return null
+  return (
+    <Card className="p-5">
+      <p className="text-[11px] font-bold uppercase tracking-[0.13em] text-[var(--color-dk-gray)]">{title}</p>
+      <div className="mt-2 grid gap-x-8 sm:grid-cols-2">
+        {items.map((c) => (
+          <div key={c.key} className="flex items-baseline justify-between gap-3 border-b border-[var(--color-border)] py-2 last:border-0">
+            <span className="min-w-0">
+              <span className="block text-sm text-[var(--color-charcoal)]">{c.label}</span>
+              <span className="block text-[11px]">
+                {c.kind === 'toggle'
+                  ? <span className="text-[var(--color-dk-gray)]">Yes on {c.now} of {c.filed} day{c.filed === 1 ? '' : 's'}</span>
+                  : <Change now={c.now} before={c.before} format={c.kind === 'dollar' ? money : undefined} />}
+              </span>
+            </span>
+            <span className="text-lg font-bold text-[var(--color-charcoal)]">
+              {c.kind === 'toggle' ? `${c.now}/${c.filed}` : c.kind === 'dollar' ? money(c.now) : c.kind === 'number' ? Math.round(c.now * 100) / 100 : c.now}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  )
+}
+
 // --- CDR ----------------------------------------------------------------------
 
 export function CdrSection({ summary, title, collapsible }: { summary: CdrSummary; title: string; collapsible?: boolean }) {
@@ -126,9 +154,9 @@ export function CdrSection({ summary, title, collapsible }: { summary: CdrSummar
       ) : (
         <>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Stat accent="coral" icon={<UserPlus className="size-4" />} label="New leads" value={t.newLeads} sub={<Change now={t.newLeads} before={p.newLeads} />} />
+            <Stat accent="coral" icon={<UserPlus className="size-4" />} label={orgFieldLabel('edr', 'enrollment', 'newLeads', 'New leads')} value={t.newLeads} sub={<Change now={t.newLeads} before={p.newLeads} />} />
             <Stat accent="sky" icon={<Phone className="size-4" />} label="IKS calls · texts" value={`${t.iksCalls} · ${t.textsSent}`} sub={<Change now={t.iksCalls + t.textsSent} before={p.iksCalls + p.textsSent} />} />
-            <Stat accent="yellow" icon={<CalendarCheck className="size-4" />} label="Tours completed" value={t.toursDone} sub={<span className="text-[var(--color-dk-gray)]">{t.toursScheduled} newly scheduled</span>} />
+            <Stat accent="yellow" icon={<CalendarCheck className="size-4" />} label={orgFieldLabel('edr', 'enrollment', 'toursDone', 'Tours completed')} value={t.toursDone} sub={<span className="text-[var(--color-dk-gray)]">{t.toursScheduled} newly scheduled</span>} />
             <Stat
               accent={t.closingDone < t.filed ? 'coral' : 'gray'}
               icon={<Briefcase className="size-4" />}
@@ -143,10 +171,10 @@ export function CdrSection({ summary, title, collapsible }: { summary: CdrSummar
               <p className="text-[11px] font-bold uppercase tracking-[0.13em] text-[var(--color-dk-gray)]">Hiring pipeline</p>
               <div className="mt-3 grid grid-cols-4 gap-2 text-center">
                 {[
-                  ['Applicants', t.applicants],
-                  ['Phone screens', t.phoneScreens],
-                  ['Interviews', t.interviews],
-                  ['Onboarded', t.onboarded],
+                  [orgFieldLabel('edr', 'hiring', 'applicants', 'Applicants'), t.applicants],
+                  [orgFieldLabel('edr', 'hiring', 'phoneScreens', 'Phone screens'), t.phoneScreens],
+                  [orgFieldLabel('edr', 'hiring', 'interviews', 'Interviews'), t.interviews],
+                  [orgFieldLabel('edr', 'hiring', 'onboarded', 'Onboarded'), t.onboarded],
                 ].map(([label, n]) => (
                   <div key={label} className="rounded-lg bg-[var(--color-secondary)] px-1 py-2.5">
                     <div className="text-2xl font-extrabold text-[var(--color-charcoal)]">{n}</div>
@@ -155,9 +183,9 @@ export function CdrSection({ summary, title, collapsible }: { summary: CdrSummar
                 ))}
               </div>
               <div className="mt-3 border-t border-[var(--color-border)] pt-2">
-                <Figure label="Emails answered" value={t.emails} />
-                <Figure label="Voicemails returned" value={t.voicemails} />
-                <Figure label="Facebook posts & events" value={t.socialPosts} />
+                <Figure label={orgFieldLabel('edr', 'communication', 'emails', 'Emails answered')} value={t.emails} />
+                <Figure label={orgFieldLabel('edr', 'communication', 'voicemails', 'Voicemails returned')} value={t.voicemails} />
+                <Figure label={orgFieldLabel('edr', 'social', 'posts', 'Facebook posts & events')} value={t.socialPosts} />
               </div>
             </Card>
 
@@ -177,6 +205,8 @@ export function CdrSection({ summary, title, collapsible }: { summary: CdrSummar
               )}
             </Card>
           </div>
+
+          <CustomCard title="More from the CDR" items={summary.custom} />
 
           {multi && (
             <Card className="overflow-x-auto p-0">
@@ -226,10 +256,10 @@ export function AdrSection({ summary, collapsible }: { summary: AdrSummary; coll
       ) : (
         <>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Stat accent="yellow" icon={<Ticket className="size-4" />} label="Inquiries" value={t.inquiries} sub={<Change now={t.inquiries} before={p.inquiries} />} />
+            <Stat accent="yellow" icon={<Ticket className="size-4" />} label={orgFieldLabel('adr', 'inquiries', 'total', 'Inquiries')} value={t.inquiries} sub={<Change now={t.inquiries} before={p.inquiries} />} />
             <Stat accent="sky" icon={<CalendarCheck className="size-4" />} label="Tours given" value={t.toursGiven} sub={<span className="text-[var(--color-dk-gray)]">{t.toursScheduled} scheduled</span>} />
             <Stat accent="coral" icon={<DollarSign className="size-4" />} label="Reg fees paid" value={t.regFees} sub={<span className="text-[var(--color-good)]">{money(t.regFeesAmt)} collected</span>} />
-            <Stat accent="gray" icon={<UserPlus className="size-4" />} label="New enrollments" value={t.newEnrollments} sub={<Change now={t.newEnrollments} before={p.newEnrollments} />} />
+            <Stat accent="gray" icon={<UserPlus className="size-4" />} label={orgFieldLabel('adr', 'conversion', 'newEnrollments', 'New enrollments')} value={t.newEnrollments} sub={<Change now={t.newEnrollments} before={p.newEnrollments} />} />
           </div>
 
           <div className="grid items-start gap-4 lg:grid-cols-2">
@@ -239,10 +269,10 @@ export function AdrSection({ summary, collapsible }: { summary: AdrSummary; coll
               </p>
               {pipe && (
                 <div className="mt-2">
-                  <Figure label="Active leads" value={pipe.activeLeads} strong />
-                  <Figure label="Tours pending" value={pipe.toursPending} />
-                  <Figure label="Waitlist" value={pipe.waitlist} />
-                  <Figure label="Follow-ups outstanding" value={pipe.followUps} />
+                  <Figure label={orgFieldLabel('adr', 'pipeline', 'activeLeads', 'Active leads')} value={pipe.activeLeads} strong />
+                  <Figure label={orgFieldLabel('adr', 'pipeline', 'toursPending', 'Tours pending')} value={pipe.toursPending} />
+                  <Figure label={orgFieldLabel('adr', 'pipeline', 'waitlist', 'Waitlist')} value={pipe.waitlist} />
+                  <Figure label={orgFieldLabel('adr', 'attrition', 'followUps', 'Follow-ups outstanding')} value={pipe.followUps} />
                 </div>
               )}
             </Card>
@@ -251,12 +281,14 @@ export function AdrSection({ summary, collapsible }: { summary: AdrSummary; coll
                 <Megaphone className="size-3.5" /> Outreach & attrition
               </p>
               <div className="mt-2">
-                <Figure label="Locations visited" value={t.locationsVisited} />
-                <Figure label="Flyers distributed" value={t.flyers} />
-                <Figure label="Withdrawals logged" value={t.withdrawals} />
+                <Figure label={orgFieldLabel('adr', 'outreach', 'locationsVisited', 'Locations visited')} value={t.locationsVisited} />
+                <Figure label={orgFieldLabel('adr', 'outreach', 'flyersDistributed', 'Flyers distributed')} value={t.flyers} />
+                <Figure label={orgFieldLabel('adr', 'attrition', 'withdrawals', 'Withdrawals logged')} value={t.withdrawals} />
               </div>
             </Card>
           </div>
+
+          <CustomCard title="More from the ADR" items={summary.custom} />
         </>
       )}
     </ReportSection>

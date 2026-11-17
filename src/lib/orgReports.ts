@@ -49,8 +49,9 @@ export function emptyOrgReport(def: OrgReportDef, date: string, uid = '', siteId
   const now = new Date().toISOString()
   const data: Record<string, Record<string, OrgFieldValue>> = {}
   for (const s of def.sections) {
+    if (s.retired) continue
     data[s.key] = {}
-    for (const f of s.fields) data[s.key][f.key] = seedFor(f.kind)
+    for (const f of s.fields) if (!f.retired) data[s.key][f.key] = seedFor(f.kind)
     if (s.note) data[s.key].note = ''
   }
   return {

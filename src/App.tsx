@@ -4,6 +4,7 @@ import { AuthProvider } from '@/auth/AuthProvider'
 import { RequireAuth } from '@/auth/RequireAuth'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { AppShell } from '@/components/AppShell'
+import { SettingsGate } from '@/components/SettingsGate'
 import { InstallPrompt } from '@/components/InstallPrompt'
 import { Login } from '@/pages/Login'
 import { SetPassword } from '@/pages/SetPassword'
@@ -15,6 +16,7 @@ const DayNotes = lazy(() => import('@/pages/DayNotes').then((m) => ({ default: m
 const RollCall = lazy(() => import('@/pages/RollCall').then((m) => ({ default: m.RollCall })))
 const FinanceReport = lazy(() => import('@/pages/FinanceReport').then((m) => ({ default: m.FinanceReport })))
 const OrgReport = lazy(() => import('@/pages/OrgReport').then((m) => ({ default: m.OrgReport })))
+const Customize = lazy(() => import('@/pages/Customize').then((m) => ({ default: m.Customize })))
 
 function PageLoader() {
   return (
@@ -35,7 +37,9 @@ export default function App() {
             <Route
               element={
                 <RequireAuth>
-                  <AppShell />
+                  <SettingsGate>
+                    <AppShell />
+                  </SettingsGate>
                 </RequireAuth>
               }
             >
@@ -85,6 +89,16 @@ export default function App() {
                   <Suspense fallback={<PageLoader />}>
                     <OrgReport />
                   </Suspense>
+                }
+              />
+              <Route
+                path="/customize"
+                element={
+                  <RequireAuth adminOnly>
+                    <Suspense fallback={<PageLoader />}>
+                      <Customize />
+                    </Suspense>
+                  </RequireAuth>
                 }
               />
             </Route>

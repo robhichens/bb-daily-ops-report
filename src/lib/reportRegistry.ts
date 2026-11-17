@@ -139,3 +139,9 @@ const CDR: OrgReportDef = {
 }
 
 export const ORG_DEFS: Partial<Record<'adr' | 'mdr' | 'edr', OrgReportDef>> = { adr: ADR, edr: CDR }
+
+/** A report field's current label (it can be renamed on the Customize page), for
+ *  the dashboard cards that show a built-in field. */
+export function orgFieldLabel(report: 'adr' | 'edr', section: string, key: string, fallback: string): string {
+  return ORG_DEFS[report]?.sections.find((s) => s.key === section)?.fields.find((f) => f.key === key)?.label || fallback
+}

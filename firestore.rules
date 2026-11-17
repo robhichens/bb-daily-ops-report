@@ -55,6 +55,14 @@ service cloud.firestore {
       allow write: if isSignedIn() && role() == 'admin';
     }
 
+    // Customize page settings (src/lib/appConfigStore.ts): rooms, ratios, lists
+    // and the ADR/CDR fields. Every DOR role reads them (forms + dashboard need
+    // them); only admins (Kathe, Molly, Rob) save — current doc + version history.
+    match /appConfig/{document=**} {
+      allow read: if isSignedIn() && role() in ['admin', 'director', 'co_director', 'finance', 'admissions'];
+      allow write: if isSignedIn() && role() == 'admin';
+    }
+
     // Report data docs — admins, plus anyone granted access to that report.
     match /financeReports/{id} {
       allow read: if isSignedIn() && canViewReport('fdr');

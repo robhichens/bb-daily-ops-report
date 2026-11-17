@@ -4,6 +4,8 @@
 // fetches the period + the prior equal-length period and passes both in.
 // Like the DDR dashboard, only SUBMITTED reports count.
 
+import { isBuiltInField, type EditableReport } from './appConfig'
+import { ORG_DEFS } from './reportRegistry'
 import {
   SITES,
   sumLines,
@@ -30,6 +32,41 @@ function listCount(v: OrgFieldValue | undefined): number {
 }
 
 const field = (r: OrgReport, section: string, key: string) => r.data?.[section]?.[key]
+
+// --- Fields added on the Customize page ----------------------------------------
+
+/** One custom field's period total, for the dashboard's "More from the …" card. */
+export interface CustomTotal {
+  key: string // `${section}.${field}`
+  label: string
+  section: string
+  kind: 'count' | 'dollar' | 'number' | 'toggle' | 'list'
+  now: number
+  before: number
+  /** Toggle: days filed in the period ("4 of 5 days"). */
+  filed: number
+}
+
+/** Totals for the live custom fields of a report (numbers summed, Yes days
+ *  counted, list rows counted). Built-in fields have their own cards. */
+export function customTotals(report: EditableReport, cur: OrgReport[], prev: OrgReport[]): CustomTotal[] {
+  const def = ORG_DEFS[report]
+  if (!def) return []
+  const out: CustomTotal[] = []
+  for (const s of def.sections) {
+    if (s.retired || s.matrix) continue
+    for (const f of s.fields) {
+      if (f.retired || f.kind === 'text' || isBuiltInField(report, s.key, f.key)) continue
+      const kind = f.kind as CustomTotal['kind']
+      const total = (rows: OrgReport[]) => rows.reduce((n, r) => {
+        const v = field(r, s.key, f.key)
+        return n + (kind === 'toggle' ? (v === true ? 1 : 0) : kind === 'list' ? listCount(v) : num(v))
+      }, 0)
+      out.push({ key: `${s.key}.${f.key}`, label: f.label || s.title, section: s.title, kind, now: total(cur), before: total(prev), filed: cur.length })
+    }
+  }
+  return out
+}
 
 // --- CDR (Co-Director Daily Report) — one doc per campus per day -------------
 
@@ -66,6 +103,7 @@ export interface CdrSummary {
   total: CdrStats
   prevTotal: CdrStats
   closingMisses: ClosingMiss[]
+  custom: CustomTotal[]
 }
 
 const emptyCdr = (): CdrStats => ({
@@ -116,7 +154,7 @@ export function cdrSummary(rows: OrgReport[], prevRows: OrgReport[], scope: Site
       reason: String(field(r, 'facility', 'reason') ?? '').trim(),
     }))
 
-  return { bySite, total: sumCdr(cur), prevTotal: sumCdr(prev), closingMisses }
+  return { bySite, total: sumCdr(cur), prevTotal: sumCdr(prev), closingMisses, custom: customTotals('edr', cur, prev) }
 }
 
 // --- ADR (Admissions Daily Report) — one org-wide doc per day ----------------
@@ -147,6 +185,7 @@ export interface AdrSummary {
   prevTotal: AdrStats
   /** Snapshot numbers from the latest report in the period (they don't add up across days). */
   pipeline: AdrPipeline | null
+  custom: CustomTotal[]
 }
 
 function sumAdr(rows: OrgReport[]): AdrStats {
@@ -173,6 +212,7 @@ export function adrSummary(rows: OrgReport[], prevRows: OrgReport[]): AdrSummary
   const cur = submitted(rows)
   const latest = [...cur].sort(byDateDesc)[0]
   return {
+    custom: customTotals('adr', cur, submitted(prevRows)),
     total: sumAdr(cur),
     prevTotal: sumAdr(submitted(prevRows)),
     pipeline: latest

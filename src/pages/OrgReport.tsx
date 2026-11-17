@@ -213,7 +213,7 @@ function OrgForm({
         )}
       </Card>
 
-      {def.sections.map((s) => (
+      {def.sections.filter((s) => !s.retired).map((s) => (
         <SectionCard key={s.key} def={def} section={s} draft={draft} locked={locked} setField={setField} patchSection={patchSection} />
       ))}
 
@@ -229,7 +229,7 @@ function OrgForm({
   )
 }
 
-function SectionCard({
+export function SectionCard({
   def, section, draft, locked, setField, patchSection,
 }: {
   def: OrgReportDef
@@ -241,7 +241,7 @@ function SectionCard({
 }) {
   const vals = draft.data[section.key] ?? {}
   // Conditional fields (e.g. a "reason" shown only when a toggle is No).
-  const visible = section.fields.filter((f) => !f.showWhen || vals[f.showWhen.key] === f.showWhen.equals)
+  const visible = section.fields.filter((f) => !f.retired && (!f.showWhen || vals[f.showWhen.key] === f.showWhen.equals))
 
   // "Copy from last report" for one school's staffing: the newest earlier ADR
   // that has numbers for it, recalculated with the current ratios.

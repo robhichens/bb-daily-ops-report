@@ -26,41 +26,38 @@ export const siteName = (id: SiteId): string =>
 export const siteCapacity = (id: SiteId): number =>
   SITES.find((s) => s.id === id)?.capacity ?? 0;
 
-/** Standard 7-room scheme, identical across all 3 campuses (as of 2026-08-17). */
+/** A classroom. `sites` limits it to some schools (Crozet's Giraffes); leave it
+ *  out for a room every school runs. */
 export interface ClassroomConfig {
   key: string;
   name: string;
   ageGroup: string;
+  sites?: SiteId[];
 }
-export const CLASSROOMS: ClassroomConfig[] = [
+
+/** Every room, in age order. Defaults below; the Customize page (lib/appConfig.ts)
+ *  can rename, re-age, add rooms and choose which schools run each one. These
+ *  arrays are updated IN PLACE when settings load, so importers stay current. */
+export const ROOMS: ClassroomConfig[] = [
   { key: 'lions', name: 'Lions', ageGroup: '0–8mo' },
   { key: 'hippos', name: 'Hippos', ageGroup: '9–16mo' },
   { key: 'elephants', name: 'Elephants', ageGroup: 'Toddlers' },
   { key: 'monkeys', name: 'Monkeys', ageGroup: '2s' },
+  // Rob, 2026-11-13: Crozet's Giraffes is a separate 2s room alongside Monkeys.
+  { key: 'giraffes', name: 'Giraffes', ageGroup: '2s', sites: ['crozet'] },
   { key: 'tigers', name: 'Tigers', ageGroup: 'Early 3s' },
   { key: 'zebras', name: 'Zebras', ageGroup: 'Late 3s/Early 4s' },
   { key: 'cheetahs', name: 'Cheetahs', ageGroup: 'Jr. Kindergarten' },
 ];
 
-/** Rooms one school runs beyond the standard seven (Rob, 2026-11-13: Crozet's
- *  Giraffes is a separate 2s room alongside Monkeys). */
-export const SITE_EXTRA_ROOMS: Partial<Record<SiteId, (ClassroomConfig & { after: string })[]>> = {
-  crozet: [{ key: 'giraffes', name: 'Giraffes', ageGroup: '2s', after: 'monkeys' }],
-};
+/** The rooms every school runs (the standard scheme, 2026-08-17). */
+export const CLASSROOMS: ClassroomConfig[] = ROOMS.filter((r) => !r.sites);
 
-/** Standard rooms with extra rooms slotted in by age (each after its `after` room). */
-function withExtras<T extends ClassroomConfig>(extras: (T & { after: string })[]): (ClassroomConfig | T)[] {
-  return CLASSROOMS.flatMap((c) => [c, ...extras.filter((e) => e.after === c.key)]);
-}
+/** A school's rooms, in age order. */
+export const roomsFor = (site: SiteId): ClassroomConfig[] => ROOMS.filter((r) => !r.sites || r.sites.includes(site));
 
-/** A school's rooms: the standard seven plus any of its own, in age order. */
-export const roomsFor = (site: SiteId): ClassroomConfig[] => withExtras(SITE_EXTRA_ROOMS[site] ?? []);
-
-/** Every room at any school, each extra room once and marked with its school
- *  (for grids across schools, e.g. the ADR's Openings to Staff). */
-export const ALL_ROOMS: (ClassroomConfig & { sites?: SiteId[] })[] = withExtras(
-  Object.entries(SITE_EXTRA_ROOMS).flatMap(([site, rooms]) => (rooms ?? []).map((r) => ({ ...r, sites: [site as SiteId] })))
-);
+/** Every room at any school (grids across schools, e.g. the ADR's Openings to Staff). */
+export const ALL_ROOMS = ROOMS;
 
 /** Directors for the autocomplete (as of June 2026). */
 export const DIRECTORS = ['Jacqueline Lang', 'Jess Rybak', 'Laura Baker'];
@@ -89,11 +86,18 @@ export interface CountNote {
 }
 export const emptyCountNote = (): CountNote => ({ count: 0, notes: '', items: [] });
 
-/** Daily target for Enrollment Communication Out / IKS (two-way comms only). Drives the goal pill. */
-export const ENROLLMENT_COMMS_DAILY_GOAL = 10;
+/** Daily target for Enrollment Communication Out / IKS (two-way comms only). Drives the goal pill.
+ *  `let` so the Customize page's setting can replace it (see setNumberSettings). */
+export let ENROLLMENT_COMMS_DAILY_GOAL = 10;
 
 /** Flat registration fee ($). Reg Fees Paid count × this = the dashboard $ figure. */
-export const REGISTRATION_FEE = 200;
+export let REGISTRATION_FEE = 200;
+
+/** Applied from saved settings (lib/appConfig.ts). */
+export function setNumberSettings(n: { registrationFee: number; commsDailyGoal: number }): void {
+  REGISTRATION_FEE = n.registrationFee;
+  ENROLLMENT_COMMS_DAILY_GOAL = n.commsDailyGoal;
+}
 
 // ---------------------------------------------------------------------------
 // Section shapes
@@ -456,6 +460,8 @@ export interface OrgFieldDef {
   /** Render this field only when another field in the same section equals a value
    *  (e.g. a reason text that shows only when a toggle is set to No). */
   showWhen?: { key: string; equals: string | number | boolean };
+  /** Taken off the form (Customize page). Past reports keep and print its value. */
+  retired?: boolean;
 }
 
 /** A row × column number grid (e.g. classrooms × sites). Renders instead of
@@ -531,6 +537,8 @@ export interface OrgSectionDef {
   fields: OrgFieldDef[];
   matrix?: MatrixDef;
   note?: boolean; // append a free-text "Note" field
+  /** Taken off the form (Customize page). Past reports keep and print its values. */
+  retired?: boolean;
 }
 export interface OrgReportDef {
   key: 'adr' | 'mdr' | 'edr';

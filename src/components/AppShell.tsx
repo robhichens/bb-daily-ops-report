@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { ClipboardList, LayoutDashboard, LogOut, HelpCircle, NotebookPen, ChevronDown } from 'lucide-react'
+import { ClipboardList, LayoutDashboard, LogOut, HelpCircle, NotebookPen, ChevronDown, SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/auth/AuthProvider'
 import { NotificationBell } from '@/components/NotificationBell'
@@ -222,6 +222,16 @@ export function AppShell() {
 
             <div className="flex items-center gap-1 border-l border-[var(--color-border)] pl-2 sm:gap-2 sm:pl-4">
               <NotificationBell />
+              {admin && (
+                <NavLink
+                  to="/customize"
+                  title="Customize the DOR"
+                  aria-label="Customize the DOR"
+                  className={({ isActive }) => cn('grid size-9 place-items-center rounded-lg transition-colors', isActive ? 'bg-[var(--color-coral)] text-white' : 'text-[var(--color-dk-gray)] hover:bg-[var(--color-secondary)] hover:text-[var(--color-charcoal)]')}
+                >
+                  <SlidersHorizontal className="size-5" />
+                </NavLink>
+              )}
               <a
                 href="/how-to-use-the-dor.html"
                 target="_blank"

@@ -6,7 +6,7 @@
 import {
   ENROLLMENT_FIELDS, STAFF_FIELDS, SITES, countNoteSummary, matrixCellKey, siteName, staffingKey,
   type DailyOpsReport, type EnrollmentMarketing, type Staff,
-  type FinanceReport, type OrgListItem, type OrgReport, type OrgReportDef, type SiteId,
+  type FinanceReport, type OrgFieldDef, type OrgFieldValue, type OrgListItem, type OrgReport, type OrgReportDef, type SiteId,
   totalBilling, totalOutstanding, subtotalDeposits, totalDeposits,
 } from './schema'
 import { formatLong } from './dates'
@@ -138,9 +138,21 @@ export function buildFdrPrintModel(r: FinanceReport): PrintModel {
 
 // --- ADR / MDR / EDR (config-driven) ----------------------------------------
 
+/** Has this report got an answer for a field? (Retired fields print only then.) */
+function answered(v: OrgFieldValue | undefined, kind: OrgFieldDef['kind']): boolean {
+  if (v === undefined || v === null) return false
+  if (kind === 'toggle') return typeof v === 'boolean'
+  if (Array.isArray(v)) return v.some((it) => Object.values(it).some((x) => String(x ?? '').trim()))
+  return typeof v === 'number' ? v !== 0 : String(v).trim() !== ''
+}
+
 export function buildOrgPrintModel(def: OrgReportDef, r: OrgReport): PrintModel {
   const submitted = r.status === 'submitted'
-  const sections: PrintSection[] = def.sections.map((s) => {
+  // A retired field (or section) leaves the form but still prints on a report that has its answer.
+  const shown = def.sections
+    .map((s) => ({ ...s, fields: s.fields.filter((f) => !f.retired || answered(r.data[s.key]?.[f.key], f.kind)) }))
+    .filter((s) => !s.retired || s.fields.length || String(r.data[s.key]?.note ?? '').trim())
+  const sections: PrintSection[] = shown.map((s) => {
     const vals = r.data[s.key] ?? {}
     const blocks: PrintBlock[] = []
     if (s.matrix) {
