@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 import { CalendarDays } from 'lucide-react'
-import { DIRECTORS, siteName, type SiteConfig, type SiteId } from '@/lib/schema'
+import { DDR_TITLES, DIRECTORS, siteName, type SiteConfig, type SiteId } from '@/lib/schema'
 import { weekdayName } from '@/lib/derive'
 import { Input, inputClass } from '@/components/ui/input'
 import { SectionCard } from './SectionCard'
@@ -29,7 +29,7 @@ export function HeaderSection({
   disabled,
 }: HeaderSectionProps) {
   return (
-    <SectionCard title="Report Details" accent="gray" icon={<CalendarDays className="size-4" />}>
+    <SectionCard title={DDR_TITLES.header} accent="gray" icon={<CalendarDays className="size-4" />}>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Site">
           {sites.length > 1 ? (

@@ -1,5 +1,5 @@
 import { Users } from 'lucide-react'
-import type { Attendance } from '@/lib/schema'
+import { DDR_TITLES, type Attendance } from '@/lib/schema'
 import { totalAttendance } from '@/lib/derive'
 import { SectionCard } from './SectionCard'
 import { NumberField } from './NumberField'
@@ -13,7 +13,7 @@ interface Props {
 export function AttendanceSection({ value, onChange, disabled }: Props) {
   const total = totalAttendance(value.preschool, value.subsidy)
   return (
-    <SectionCard title="Attendance" accent="sky" icon={<Users className="size-4" />}>
+    <SectionCard title={DDR_TITLES.attendance} accent="sky" icon={<Users className="size-4" />}>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:items-end">
         <NumberField
           label="Pre-School"

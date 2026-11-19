@@ -5,7 +5,7 @@
 // Like the DDR dashboard, only SUBMITTED reports count.
 
 import { isBuiltInField, type EditableReport } from './appConfig'
-import { ORG_DEFS } from './reportRegistry'
+import { editableDef } from './reportRegistry'
 import {
   SITES,
   sumLines,
@@ -50,16 +50,20 @@ export interface CustomTotal {
 /** Totals for the live custom fields of a report (numbers summed, Yes days
  *  counted, list rows counted). Built-in fields have their own cards. */
 export function customTotals(report: EditableReport, cur: OrgReport[], prev: OrgReport[]): CustomTotal[] {
-  const def = ORG_DEFS[report]
-  if (!def) return []
+  return customTotalsFrom(report, cur.map((r) => r.data), prev.map((r) => r.data))
+}
+
+/** Same, from each report's answers (`data` on an ADR/CDR, `custom` on a DDR/FDR). */
+export function customTotalsFrom(report: EditableReport, cur: (OrgReport['data'] | undefined)[], prev: (OrgReport['data'] | undefined)[]): CustomTotal[] {
+  const def = editableDef(report)
   const out: CustomTotal[] = []
   for (const s of def.sections) {
     if (s.retired || s.matrix) continue
     for (const f of s.fields) {
       if (f.retired || f.kind === 'text' || isBuiltInField(report, s.key, f.key)) continue
       const kind = f.kind as CustomTotal['kind']
-      const total = (rows: OrgReport[]) => rows.reduce((n, r) => {
-        const v = field(r, s.key, f.key)
+      const total = (rows: (OrgReport['data'] | undefined)[]) => rows.reduce((n, d) => {
+        const v = d?.[s.key]?.[f.key]
         return n + (kind === 'toggle' ? (v === true ? 1 : 0) : kind === 'list' ? listCount(v) : num(v))
       }, 0)
       out.push({ key: `${s.key}.${f.key}`, label: f.label || s.title, section: s.title, kind, now: total(cur), before: total(prev), filed: cur.length })
@@ -258,6 +262,7 @@ export interface FdrSummary {
   prevDeposits: number
   outstandingAsOf: string | null
   declines: DeclineRefundRow[]
+  custom: CustomTotal[]
 }
 
 export function fdrSummary(rows: FinanceReport[], prevRows: FinanceReport[], scope: SiteId[]): FdrSummary {
@@ -315,5 +320,6 @@ export function fdrSummary(rows: FinanceReport[], prevRows: FinanceReport[], sco
     }
   }
 
-  return { filed: cur.length, bySite, total, prevDeposits, outstandingAsOf: latest?.date ?? null, declines }
+  const custom = customTotalsFrom('fdr', cur.map((r) => r.custom), submitted(prevRows).map((r) => r.custom))
+  return { filed: cur.length, bySite, total, prevDeposits, outstandingAsOf: latest?.date ?? null, declines, custom }
 }

@@ -24,15 +24,24 @@
 import {
   ROOMS, CLASSROOMS, ROOM_RATIOS, RATIO_WAIVERS, SITES, DIRECTORS, REQUEST_LISTS,
   REGISTRATION_FEE, ENROLLMENT_COMMS_DAILY_GOAL, setNumberSettings,
-  type FieldKind, type OrgFieldDef, type OrgReportDef, type OrgSectionDef, type OrgSubField,
+  DDR_TITLES, ENROLLMENT_FIELDS, STAFF_FIELDS, FDR_TEXT, FINANCE_AGENCIES,
+  type CountNoteField, type FieldKind, type OrgFieldDef, type OrgReportDef, type OrgSectionDef, type OrgSubField,
   type RequestList, type SiteId,
 } from './schema'
-import { ORG_DEFS } from './reportRegistry'
+import { EXTRA_SECTIONS, ORG_DEFS } from './reportRegistry'
 
 // --- Shape -------------------------------------------------------------------
 
-export type EditableReport = 'adr' | 'edr'
-export const EDITABLE_REPORTS: EditableReport[] = ['edr', 'adr'] // CDR first: it changes most
+/** Reports whose sections the Customize page edits. ADR/CDR are fully config-driven;
+ *  the hand-built DDR/FDR keep their own form and get EXTRA sections added after it
+ *  (no built-in sections in their list), plus renamable wording (see `text`). */
+export type EditableReport = 'adr' | 'edr' | 'ddr' | 'fdr'
+export const EDITABLE_REPORTS: EditableReport[] = ['edr', 'adr', 'ddr', 'fdr'] // CDR first: it changes most
+type OrgEditable = 'adr' | 'edr'
+const ORG_EDITABLE: OrgEditable[] = ['edr', 'adr']
+export type TextReport = 'ddr' | 'fdr'
+const TEXT_REPORTS: TextReport[] = ['ddr', 'fdr']
+export const REPORT_SHORT: Record<EditableReport, string> = { edr: 'CDR', adr: 'ADR', ddr: 'DDR', fdr: 'FDR' }
 
 export interface SiteSetting { id: SiteId; name: string; capacity: number; waiver: number }
 export interface RoomSetting { key: string; name: string; ageGroup: string; ratio: number; sites: SiteId[] }
@@ -40,6 +49,16 @@ export interface ListColumn { key: string; label: string; type: 'text' | 'select
 export interface FieldSetting { key: string; label: string; kind: FieldKind; subFields?: ListColumn[]; retired?: boolean }
 export interface SectionSetting { key: string; title: string; hint?: string; note?: boolean; retired?: boolean; fields: FieldSetting[] }
 export interface ReportSetting { sections: SectionSetting[] }
+/** A piece of the hand-built DDR/FDR's wording. Keys are fixed by the code. */
+export interface TextSetting {
+  key: string
+  /** Which part of the form it belongs to, for grouping on the Customize page. */
+  group: string
+  label: string
+  hint?: string
+  /** A dropdown inside the row (e.g. Call / Email / Web / Walk-in). */
+  choices?: string[]
+}
 
 export interface DorConfig {
   sites: SiteSetting[]
@@ -48,6 +67,10 @@ export interface DorConfig {
   requestLists: { id: RequestList; label: string; short: string }[]
   numbers: { registrationFee: number; commsDailyGoal: number }
   reports: Record<EditableReport, ReportSetting>
+  /** DDR/FDR wording: headings, row labels, hints, dropdown choices. */
+  text: Record<TextReport, TextSetting[]>
+  /** Suggestions for the FDR's Payment by Agency (free-type still allowed). */
+  agencies: string[]
 }
 
 /** Field types a custom field can be (the form already knows how to draw each). */
@@ -74,6 +97,30 @@ function sectionToSetting(s: OrgSectionDef): SectionSetting {
 
 const allSiteIds = () => SITES.map((s) => s.id)
 
+/** A DDR row's dropdown that admins may re-choice: only "Type"-style selects nothing
+ *  else depends on (the Call-out/Late select drives a hidden field, so it's left out). */
+const typeSelect = (f: CountNoteField) => f.itemFields?.find((x) => x.key === 'type' && x.type === 'select')
+
+function ddrText(): TextSetting[] {
+  const titles: TextSetting[] = (Object.keys(DDR_TITLES) as (keyof typeof DDR_TITLES)[])
+    .map((k) => ({ key: `title.${k}`, group: 'Section headings', label: DDR_TITLES[k] }))
+  const rows = (fields: CountNoteField[], group: string): TextSetting[] => fields.map((f) => {
+    const t: TextSetting = { key: f.key, group, label: f.label }
+    if (f.hint) t.hint = f.hint
+    const sel = typeSelect(f)
+    if (sel?.options) t.choices = [...sel.options]
+    return t
+  })
+  return [...titles, ...rows(ENROLLMENT_FIELDS, 'Enrollment / Marketing rows'), ...rows(STAFF_FIELDS, 'Staff rows')]
+}
+
+const FDR_BILLING_KEYS = ['billing', 'tuitionCharges', 'otherCharges', 'credits', 'outstanding']
+function fdrText(): TextSetting[] {
+  return Object.entries(FDR_TEXT).map(([key, v]) => ({
+    key, group: FDR_BILLING_KEYS.includes(key) ? 'Billing' : 'Deposits', label: v.label, ...(v.hint ? { hint: v.hint } : {}),
+  }))
+}
+
 function buildDefaults(): DorConfig {
   return clone({
     sites: SITES.map((s) => ({ id: s.id, name: s.name, capacity: s.capacity, waiver: RATIO_WAIVERS[s.id] ?? 0 })),
@@ -84,7 +131,11 @@ function buildDefaults(): DorConfig {
     reports: {
       adr: { sections: ORG_DEFS.adr!.sections.map(sectionToSetting) },
       edr: { sections: ORG_DEFS.edr!.sections.map(sectionToSetting) },
+      ddr: { sections: [] },
+      fdr: { sections: [] },
     },
+    text: { ddr: ddrText(), fdr: fdrText() },
+    agencies: [...FINANCE_AGENCIES],
   })
 }
 
@@ -94,6 +145,8 @@ const DEFAULTS: DorConfig = buildDefaults()
 const DEFAULT_SECTIONS: Record<EditableReport, OrgSectionDef[]> = {
   adr: clone(ORG_DEFS.adr!.sections),
   edr: clone(ORG_DEFS.edr!.sections),
+  ddr: [],
+  fdr: [],
 }
 
 export const defaultConfig = (): DorConfig => clone(DEFAULTS)
@@ -280,11 +333,33 @@ export function normalizeConfig(saved: unknown): DorConfig {
   })
   const n = isObj(s.numbers) ? s.numbers : {}
   const reports = isObj(s.reports) ? s.reports : {}
+  const text = isObj(s.text) ? s.text : {}
   return {
     sites, rooms, directors, requestLists,
     numbers: { registrationFee: nonNeg(n.registrationFee, d.numbers.registrationFee), commsDailyGoal: nonNeg(n.commsDailyGoal, d.numbers.commsDailyGoal) },
-    reports: { adr: normalizeReport('adr', reports.adr), edr: normalizeReport('edr', reports.edr) },
+    reports: {
+      adr: normalizeReport('adr', reports.adr), edr: normalizeReport('edr', reports.edr),
+      ddr: normalizeReport('ddr', reports.ddr), fdr: normalizeReport('fdr', reports.fdr),
+    },
+    text: { ddr: normalizeText(d.text.ddr, text.ddr), fdr: normalizeText(d.text.fdr, text.fdr) },
+    agencies: Array.isArray(s.agencies) ? cleanChoices(s.agencies) : [...d.agencies],
   }
+}
+
+const cleanChoices = (v: unknown[]): string[] =>
+  [...new Set(v.filter((x): x is string => typeof x === 'string').map((x) => x.trim()).filter(Boolean))]
+
+/** Wording: the code decides which pieces exist (keys, order, groups); the saved copy
+ *  only supplies the words. Choices are kept only where the code has a dropdown. */
+function normalizeText(defaults: TextSetting[], saved: unknown): TextSetting[] {
+  const list = Array.isArray(saved) ? saved.filter(isObj) : []
+  return defaults.map((def) => {
+    const x = list.find((v) => v.key === def.key)
+    const out: TextSetting = { ...clone(def), label: str(x?.label, def.label) }
+    if (x && 'hint' in x) { const h = optStr(x.hint); if (h) out.hint = h; else delete out.hint }
+    if (def.choices && Array.isArray(x?.choices)) { const c = cleanChoices(x.choices); if (c.length) out.choices = c }
+    return out
+  })
 }
 
 // --- Check before saving ------------------------------------------------------------
@@ -307,8 +382,14 @@ export function validateConfig(c: DorConfig): string[] {
   for (const s of c.sites) if (!c.rooms.some((r) => r.sites.includes(s.id))) p.push(`${s.name} has no rooms ticked.`)
   for (const l of c.requestLists) if (!l.label.trim() || !l.short.trim()) p.push('Each Buy/Fix list needs a name and a short button label.')
 
+  for (const tr of TEXT_REPORTS) {
+    for (const t of c.text[tr]) {
+      if (!t.label.trim()) p.push(`${REPORT_SHORT[tr]}: every heading and row needs a name.`)
+      if (t.choices && !t.choices.length) p.push(`${REPORT_SHORT[tr]} “${t.label}”: the dropdown needs at least one choice.`)
+    }
+  }
   for (const rk of EDITABLE_REPORTS) {
-    const rname = rk === 'edr' ? 'CDR' : 'ADR'
+    const rname = REPORT_SHORT[rk]
     for (const sec of c.reports[rk].sections) {
       if (!sec.title.trim()) p.push(`${rname}: a section has no title.`)
       const live = sec.fields.filter((f) => !f.retired)
@@ -379,10 +460,36 @@ export function applyConfig(c: DorConfig): void {
     const list = REQUEST_LISTS.find((x) => x.id === l.id)
     if (list) { list.label = l.label; list.short = l.short }
   }
+  // Wording before numbers: setNumberSettings keeps the comms hint's goal in step.
+  applyText(c.text)
   setNumberSettings(c.numbers)
-  for (const r of EDITABLE_REPORTS) {
+  for (const r of ORG_EDITABLE) {
     const def = ORG_DEFS[r] as OrgReportDef
     def.sections = toOrgSections(r, c.reports[r])
+  }
+  for (const r of TEXT_REPORTS) EXTRA_SECTIONS[r].splice(0, EXTRA_SECTIONS[r].length, ...toOrgSections(r, c.reports[r]))
+  FINANCE_AGENCIES.splice(0, FINANCE_AGENCIES.length, ...c.agencies)
+}
+
+function applyText(text: DorConfig['text']): void {
+  for (const t of text.ddr) {
+    if (t.key.startsWith('title.')) {
+      const k = t.key.slice(6) as keyof typeof DDR_TITLES
+      if (k in DDR_TITLES) DDR_TITLES[k] = t.label
+      continue
+    }
+    const f = ENROLLMENT_FIELDS.find((x) => x.key === t.key) ?? STAFF_FIELDS.find((x) => x.key === t.key)
+    if (!f) continue
+    f.label = t.label
+    if (t.hint) f.hint = t.hint; else delete f.hint
+    const sel = typeSelect(f)
+    if (sel && t.choices?.length) sel.options = [...t.choices]
+  }
+  for (const t of text.fdr) {
+    const v = FDR_TEXT[t.key]
+    if (!v) continue
+    v.label = t.label
+    if (t.hint) v.hint = t.hint; else delete v.hint
   }
 }
 
@@ -414,8 +521,18 @@ export function describeChanges(before: DorConfig, after: DorConfig): string[] {
   }
   if (before.numbers.registrationFee !== after.numbers.registrationFee) out.push(`Registration fee $${before.numbers.registrationFee} → $${after.numbers.registrationFee}`)
   if (before.numbers.commsDailyGoal !== after.numbers.commsDailyGoal) out.push(`Daily enrollment comms goal ${before.numbers.commsDailyGoal} → ${after.numbers.commsDailyGoal}`)
+  for (const tr of TEXT_REPORTS) {
+    for (const t of after.text[tr]) {
+      const b = before.text[tr].find((x) => x.key === t.key)
+      if (!b) continue
+      if (b.label !== t.label) out.push(`${REPORT_SHORT[tr]}: “${b.label}” → “${t.label}”`)
+      if ((b.hint ?? '') !== (t.hint ?? '')) out.push(`${REPORT_SHORT[tr]} ${t.label}: hint changed`)
+      if ((b.choices ?? []).join('|') !== (t.choices ?? []).join('|')) out.push(`${REPORT_SHORT[tr]} ${t.label}: choices → ${(t.choices ?? []).join(', ')}`)
+    }
+  }
+  if (before.agencies.join('|') !== after.agencies.join('|')) out.push(`FDR agencies → ${after.agencies.join(', ') || '(none)'}`)
   for (const rk of EDITABLE_REPORTS) {
-    const rname = rk === 'edr' ? 'CDR' : 'ADR'
+    const rname = REPORT_SHORT[rk]
     const bs = before.reports[rk].sections
     for (const s of after.reports[rk].sections) {
       const b = bs.find((x) => x.key === s.key)

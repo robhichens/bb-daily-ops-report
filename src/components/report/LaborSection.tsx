@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Clock, Plus, X } from 'lucide-react'
-import type { Labor, OvertimeEntry } from '@/lib/schema'
+import { DDR_TITLES, type Labor, type OvertimeEntry } from '@/lib/schema'
 import { totalOvertime } from '@/lib/derive'
 import { SectionCard } from './SectionCard'
 import { NumberField } from './NumberField'
@@ -30,7 +30,7 @@ export function LaborSection({ value, onChange, disabled }: Props) {
   }
 
   return (
-    <SectionCard title="Labor" accent="gray" icon={<Clock className="size-4" />}>
+    <SectionCard title={DDR_TITLES.labor} accent="gray" icon={<Clock className="size-4" />}>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:items-end">
         <NumberField
           label="Total Labor Hours"

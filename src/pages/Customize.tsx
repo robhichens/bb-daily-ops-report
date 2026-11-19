@@ -6,10 +6,10 @@ import { useAuth } from '@/auth/AuthProvider'
 import {
   CUSTOM_KINDS, defaultConfig, describeChanges, finalizeKeys, isBuiltInColumn, isBuiltInField,
   isBuiltInSection, isConditionalField, isGridSection, kindLabel, makeKey, normalizeConfig, toOrgSections, validateConfig,
-  type DorConfig, type EditableReport, type FieldSetting, type ListColumn, type SectionSetting,
+  type DorConfig, type EditableReport, type FieldSetting, type ListColumn, type SectionSetting, type TextReport,
 } from '@/lib/appConfig'
 import { ConfigConflictError, listVersions, loadConfig, saveConfig, type ConfigVersion } from '@/lib/appConfigStore'
-import { ORG_DEFS } from '@/lib/reportRegistry'
+import { editableDef } from '@/lib/reportRegistry'
 import { emptyOrgReport } from '@/lib/orgReports'
 import type { FieldKind, OrgFieldValue, OrgReport as TOrgReport, SiteId } from '@/lib/schema'
 import { Card } from '@/components/ui/card'
@@ -29,9 +29,21 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'lists', label: 'Lists & Numbers' },
   { id: 'edr', label: 'CDR' },
   { id: 'adr', label: 'ADR' },
+  { id: 'ddr', label: 'DDR' },
+  { id: 'fdr', label: 'FDR' },
   { id: 'history', label: 'History' },
 ]
-const REPORT_NAME: Record<EditableReport, string> = { edr: 'Co-Director Daily Report (CDR)', adr: 'Admissions Daily Report (ADR)' }
+const REPORT_NAME: Record<EditableReport, string> = {
+  edr: 'Co-Director Daily Report (CDR)',
+  adr: 'Admissions Daily Report (ADR)',
+  ddr: 'Director Daily Report (DDR)',
+  fdr: 'Finance Daily Report (FDR)',
+}
+/** Where the DDR/FDR's added sections appear on the form. */
+const EXTRA_PLACE: Record<TextReport, string> = {
+  ddr: 'after Director Packet, before the Director Report on the Day',
+  fdr: 'after Deposits, once per day (add a Campus column to a list if it’s per school)',
+}
 
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x)) as T
 type Edit = (fn: (d: DorConfig) => void) => void
@@ -125,6 +137,12 @@ export function Customize() {
       {tab === 'schools' && <SchoolsTab draft={draft} edit={edit} saved={base.config} />}
       {tab === 'lists' && <ListsTab draft={draft} edit={edit} />}
       {(tab === 'edr' || tab === 'adr') && <ReportTab r={tab} draft={draft} edit={edit} saved={base.config} />}
+      {(tab === 'ddr' || tab === 'fdr') && (
+        <div className="space-y-8">
+          <WordingTab r={tab} draft={draft} edit={edit} />
+          <ReportTab r={tab} draft={draft} edit={edit} saved={base.config} />
+        </div>
+      )}
       {tab === 'history' && (
         <HistoryTab
           current={base.version}
@@ -348,18 +366,31 @@ function ReportTab({ r, draft, edit, saved }: { r: EditableReport; draft: DorCon
   const savedSections = saved.reports[r].sections
   const savedField = (sk: string, fk: string) => savedSections.find((s) => s.key === sk)?.fields.find((f) => f.key === fk)
   const allSectionKeys = sections.map((s) => s.key)
+  const extras = r === 'ddr' || r === 'fdr'
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-2xl text-sm text-[var(--color-dk-gray)]">
-          {REPORT_NAME[r]}. Rename anything. Fields marked <Badge tone="lock"><Lock className="size-2.5" /> dashboard</Badge> feed the dashboard, so they can be renamed and moved but not removed. Fields you add get their own dashboard line.
-        </p>
-        <Button size="sm" variant="outline" onClick={() => setPreview((p) => !p)}>{preview ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />} {preview ? 'Hide preview' : 'Preview the form'}</Button>
+        {extras ? (
+          <div className="max-w-2xl">
+            <h2 className="text-sm font-extrabold uppercase tracking-[0.14em] text-[var(--color-charcoal)]">Your added sections</h2>
+            <p className="mt-0.5 text-sm text-[var(--color-dk-gray)]">
+              New things to track on the {REPORT_SHORT_NAME[r]}. They appear {EXTRA_PLACE[r]}, print with the report, and each number, yes/no or list gets its own line on the dashboard.
+            </p>
+          </div>
+        ) : (
+          <p className="max-w-2xl text-sm text-[var(--color-dk-gray)]">
+            {REPORT_NAME[r]}. Rename anything. Fields marked <Badge tone="lock"><Lock className="size-2.5" /> dashboard</Badge> feed the dashboard, so they can be renamed and moved but not removed. Fields you add get their own dashboard line.
+          </p>
+        )}
+        {(!extras || sections.length > 0) && <Button size="sm" variant="outline" onClick={() => setPreview((p) => !p)}>{preview ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />} {preview ? 'Hide preview' : extras ? 'Preview these sections' : 'Preview the form'}</Button>}
       </div>
 
       <div className={cn('grid items-start gap-5', preview && 'xl:grid-cols-2')}>
         <div className="space-y-4">
+          {extras && !sections.length && (
+            <p className="rounded-lg border border-dashed border-[var(--color-border)] px-4 py-3 text-sm text-[var(--color-dk-gray)]">None yet — the {REPORT_SHORT_NAME[r]} is exactly as built. Add a section to start tracking something new.</p>
+          )}
           {sections.map((s, si) => {
             const builtInSec = isBuiltInSection(r, s.key)
             const grid = isGridSection(r, s.key)
@@ -557,7 +588,7 @@ function ChoicesInput({ value, onChange }: { value: string[]; onChange: (v: stri
 
 /** The form as people will see it, from the unsaved settings (try typing in it). */
 function FormPreview({ r, draft }: { r: EditableReport; draft: DorConfig }) {
-  const def = useMemo(() => ({ ...ORG_DEFS[r]!, sections: toOrgSections(r, draft.reports[r]) }), [r, draft])
+  const def = useMemo(() => ({ ...editableDef(r), sections: toOrgSections(r, draft.reports[r]) }), [r, draft])
   const [report, setReport] = useState<TOrgReport>(() => emptyOrgReport(def, '2026-01-05', '', 'crozet'))
   const setField = (section: string, field: string, value: OrgFieldValue) =>
     setReport((p) => ({ ...p, data: { ...p.data, [section]: { ...p.data[section], [field]: value } } }))
@@ -569,6 +600,67 @@ function FormPreview({ r, draft }: { r: EditableReport; draft: DorConfig }) {
       {def.sections.filter((s) => !s.retired).map((s) => (
         <SectionCard key={s.key} def={def} section={s} draft={report} locked={false} setField={setField} patchSection={patchSection} />
       ))}
+    </div>
+  )
+}
+
+// --- DDR / FDR wording ---------------------------------------------------------------------
+
+const REPORT_SHORT_NAME: Record<EditableReport, string> = { edr: 'CDR', adr: 'ADR', ddr: 'DDR', fdr: 'FDR' }
+/** Pieces of the hand-built forms that have no hint line to edit. */
+const NO_HINT = new Set(['billing', 'deposits', 'outstanding', 'paymentsByAgency'])
+
+function WordingTab({ r, draft, edit }: { r: TextReport; draft: DorConfig; edit: Edit }) {
+  const original = useMemo(() => defaultConfig().text[r], [r])
+  const items = draft.text[r]
+  const groups = [...new Set(items.map((t) => t.group))]
+  return (
+    <div className="space-y-4">
+      <div className="max-w-2xl">
+        <h2 className="text-sm font-extrabold uppercase tracking-[0.14em] text-[var(--color-charcoal)]">Wording on the {REPORT_SHORT_NAME[r]}</h2>
+        <p className="mt-0.5 text-sm text-[var(--color-dk-gray)]">
+          {REPORT_NAME[r]}. Rename headings and rows, change their hints and dropdown choices. The form’s layout and math stay as built, and renaming never touches past reports.
+        </p>
+      </div>
+      <div className="grid items-start gap-5 lg:grid-cols-2">
+        {groups.map((g) => (
+          <Panel key={g} title={g}>
+            <div className="divide-y divide-[var(--color-border)]">
+              {items.map((t, i) => {
+                if (t.group !== g) return null
+                const orig = original.find((o) => o.key === t.key)
+                const renamed = !!orig && orig.label !== t.label
+                const hasHint = !t.key.startsWith('title.') && !NO_HINT.has(t.key)
+                return (
+                  <div key={t.key} className="space-y-1.5 py-2.5 first:pt-0 last:pb-0">
+                    <input className={cn(cell, 'w-full font-semibold')} value={t.label} aria-label={`${orig?.label ?? t.key} name`} onChange={(e) => edit((d) => { d.text[r][i].label = e.target.value })} />
+                    {renamed && orig && (
+                      <p className="flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-mid-gray)]">
+                        Originally “{orig.label}”
+                        <button type="button" className="font-semibold text-[var(--color-coral-dark,#c95f5a)] hover:underline" onClick={() => edit((d) => { d.text[r][i].label = orig.label })}>Put it back</button>
+                      </p>
+                    )}
+                    {hasHint && (
+                      <input className={cn(cell, 'w-full text-xs')} value={t.hint ?? ''} placeholder="Hint under it (optional)" aria-label={`${t.label} hint`} onChange={(e) => edit((d) => { d.text[r][i].hint = e.target.value })} />
+                    )}
+                    {t.choices && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-mid-gray)]">Type choices</span>
+                        <ChoicesInput value={t.choices} onChange={(opts) => edit((d) => { d.text[r][i].choices = opts })} />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </Panel>
+        ))}
+        {r === 'fdr' && (
+          <Panel title="Agency choices" hint="Offered under Payment by Agency. Alicia can still type one that isn’t listed.">
+            <ChoicesInput value={draft.agencies} onChange={(opts) => edit((d) => { d.agencies = opts })} />
+          </Panel>
+        )}
+      </div>
     </div>
   )
 }

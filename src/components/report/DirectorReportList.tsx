@@ -3,7 +3,7 @@ import { NotebookPen, Plus, X } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { SectionCard } from './SectionCard'
 import { Composer, Thread } from './NoteThread'
-import type { NoteComment } from '@/lib/schema'
+import { DDR_TITLES, type NoteComment } from '@/lib/schema'
 
 interface Props {
   value: string[]
@@ -33,7 +33,7 @@ export function DirectorReportList({ value, onChange, disabled, commentsFor, vie
 
   return (
     <SectionCard
-      title="Director Report on the Day"
+      title={DDR_TITLES.directorReport}
       accent="coral"
       icon={<NotebookPen className="size-4" />}
       description="Notes, follow-ups, write-ups — one item per line."

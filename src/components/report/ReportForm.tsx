@@ -24,6 +24,7 @@ import { EnrollmentMarketingSection } from './EnrollmentMarketingSection'
 import { StaffSection } from './StaffSection'
 import { DirectorPacketSection } from './DirectorPacketSection'
 import { DirectorReportList } from './DirectorReportList'
+import { ExtraSections } from './ExtraSections'
 import { CelebrationOverlay } from './CelebrationOverlay'
 import { PrintableReport } from './PrintableReport'
 import { buildDdrPrintModel } from '@/lib/printModel'
@@ -246,6 +247,13 @@ export function ReportForm({ siteId, date, isAdmin, sites, uid, onSite, onDate }
         value={draft.directorPacket}
         onChange={(directorPacket) => update({ directorPacket })}
         disabled={locked}
+      />
+      <ExtraSections
+        report="ddr"
+        date={draft.date}
+        data={draft.custom}
+        locked={locked}
+        onChange={(fn) => update((cur) => ({ custom: fn(cur.custom ?? {}) }))}
       />
       <DirectorReportList
         value={draft.directorReport}

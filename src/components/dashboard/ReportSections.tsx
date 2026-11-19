@@ -114,7 +114,7 @@ function Figure({ label, value, strong }: { label: string; value: ReactNode; str
 }
 
 /** Fields added on the Customize page: each one's period total vs the prior period. */
-function CustomCard({ title, items }: { title: string; items: CustomTotal[] }) {
+export function CustomCard({ title, items }: { title: string; items: CustomTotal[] }) {
   if (!items.length) return null
   return (
     <Card className="p-5">
@@ -400,6 +400,7 @@ export function FdrSection({ summary, collapsible }: { summary: FdrSummary; coll
                 </ul>
               )}
             </Card>
+            <CustomCard title="More from the FDR" items={summary.custom} />
         </>
       )}
     </ReportSection>

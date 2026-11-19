@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { ClipboardCheck } from 'lucide-react'
-import type { DirectorPacket } from '@/lib/schema'
+import { DDR_TITLES, type DirectorPacket } from '@/lib/schema'
 import { Textarea } from '@/components/ui/textarea'
 import { SectionCard } from './SectionCard'
 
@@ -12,7 +12,7 @@ interface Props {
 
 export function DirectorPacketSection({ value, onChange, disabled }: Props) {
   return (
-    <SectionCard title="Director Packet" accent="sky" icon={<ClipboardCheck className="size-4" />}>
+    <SectionCard title={DDR_TITLES.packet} accent="sky" icon={<ClipboardCheck className="size-4" />}>
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-sm font-semibold text-[var(--color-charcoal)]">

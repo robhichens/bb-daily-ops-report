@@ -6,7 +6,7 @@ import {
 import { useAuth } from '@/auth/AuthProvider'
 import { reportAccessLevel } from '@/lib/users'
 import {
-  SITES, FINANCE_AGENCIES,
+  SITES, FINANCE_AGENCIES, FDR_TEXT,
   totalBilling, totalOutstanding, subtotalDeposits, totalDeposits,
   emptyFinanceReport,
   type FinanceReport as TFinanceReport, type FinanceLocation, type FinanceLine,
@@ -20,9 +20,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TextField } from '@/components/ui/textarea'
 import { NotesLedger } from '@/components/report/NotesLedger'
+import { ExtraSections, type ExtraData } from '@/components/report/ExtraSections'
 import { PrintableReport, PrintButton } from '@/components/report/PrintableReport'
 import { buildFdrPrintModel } from '@/lib/printModel'
 import { cn } from '@/lib/utils'
+
+/** The current (renamable) wording for a piece of the form. */
+const txt = (k: string) => FDR_TEXT[k] ?? { label: k }
 
 const money = (n: number) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -78,14 +82,11 @@ function FinanceForm({
 
   const locked = readOnly || (!!draft && draft.status === 'submitted' && !editing)
 
-  const setLoc = useCallback((siteId: SiteId, patch: Partial<FinanceLocation>) => {
+  /** Applies a change to the latest draft and autosaves it. */
+  const change = useCallback((fn: (prev: TFinanceReport) => Partial<TFinanceReport>) => {
     setDraft((prev) => {
       if (!prev) return prev
-      const next: TFinanceReport = {
-        ...prev,
-        completedBy: prev.completedBy || author,
-        locations: { ...prev.locations, [siteId]: { ...prev.locations[siteId], ...patch } },
-      }
+      const next: TFinanceReport = { ...prev, completedBy: prev.completedBy || author, ...fn(prev) }
       if (saveTimer.current) clearTimeout(saveTimer.current)
       setSaveState('saving')
       saveTimer.current = setTimeout(async () => {
@@ -94,6 +95,11 @@ function FinanceForm({
       return next
     })
   }, [author])
+
+  const setLoc = useCallback((siteId: SiteId, patch: Partial<FinanceLocation>) =>
+    change((prev) => ({ locations: { ...prev.locations, [siteId]: { ...prev.locations[siteId], ...patch } } })), [change])
+  const setCustom = useCallback((fn: (prev: ExtraData) => ExtraData) =>
+    change((prev) => ({ custom: fn(prev.custom ?? {}) })), [change])
 
   async function handleSubmit() {
     if (!draft) return
@@ -135,7 +141,7 @@ function FinanceForm({
 
       {/* BILLING */}
       <div>
-        <SectionHeader title="Billing" accent="coral" />
+        <SectionHeader title={txt('billing').label} accent="coral" />
         <div className="space-y-2">
           {SITES.map((s) => {
             const loc = draft.locations[s.id]
@@ -150,7 +156,7 @@ function FinanceForm({
 
       {/* DEPOSITS */}
       <div>
-        <SectionHeader title="Deposits" accent="sky" />
+        <SectionHeader title={txt('deposits').label} accent="sky" />
         <div className="space-y-2">
           {SITES.map((s) => {
             const loc = draft.locations[s.id]
@@ -162,6 +168,8 @@ function FinanceForm({
           })}
         </div>
       </div>
+
+      <ExtraSections report="fdr" date={date} data={draft.custom} locked={locked} onChange={setCustom} />
 
       {!locked && (
         <div className="sticky bottom-0 z-10 -mx-4 flex items-center justify-between gap-3 border-t border-[var(--color-border)] bg-[var(--color-cream)]/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
@@ -218,17 +226,17 @@ function LocationPanel({
 function BillingFields({ loc, disabled, onLoc }: { loc: FinanceLocation; disabled: boolean; onLoc: (p: Partial<FinanceLocation>) => void }) {
   return (
     <div className="space-y-5">
-      <LineList label="Tuition Charges" hint="Charged to the Procare ledger (prorate or full)" whoPlaceholder="Who" whatPlaceholder="What for"
+      <LineList label={txt('tuitionCharges').label} hint={txt('tuitionCharges').hint} whoPlaceholder="Who" whatPlaceholder="What for"
         value={loc.tuitionCharges} disabled={disabled} onChange={(tuitionCharges) => onLoc({ tuitionCharges })} />
-      <LineList label="Other Charges" hint="Reg / Enhancement / Late / CC-decline fees" whoPlaceholder="Who" whatPlaceholder="What for"
+      <LineList label={txt('otherCharges').label} hint={txt('otherCharges').hint} whoPlaceholder="Who" whatPlaceholder="What for"
         value={loc.otherCharges} disabled={disabled} onChange={(otherCharges) => onLoc({ otherCharges })} />
-      <LineList label="Credits" hint="Any credits added to the ledger (subtracts from billing)" whoPlaceholder="Who" whatPlaceholder="What for"
+      <LineList label={txt('credits').label} hint={txt('credits').hint} whoPlaceholder="Who" whatPlaceholder="What for"
         value={loc.credits} disabled={disabled} onChange={(credits) => onLoc({ credits })} />
 
       <TotalRow label="Total Billing" value={money(totalBilling(loc))} strong />
 
       <div className="space-y-3 rounded-xl bg-[var(--color-secondary)]/50 p-4">
-        <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-dk-gray)]">Tuition Money Outstanding (as of today)</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-dk-gray)]">{txt('outstanding').label}</p>
         <OutstandingRow label="Current families" value={loc.outstandingCurrent} disabled={disabled}
           onChange={(outstandingCurrent) => onLoc({ outstandingCurrent })} />
         <OutstandingRow label="Former families" value={loc.outstandingFormer} disabled={disabled}
@@ -245,13 +253,13 @@ function DepositFields({ loc, disabled, onLoc }: { loc: FinanceLocation; disable
   const te = loc.tuitionExpress
   return (
     <div className="space-y-5">
-      <LineList label="Payment by Check" whoPlaceholder="Who paid" whatPlaceholder="For what"
+      <LineList label={txt('paymentsByCheck').label} hint={txt('paymentsByCheck').hint} whoPlaceholder="Who paid" whatPlaceholder="For what"
         value={loc.paymentsByCheck} disabled={disabled} onChange={(paymentsByCheck) => onLoc({ paymentsByCheck })} />
-      <AgencyLineList label="Payment by Agency" value={loc.paymentsByAgency} disabled={disabled}
+      <AgencyLineList label={txt('paymentsByAgency').label} value={loc.paymentsByAgency} disabled={disabled}
         onChange={(paymentsByAgency) => onLoc({ paymentsByAgency })} />
 
       <div>
-        <p className="mb-2 text-sm font-bold text-[var(--color-charcoal)]">Tuition Express <span className="font-normal text-[var(--color-dk-gray)]">— daily totals</span></p>
+        <p className="mb-2 text-sm font-bold text-[var(--color-charcoal)]">{txt('tuitionExpress').label}{txt('tuitionExpress').hint && <span className="font-normal text-[var(--color-dk-gray)]"> — {txt('tuitionExpress').hint}</span>}</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <MoneyField label="ACH Batch" value={te.achBatch} disabled={disabled} onChange={(achBatch) => onLoc({ tuitionExpress: { ...te, achBatch } })} />
           <MoneyField label="CC Batch" value={te.ccBatch} disabled={disabled} onChange={(ccBatch) => onLoc({ tuitionExpress: { ...te, ccBatch } })} />
@@ -359,7 +367,7 @@ function DeclineRefundList({
   return (
     <div>
       <p className="mb-1.5 text-sm font-bold text-[var(--color-charcoal)]">
-        Less Declines / Refunds <span className="font-normal text-[var(--color-dk-gray)]">— subtracts from deposits</span>
+        {txt('declinesRefunds').label}{txt('declinesRefunds').hint && <span className="font-normal text-[var(--color-dk-gray)]"> — {txt('declinesRefunds').hint}</span>}
       </p>
       <div className="space-y-2">
         {rows.map((r, i) => (

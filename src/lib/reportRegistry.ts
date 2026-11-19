@@ -12,7 +12,7 @@
 
 import { ClipboardList, Wallet, Ticket, Users } from 'lucide-react'
 import { ADMIN_NOTE_SOURCE, ALL_ROOMS, SITES } from './schema'
-import type { OrgReportDef, OrgSubField, ReportKey } from './schema'
+import type { OrgReportDef, OrgSectionDef, OrgSubField, ReportKey } from './schema'
 
 export interface ReportMeta {
   key: ReportKey
@@ -139,6 +139,23 @@ const CDR: OrgReportDef = {
 }
 
 export const ORG_DEFS: Partial<Record<'adr' | 'mdr' | 'edr', OrgReportDef>> = { adr: ADR, edr: CDR }
+
+/** Sections added to the hand-built DDR and FDR on the Customize page. None in the
+ *  code; filled IN PLACE from saved settings (lib/appConfig.ts). Their answers are
+ *  stored on the report doc under `custom[section][field]`. */
+export const EXTRA_SECTIONS: Record<'ddr' | 'fdr', OrgSectionDef[]> = { ddr: [], fdr: [] }
+
+/** Look and labels for drawing the DDR/FDR extra sections with the generic engine. */
+export const EXTRA_DEFS: Record<'ddr' | 'fdr', OrgReportDef> = {
+  ddr: { key: 'adr', short: 'DDR', title: 'Director Daily Report', accent: 'coral', collection: 'dailyOpsReports', notesCollection: '', sections: EXTRA_SECTIONS.ddr },
+  fdr: { key: 'adr', short: 'FDR', title: 'Finance Daily Report', accent: 'sky', collection: 'financeReports', notesCollection: '', sections: EXTRA_SECTIONS.fdr },
+}
+
+/** The section definitions the Customize page edits for a report: the whole
+ *  ADR/CDR, or the DDR/FDR's extra sections. */
+export function editableDef(r: 'adr' | 'edr' | 'ddr' | 'fdr'): OrgReportDef {
+  return r === 'ddr' || r === 'fdr' ? EXTRA_DEFS[r] : ORG_DEFS[r]!
+}
 
 /** A report field's current label (it can be renamed on the Customize page), for
  *  the dashboard cards that show a built-in field. */

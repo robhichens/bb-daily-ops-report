@@ -4,13 +4,14 @@
 // blank fields (rendered as fillable lines) so a printout can be filled by hand.
 
 import {
-  ENROLLMENT_FIELDS, STAFF_FIELDS, SITES, countNoteSummary, matrixCellKey, siteName, staffingKey,
+  DDR_TITLES, ENROLLMENT_FIELDS, FDR_TEXT, STAFF_FIELDS, SITES, countNoteSummary, matrixCellKey, siteName, staffingKey,
   type DailyOpsReport, type EnrollmentMarketing, type Staff,
-  type FinanceReport, type OrgFieldDef, type OrgFieldValue, type OrgListItem, type OrgReport, type OrgReportDef, type SiteId,
+  type FinanceReport, type OrgFieldDef, type OrgFieldValue, type OrgListItem, type OrgReport, type OrgReportDef, type OrgSectionDef, type SiteId,
   totalBilling, totalOutstanding, subtotalDeposits, totalDeposits,
 } from './schema'
 import { formatLong } from './dates'
 import { weekdayName } from './derive'
+import { EXTRA_SECTIONS } from './reportRegistry'
 
 export interface PrintField { label: string; value?: string }
 export interface PrintTable {
@@ -54,12 +55,12 @@ export function buildDdrPrintModel(r: DailyOpsReport): PrintModel {
       { label: 'Director', value: r.director },
     ],
     sections: [
-      { title: 'Attendance', blocks: [{ kind: 'fields', fields: [
+      { title: DDR_TITLES.attendance, blocks: [{ kind: 'fields', fields: [
         { label: 'Pre-School', value: numStr(r.attendance.preschool) },
         { label: 'Subsidy (DSS, CCA, Foster, United Way)', value: numStr(r.attendance.subsidy) },
         { label: 'Total Attendance', value: numStr(r.attendance.total) },
       ] }] },
-      { title: 'Labor', blocks: [
+      { title: DDR_TITLES.labor, blocks: [
         { kind: 'fields', fields: [
           { label: 'Total Labor Hours', value: numStr(r.labor.totalHours) },
           { label: 'Director Minutes in Rooms', value: numStr(r.labor.directorMinutesInRooms) },
@@ -71,26 +72,27 @@ export function buildDdrPrintModel(r: DailyOpsReport): PrintModel {
           minRows: 4,
         } },
       ] },
-      { title: 'Enrollment / Marketing', blocks: [{ kind: 'table', table: {
+      { title: DDR_TITLES.enrollment, blocks: [{ kind: 'table', table: {
         columns: ['Item', '#', 'Details'],
         rows: ENROLLMENT_FIELDS.map((f) => {
           const c = r.enrollmentMarketing[f.key as keyof EnrollmentMarketing]
           return [f.label, numStr(c.count), c.noneToday ? 'None today (confirmed)' : countNoteSummary(c, f.itemFields)]
         }),
       } }] },
-      { title: 'Staff', blocks: [{ kind: 'table', table: {
+      { title: DDR_TITLES.staff, blocks: [{ kind: 'table', table: {
         columns: ['Item', '#', 'Details'],
         rows: STAFF_FIELDS.map((f) => {
           const c = r.staff[f.key as keyof Staff]
-          const label = f.key === 'timeSpentRecruiting' ? 'Time Spent Recruiting (hrs)' : f.label
+          const label = f.key === 'timeSpentRecruiting' ? `${f.label} (hrs)` : f.label
           return [label, numStr(c.count), countNoteSummary(c, f.itemFields)]
         }),
       } }] },
-      { title: 'Director Packet', blocks: [{ kind: 'fields', fields: [
+      { title: DDR_TITLES.packet, blocks: [{ kind: 'fields', fields: [
         { label: 'Completed today? (Yes / No)', value: filed ? (r.directorPacket.completed ? 'Yes' : 'No') : '' },
         { label: 'If no, what got in the way', value: r.directorPacket.incompleteReason },
       ] }] },
-      { title: 'Director Report on the Day', blocks: [{ kind: 'lines',
+      ...sectionsToPrint(EXTRA_SECTIONS.ddr, r.custom ?? {}, filed),
+      { title: DDR_TITLES.directorReport, blocks: [{ kind: 'lines',
         values: r.directorReport.map((s) => s.trim()).filter(Boolean), minRows: 6 }] },
     ],
   }
@@ -102,10 +104,11 @@ export function buildFdrPrintModel(r: FinanceReport): PrintModel {
   const sections: PrintSection[] = []
   for (const s of SITES) {
     const loc = r.locations[s.id]
-    sections.push({ title: `Billing — ${s.name}`, blocks: [
-      { kind: 'table', table: { columns: ['Tuition Charges — Who', 'What for', 'Amount'], rows: loc.tuitionCharges.map((l) => [l.who, l.what, moneyStr(l.amount)]), minRows: 4 } },
-      { kind: 'table', table: { columns: ['Other Charges — Who', 'What for', 'Amount'], rows: loc.otherCharges.map((l) => [l.who, l.what, moneyStr(l.amount)]), minRows: 3 } },
-      { kind: 'table', table: { columns: ['Credits — Who', 'What for', 'Amount'], rows: loc.credits.map((l) => [l.who, l.what, moneyStr(l.amount)]), minRows: 2 } },
+    const t = (k: string) => FDR_TEXT[k]?.label ?? k
+    sections.push({ title: `${t('billing')} — ${s.name}`, blocks: [
+      { kind: 'table', table: { columns: [`${t('tuitionCharges')} — Who`, 'What for', 'Amount'], rows: loc.tuitionCharges.map((l) => [l.who, l.what, moneyStr(l.amount)]), minRows: 4 } },
+      { kind: 'table', table: { columns: [`${t('otherCharges')} — Who`, 'What for', 'Amount'], rows: loc.otherCharges.map((l) => [l.who, l.what, moneyStr(l.amount)]), minRows: 3 } },
+      { kind: 'table', table: { columns: [`${t('credits')} — Who`, 'What for', 'Amount'], rows: loc.credits.map((l) => [l.who, l.what, moneyStr(l.amount)]), minRows: 2 } },
       { kind: 'fields', fields: [
         { label: 'Total Billing', value: moneyStr(totalBilling(loc)) },
         { label: 'Outstanding — Current families (names)', value: loc.outstandingCurrent.names },
@@ -115,19 +118,20 @@ export function buildFdrPrintModel(r: FinanceReport): PrintModel {
         { label: 'Total Outstanding', value: moneyStr(totalOutstanding(loc)) },
       ] },
     ] })
-    sections.push({ title: `Deposits — ${s.name}`, blocks: [
-      { kind: 'table', table: { columns: ['Check — Who paid', 'For what', 'Amount'], rows: loc.paymentsByCheck.map((l) => [l.who, l.what, moneyStr(l.amount)]), minRows: 4 } },
-      { kind: 'table', table: { columns: ['Agency', 'Parent', 'Child', 'Amount'], rows: loc.paymentsByAgency.map((l) => [l.agency, l.parent, l.child, moneyStr(l.amount)]), minRows: 3 } },
+    sections.push({ title: `${t('deposits')} — ${s.name}`, blocks: [
+      { kind: 'table', table: { columns: [`${t('paymentsByCheck')} — Who paid`, 'For what', 'Amount'], rows: loc.paymentsByCheck.map((l) => [l.who, l.what, moneyStr(l.amount)]), minRows: 4 } },
+      { kind: 'table', table: { label: t('paymentsByAgency'), columns: ['Agency', 'Parent', 'Child', 'Amount'], rows: loc.paymentsByAgency.map((l) => [l.agency, l.parent, l.child, moneyStr(l.amount)]), minRows: 3 } },
       { kind: 'fields', fields: [
-        { label: 'Tuition Express — ACH Batch', value: moneyStr(loc.tuitionExpress.achBatch) },
-        { label: 'Tuition Express — CC Batch', value: moneyStr(loc.tuitionExpress.ccBatch) },
-        { label: 'Tuition Express — CC POS', value: moneyStr(loc.tuitionExpress.ccPos) },
+        { label: `${t('tuitionExpress')} — ACH Batch`, value: moneyStr(loc.tuitionExpress.achBatch) },
+        { label: `${t('tuitionExpress')} — CC Batch`, value: moneyStr(loc.tuitionExpress.ccBatch) },
+        { label: `${t('tuitionExpress')} — CC POS`, value: moneyStr(loc.tuitionExpress.ccPos) },
         { label: 'SubTotal Deposits', value: moneyStr(subtotalDeposits(loc)) },
       ] },
-      { kind: 'table', table: { columns: ['Declines / Refunds — Type', 'Parent', 'Amount'], rows: loc.declinesRefunds.map((d) => [d.type, d.parent, moneyStr(d.amount)]), minRows: 2 } },
+      { kind: 'table', table: { columns: [`${t('declinesRefunds')} — Type`, 'Parent', 'Amount'], rows: loc.declinesRefunds.map((d) => [d.type, d.parent, moneyStr(d.amount)]), minRows: 2 } },
       { kind: 'fields', fields: [{ label: 'Total Deposits', value: moneyStr(totalDeposits(loc)) }] },
     ] })
   }
+  sections.push(...sectionsToPrint(EXTRA_SECTIONS.fdr, r.custom ?? {}, r.status === 'submitted'))
   return {
     reportName: 'Finance Daily Report',
     short: 'FDR',
@@ -147,13 +151,26 @@ function answered(v: OrgFieldValue | undefined, kind: OrgFieldDef['kind']): bool
 }
 
 export function buildOrgPrintModel(def: OrgReportDef, r: OrgReport): PrintModel {
-  const submitted = r.status === 'submitted'
+  return {
+    reportName: def.title,
+    short: def.short,
+    meta: [
+      ...(def.siteScoped && r.siteId ? [{ label: 'Campus', value: siteName(r.siteId) }] : []),
+      ...dateMeta(r.date),
+      { label: 'Completed by', value: r.completedBy },
+    ],
+    sections: sectionsToPrint(def.sections, r.data, r.status === 'submitted'),
+  }
+}
+
+/** Config-driven sections → print sections (ADR/CDR, and the DDR/FDR extras). */
+export function sectionsToPrint(defs: OrgSectionDef[], data: OrgReport['data'], submitted: boolean): PrintSection[] {
   // A retired field (or section) leaves the form but still prints on a report that has its answer.
-  const shown = def.sections
-    .map((s) => ({ ...s, fields: s.fields.filter((f) => !f.retired || answered(r.data[s.key]?.[f.key], f.kind)) }))
-    .filter((s) => !s.retired || s.fields.length || String(r.data[s.key]?.note ?? '').trim())
-  const sections: PrintSection[] = shown.map((s) => {
-    const vals = r.data[s.key] ?? {}
+  const shown = defs
+    .map((s) => ({ ...s, fields: s.fields.filter((f) => !f.retired || answered(data[s.key]?.[f.key], f.kind)) }))
+    .filter((s) => !s.retired || s.fields.length || String(data[s.key]?.note ?? '').trim())
+  return shown.map((s) => {
+    const vals = data[s.key] ?? {}
     const blocks: PrintBlock[] = []
     if (s.matrix) {
       const m = s.matrix
@@ -205,14 +222,4 @@ export function buildOrgPrintModel(def: OrgReportDef, r: OrgReport): PrintModel 
     if (s.note) blocks.push({ kind: 'note', label: 'Note', value: String(vals.note ?? '') })
     return { title: s.title, hint: s.hint, blocks }
   })
-  return {
-    reportName: def.title,
-    short: def.short,
-    meta: [
-      ...(def.siteScoped && r.siteId ? [{ label: 'Campus', value: siteName(r.siteId) }] : []),
-      ...dateMeta(r.date),
-      { label: 'Completed by', value: r.completedBy },
-    ],
-    sections,
-  }
 }

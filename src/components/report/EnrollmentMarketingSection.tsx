@@ -1,5 +1,6 @@
 import { Megaphone } from 'lucide-react'
 import {
+  DDR_TITLES,
   ENROLLMENT_FIELDS,
   type CountNote,
   type EnrollmentMarketing,
@@ -21,7 +22,7 @@ export function EnrollmentMarketingSection({ value, onChange, disabled, onCopyFu
     onChange({ ...value, [key]: next })
 
   return (
-    <SectionCard title="Enrollment / Marketing" accent="coral" icon={<Megaphone className="size-4" />}>
+    <SectionCard title={DDR_TITLES.enrollment} accent="coral" icon={<Megaphone className="size-4" />}>
       <div className="divide-y divide-[var(--color-border)]">
         {ENROLLMENT_FIELDS.map((f) => (
           <CountNoteRow

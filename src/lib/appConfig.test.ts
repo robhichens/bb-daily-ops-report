@@ -3,11 +3,14 @@ vi.mock('./firebase', () => ({ auth: {}, db: {} })) // orgReports pulls in the c
 import {
   applyConfig, defaultConfig, describeChanges, finalizeKeys, isBuiltInField, makeKey, normalizeConfig, validateConfig, type DorConfig,
 } from './appConfig'
-import { ORG_DEFS } from './reportRegistry'
-import { CLASSROOMS, DIRECTORS, REGISTRATION_FEE, REQUEST_LISTS, ROOM_RATIOS, SITES, effectiveRatio, openingsFor, roomsFor, type OrgReport } from './schema'
+import { EXTRA_DEFS, EXTRA_SECTIONS, ORG_DEFS } from './reportRegistry'
+import {
+  CLASSROOMS, DDR_TITLES, DIRECTORS, ENROLLMENT_FIELDS, FDR_TEXT, FINANCE_AGENCIES, REGISTRATION_FEE, REQUEST_LISTS, ROOM_RATIOS, SITES, STAFF_FIELDS,
+  effectiveRatio, emptyFinanceReport, emptyReport, openingsFor, roomsFor, type OrgReport,
+} from './schema'
 import { emptyOrgReport } from './orgReports'
-import { buildOrgPrintModel } from './printModel'
-import { customTotals, cdrSummary } from './dashboardReports'
+import { buildDdrPrintModel, buildFdrPrintModel, buildOrgPrintModel } from './printModel'
+import { customTotals, customTotalsFrom, cdrSummary, fdrSummary } from './dashboardReports'
 import { orgFieldLabel } from './reportRegistry'
 
 afterEach(() => applyConfig(defaultConfig())) // every test starts from the code's defaults
@@ -208,5 +211,99 @@ describe('checks before saving', () => {
     edrSection(b, 'enrollment').fields.push({ key: 'walkIns', label: 'Walk-ins', kind: 'count' })
     expect(describeChanges(a, b)).toEqual(['Lions ratio 1:4 → 1:5', 'CDR Enrollment / IKS: “New leads” → “Fresh inquiries”', 'CDR Enrollment / IKS: added “Walk-ins”'])
     expect(describeChanges(a, defaultConfig())).toEqual([])
+  })
+})
+
+describe('DDR / FDR (Release 2)', () => {
+  const ddrText = (c: DorConfig, key: string) => c.text.ddr.find((t) => t.key === key)!
+
+  it('renames DDR headings, rows, hints and choices everywhere the form, print and dashboard read them', () => {
+    const c = defaultConfig()
+    ddrText(c, 'title.staff').label = 'Team'
+    ddrText(c, 'toursGiven').label = 'Tours given'
+    ddrText(c, 'callsInEmailsWeb').choices = ['Call', 'Email', 'Web', 'Walk-in', 'Facebook']
+    ddrText(c, 'rtoVacation').hint = 'Planned time off only'
+    applyConfig(normalizeConfig(c))
+    expect(DDR_TITLES.staff).toBe('Team')
+    expect(ENROLLMENT_FIELDS.find((f) => f.key === 'toursGiven')!.label).toBe('Tours given')
+    expect(ENROLLMENT_FIELDS.find((f) => f.key === 'callsInEmailsWeb')!.itemFields!.find((x) => x.key === 'type')!.options).toContain('Facebook')
+    expect(STAFF_FIELDS.find((f) => f.key === 'rtoVacation')!.hint).toBe('Planned time off only')
+    const print = buildDdrPrintModel(emptyReport('crozet', '2026-11-19'))
+    expect(print.sections.map((s) => s.title)).toContain('Team')
+  })
+
+  it('only the code decides which wording exists; the Call-out/Late select is not offered', () => {
+    const c = normalizeConfig({ text: { ddr: [{ key: 'madeUp', label: 'x' }, { key: 'callOutsLate', label: 'Call outs', choices: ['A'] }] } })
+    expect(c.text.ddr.some((t) => t.key === 'madeUp')).toBe(false)
+    expect(ddrText(c, 'callOutsLate')).toMatchObject({ label: 'Call outs' })
+    expect(ddrText(c, 'callOutsLate').choices).toBeUndefined()
+    expect(normalizeConfig({ text: { ddr: [{ key: 'toursGiven', label: '   ' }] } }).text.ddr.find((t) => t.key === 'toursGiven')!.label).toBe('Number of Tours Given')
+  })
+
+  it('the comms goal setting now reaches the DDR goal pill and its hint', () => {
+    const c = defaultConfig()
+    c.numbers.commsDailyGoal = 12
+    applyConfig(c)
+    const comms = ENROLLMENT_FIELDS.find((f) => f.key === 'enrollmentCommsOut')!
+    expect(comms.goal).toBe(12)
+    expect(comms.hint).toMatch(/goal is 12/)
+  })
+
+  it('FDR wording and agencies', () => {
+    const c = defaultConfig()
+    c.text.fdr.find((t) => t.key === 'tuitionCharges')!.label = 'Tuition billed'
+    c.agencies = ['CCA', 'DSS', 'Head Start']
+    applyConfig(normalizeConfig(c))
+    expect(FDR_TEXT.tuitionCharges.label).toBe('Tuition billed')
+    expect(FINANCE_AGENCIES).toEqual(['CCA', 'DSS', 'Head Start'])
+    expect(describeChanges(defaultConfig(), c)).toEqual(['FDR: “Tuition Charges” → “Tuition billed”', 'FDR agencies → CCA, DSS, Head Start'])
+  })
+
+  it('extra DDR sections: on the form, printed, totalled on the dashboard, retire-safe', () => {
+    const c = defaultConfig()
+    c.reports.ddr.sections.push({ key: 'newSec', title: 'Safety', note: false, fields: [
+      { key: 'newField', label: 'Fire drill done?', kind: 'toggle' },
+      { key: 'newField2', label: 'Incident reports', kind: 'count' },
+    ] })
+    const saved = normalizeConfig(finalizeKeys(c, defaultConfig()))
+    expect(saved.reports.ddr.sections[0]).toMatchObject({ key: 'safety', fields: [{ key: 'fireDrillDone' }, { key: 'incidentReports' }] })
+    expect(validateConfig(saved)).toEqual([])
+    expect(describeChanges(defaultConfig(), saved)).toEqual(['DDR: section added — Safety'])
+    applyConfig(saved)
+    expect(EXTRA_SECTIONS.ddr.map((s) => s.key)).toEqual(['safety'])
+    expect(EXTRA_DEFS.ddr.sections).toBe(EXTRA_SECTIONS.ddr) // same array, updated in place
+
+    const r = { ...emptyReport('crozet', '2026-11-19'), status: 'submitted' as const, custom: { safety: { fireDrillDone: true, incidentReports: 2 } } }
+    const print = buildDdrPrintModel(r)
+    const titles = print.sections.map((s) => s.title)
+    expect(titles.indexOf('Safety')).toBe(titles.indexOf(DDR_TITLES.directorReport) - 1)
+    expect(customTotalsFrom('ddr', [r.custom, { safety: { incidentReports: 1 } }], [])).toMatchObject([
+      { label: 'Fire drill done?', kind: 'toggle', now: 1, filed: 2 },
+      { label: 'Incident reports', kind: 'count', now: 3, before: 0 },
+    ])
+
+    // retired: off the form + dashboard, still prints where answered
+    saved.reports.ddr.sections[0].fields[1].retired = true
+    applyConfig(normalizeConfig(saved))
+    expect(customTotalsFrom('ddr', [r.custom], []).map((t) => t.label)).toEqual(['Fire drill done?'])
+    expect(JSON.stringify(buildDdrPrintModel(r))).toContain('Incident reports')
+  })
+
+  it('extra FDR sections print after the locations and feed the FDR summary', () => {
+    const c = defaultConfig()
+    c.reports.fdr.sections.push({ key: 'payroll', title: 'Payroll', note: false, fields: [{ key: 'runs', label: 'Payroll run $', kind: 'dollar' }] })
+    applyConfig(normalizeConfig(c))
+    const r = { ...emptyFinanceReport('2026-11-19'), status: 'submitted' as const, custom: { payroll: { runs: 1500 } } }
+    expect(buildFdrPrintModel(r).sections.at(-1)!.title).toBe('Payroll')
+    expect(fdrSummary([r], [], ['crozet']).custom).toMatchObject([{ label: 'Payroll run $', kind: 'dollar', now: 1500 }])
+  })
+
+  it('an empty extra section or a blank row name blocks the save', () => {
+    const c = defaultConfig()
+    c.reports.fdr.sections.push({ key: 'x', title: 'Empty', note: false, fields: [] })
+    ddrText(c, 'title.labor').label = ''
+    const p = validateConfig(c)
+    expect(p).toContain('FDR “Empty”: add a field (or a note) or retire the section.')
+    expect(p).toContain('DDR: every heading and row needs a name.')
   })
 })

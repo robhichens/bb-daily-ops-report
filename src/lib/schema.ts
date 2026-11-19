@@ -97,7 +97,24 @@ export let REGISTRATION_FEE = 200;
 export function setNumberSettings(n: { registrationFee: number; commsDailyGoal: number }): void {
   REGISTRATION_FEE = n.registrationFee;
   ENROLLMENT_COMMS_DAILY_GOAL = n.commsDailyGoal;
+  // The DDR goal pill + its hint were captured at load; keep them in step.
+  const comms = ENROLLMENT_FIELDS.find((f) => f.key === 'enrollmentCommsOut');
+  if (comms) {
+    comms.goal = n.commsDailyGoal;
+    if (comms.hint) comms.hint = comms.hint.replace(/goal is \d+/i, (m) => m.replace(/\d+/, String(n.commsDailyGoal)));
+  }
 }
+
+/** DDR section headings (renamable on the Customize page; changed IN PLACE). */
+export const DDR_TITLES: Record<'header' | 'attendance' | 'labor' | 'enrollment' | 'staff' | 'packet' | 'directorReport', string> = {
+  header: 'Report Details',
+  attendance: 'Attendance',
+  labor: 'Labor',
+  enrollment: 'Enrollment / Marketing',
+  staff: 'Staff',
+  packet: 'Director Packet',
+  directorReport: 'Director Report on the Day',
+};
 
 // ---------------------------------------------------------------------------
 // Section shapes
@@ -234,6 +251,9 @@ export interface DailyOpsReport {
 
   qualityScore?: number;   // derived 0–100 (gamification.ts); written on every save
 
+  /** Answers to sections added on the Customize page: custom[section][field]. */
+  custom?: Record<string, Record<string, OrgFieldValue>>;
+
   status: 'draft' | 'submitted';
   submittedAt: string | null;
   createdAt: string;
@@ -360,8 +380,23 @@ export interface FinanceLocation {
   declinesRefunds: DeclineRefund[];
 }
 
-/** Agency dropdown options for Payment by Agency (plus a free-type "Other"). */
-export const FINANCE_AGENCIES = ['CCA', 'DSS', 'United Way', 'Foster'] as const;
+/** Agency suggestions for Payment by Agency (free-type allowed). Editable on the
+ *  Customize page — changed IN PLACE. */
+export const FINANCE_AGENCIES: string[] = ['CCA', 'DSS', 'United Way', 'Foster'];
+
+/** FDR wording (renamable on the Customize page; changed IN PLACE). Keys are fixed. */
+export const FDR_TEXT: Record<string, { label: string; hint?: string }> = {
+  billing: { label: 'Billing' },
+  tuitionCharges: { label: 'Tuition Charges', hint: 'Charged to the Procare ledger (prorate or full)' },
+  otherCharges: { label: 'Other Charges', hint: 'Reg / Enhancement / Late / CC-decline fees' },
+  credits: { label: 'Credits', hint: 'Any credits added to the ledger (subtracts from billing)' },
+  outstanding: { label: 'Tuition Money Outstanding (as of today)' },
+  deposits: { label: 'Deposits' },
+  paymentsByCheck: { label: 'Payment by Check' },
+  paymentsByAgency: { label: 'Payment by Agency' },
+  tuitionExpress: { label: 'Tuition Express', hint: 'daily totals' },
+  declinesRefunds: { label: 'Less Declines / Refunds', hint: 'subtracts from deposits' },
+};
 
 export interface FinanceReport {
   id: string;      // = date 'YYYY-MM-DD' (one per day)
@@ -370,6 +405,8 @@ export interface FinanceReport {
   weekOf: string;
   completedBy: string;
   locations: Record<SiteId, FinanceLocation>;
+  /** Answers to sections added on the Customize page: custom[section][field]. */
+  custom?: Record<string, Record<string, OrgFieldValue>>;
   status: 'draft' | 'submitted';
   submittedAt: string | null;
   createdAt: string;

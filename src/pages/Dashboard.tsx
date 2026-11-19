@@ -9,7 +9,7 @@ import { todayIso, addIsoDays, daysBetween, formatRange, formatShort } from '@/l
 import { subscribeRecentReports, subscribeReportsByRange } from '@/lib/reports'
 import { buildDashboardView, censusFromPoints, mergeOpeningsSources, sortWithdrawals, type DashboardView } from '@/lib/dashboard'
 import { headlinePoints, latestRollCalls, subscribeDdrHeadlines, subscribeDdrHeadlinesUpTo, subscribeOpeningsHeadline, subscribeRollCalls, type DdrHeadline, type OpeningsHeadline, type RollCallHeadline } from '@/lib/headlines'
-import { adrSummary, cdrSummary, fdrSummary } from '@/lib/dashboardReports'
+import { adrSummary, cdrSummary, customTotalsFrom, fdrSummary } from '@/lib/dashboardReports'
 import {
   subscribeDirectorView,
   DEFAULT_DIRECTOR_VIEW,
@@ -28,7 +28,7 @@ import { Link } from 'react-router-dom'
 import { Card } from '@/components/ui/card'
 import { DashboardSections } from '@/components/dashboard/DashboardSections'
 import { CensusPanel } from '@/components/dashboard/CensusPanel'
-import { AdrSection, CdrSection, FdrSection, ReportSection } from '@/components/dashboard/ReportSections'
+import { AdrSection, CdrSection, CustomCard, FdrSection, ReportSection } from '@/components/dashboard/ReportSections'
 import { PeriodPicker } from '@/components/dashboard/PeriodPicker'
 import { thisWeekPeriod, type Period } from '@/lib/period'
 import { DirectorViewConfig } from '@/components/dashboard/DirectorViewConfig'
@@ -134,6 +134,13 @@ export function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [has.ddr, admin, ddr.cur, ddr.prev, range.end, site, today, siteIds.join(), latestAdr])
 
+  // Fields added to the DDR on the Customize page (admins; the director view is curated).
+  const ddrCustom = useMemo(() => {
+    if (!has.ddr || !admin) return []
+    const pick = (rows: DailyOpsReport[]) => rows.filter((r) => r.status === 'submitted' && (site === 'all' || r.siteId === site)).map((r) => r.custom)
+    return customTotalsFrom('ddr', pick(ddr.cur), pick(ddr.prev))
+  }, [has.ddr, admin, ddr.cur, ddr.prev, site])
+
   const cdrData = useMemo(() => (has.cdr ? cdrSummary(cdr.cur, cdr.prev, scope) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [has.cdr, cdr.cur, cdr.prev, scope.join()])
@@ -169,6 +176,7 @@ export function Dashboard() {
   const ddrBody = view && (
     <>
       <DashboardSections view={view} sections={ddrSections} />
+      {admin && <CustomCard title="More from the DDR" items={ddrCustom} />}
       <ReportsTable rows={view.tableRows} />
     </>
   )
